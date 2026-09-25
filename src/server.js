@@ -142,10 +142,10 @@ async function handleProxyRequest(req, res) {
   }
 
   // All accounts failed
-  console.error(`${colors.red}[Req #${reqId}] ❌ All ${candidates.length} Google Pro accounts exhausted their quotas!${colors.reset}`);
+  console.error(`${colors.red}[Req #${reqId}] ❌ All ${candidates.length} Google accounts exhausted their quotas!${colors.reset}`);
   res.writeHead(429, { 'Content-Type': 'application/json' });
   return res.end(JSON.stringify({
-    error: 'All configured Google Pro accounts have temporarily exceeded rate limits. Please wait 1 minute.'
+    error: `All ${candidates.length} configured Google accounts have temporarily exceeded rate limits. Please wait 1 minute.`
   }));
 }
 
@@ -155,14 +155,14 @@ server.listen(CONFIG.PORT, CONFIG.HOST, () => {
   const accounts = loadAccounts();
   console.log(`
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════${colors.reset}
-${colors.bold}${colors.green}  🚀 Antigravity 4-Account Harness & Shield is RUNNING${colors.reset}
+${colors.bold}${colors.green}  🚀 Antigravity Multi-Account Harness & Shield is RUNNING${colors.reset}
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════${colors.reset}
-  ${colors.bold}• Proxy URL:${colors.reset}      http://${CONFIG.HOST}:${CONFIG.PORT}
-  ${colors.bold}• Loaded Accounts:${colors.reset} ${colors.magenta}${accounts.length}${colors.reset}
-  ${colors.bold}• Scheduling:${colors.reset}     Round-Robin + Smart 429 Failover
-  ${colors.bold}• Accounts:${colors.reset}
+  ${colors.bold}• Proxy URL:${colors.reset}       http://${CONFIG.HOST}:${CONFIG.PORT}
+  ${colors.bold}• Pooled Accounts:${colors.reset} ${colors.magenta}${accounts.length} active account(s)${colors.reset}
+  ${colors.bold}• Scheduling:${colors.reset}      Dynamic Round-Robin + Instant 429 Failover
+  ${colors.bold}• Account Pool:${colors.reset}
 ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} (${a.name || 'Pro Account'})`).join('\n')}
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
-  ${colors.dim}Ready! Keep this running or launch Antigravity (Pro).app.${colors.reset}
+  ${colors.dim}Ready! Add unlimited accounts anytime via 'npm run add-account'.${colors.reset}
 `);
 });

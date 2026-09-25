@@ -21,7 +21,7 @@ on run
     end try
 
     if not isRunning then
-        display notification "Starting 4-Account Harness in background..." with title "Antigravity (Pro)"
+        display notification "Starting Multi-Account Harness in background..." with title "Antigravity (Pro)"
         do shell script "nohup /opt/homebrew/bin/node '$REPO_DIR/src/server.js' > /tmp/antigravity-harness.log 2>&1 &"
         repeat 15 times
             delay 0.3
@@ -35,7 +35,7 @@ on run
         end repeat
     end if
 
-    display notification "Connected to 4-Account Balance Harness (Port 8045)" with title "Antigravity (Pro) Active 🚀" subtitle "All 4 Google Pro accounts pooled"
+    display notification "Connected to Multi-Account Balance Harness (Port 8045)" with title "Antigravity (Pro) Active 🚀" subtitle "Pooled accounts & instant 429 failover active"
 
     do shell script "HTTPS_PROXY='http://127.0.0.1:8045' HTTP_PROXY='http://127.0.0.1:8045' open -a 'Antigravity'"
 end run

@@ -8,7 +8,7 @@
     "start": "node src/server.js",
     "add-account": "node src/add-account.js",
     "build:app": "bash scripts/build-mac-app.sh",
-    "terminals": "bash scripts/start-4-terminals.sh"
+    "terminals": "bash scripts/start-terminals.sh"
   },
   "keywords": [
     "antigravity",
