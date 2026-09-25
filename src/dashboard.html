@@ -3,17 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Antigravity Harness — Neural Multi-Account Hub</title>
+  <title>Antigravity Enterprise Hub</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
-      --bg: #06080d;
-      --card-bg: rgba(13, 19, 33, 0.7);
-      --card-border: rgba(56, 189, 248, 0.16);
-      --accent: #38bdf8;
-      --accent-glow: rgba(56, 189, 248, 0.4);
-      --purple: #c084fc;
+      --bg: #090d16;
+      --sidebar-bg: #0d121f;
+      --card-bg: rgba(18, 26, 44, 0.75);
+      --card-border: rgba(56, 189, 248, 0.12);
+      --accent: #0ea5e9;
+      --accent-glow: rgba(14, 165, 233, 0.35);
       --green: #10b981;
-      --yellow: #f59e0b;
+      --green-glow: rgba(16, 185, 129, 0.25);
+      --purple: #8b5cf6;
+      --purple-glow: rgba(139, 92, 246, 0.25);
+      --amber: #f59e0b;
       --red: #ef4444;
       --text: #f8fafc;
       --text-muted: #94a3b8;
@@ -23,763 +28,831 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(circle at 50% -10%, #0f172a 0%, var(--bg) 80%);
+      background: var(--bg);
       color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
-      min-height: 100vh;
-      overflow-x: hidden;
     }
 
-    /* Window Drag Header */
-    .titlebar {
-      height: 38px;
-      -webkit-app-region: drag;
+    /* Left Icon Sidebar */
+    .sidebar {
+      width: 72px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      gap: 12px;
+      z-index: 10;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .brand-icon:hover { transform: scale(1.05); }
+
+    .nav-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(6, 8, 13, 0.9);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: 0.5px;
       color: var(--text-dim);
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .nav-btn:hover {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+    .nav-btn.active {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.15);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+    .nav-btn.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      width: 3px;
+      height: 20px;
+      background: var(--accent);
+      border-radius: 0 4px 4px 0;
     }
 
-    .container {
-      max-width: 1020px;
-      margin: 0 auto;
-      padding: 24px;
+    .sidebar-bottom {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      cursor: pointer;
     }
 
-    /* Header */
-    .header {
+    /* Main Container */
+    .main-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
+      height: 64px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(13, 18, 31, 0.6);
+      backdrop-filter: blur(20px);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 24px;
+      padding: 0 28px;
+      -webkit-app-region: drag;
     }
 
-    .brand {
+    .top-left {
       display: flex;
       align-items: center;
       gap: 16px;
     }
-
-    .brand img {
-      width: 54px;
-      height: 54px;
-      border-radius: 14px;
-      box-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
-      border: 1px solid rgba(56, 189, 248, 0.3);
+    .page-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
-
-    .brand h1 {
-      font-size: 24px;
-      font-weight: 800;
-      background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: -0.5px;
-    }
-
-    .brand p {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .status-pill {
+    .status-indicator {
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 8px 16px;
-      border-radius: 30px;
-      font-size: 13px;
-      font-weight: 600;
+      gap: 8px;
+      font-size: 12px;
       color: var(--green);
+      background: rgba(16, 185, 129, 0.1);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(16, 185, 129, 0.25);
     }
-
-    .pulse {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
       background: var(--green);
-      box-shadow: 0 0 12px var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
       animation: pulse 2s infinite;
     }
-
     @keyframes pulse {
-      0% { transform: scale(0.9); opacity: 0.8; }
-      50% { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(0.9); opacity: 0.8; }
+      0%, 100% { opacity: 0.6; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.2); }
     }
 
-    /* Realtime Load Strip */
-    .load-banner {
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.6));
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      border-radius: 16px;
-      padding: 18px 22px;
-      margin-bottom: 24px;
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr;
-      gap: 20px;
+    .search-box {
+      width: 320px;
+      height: 38px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      display: flex;
       align-items: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      padding: 0 12px;
+      gap: 10px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .search-box input {
+      background: none;
+      border: none;
+      outline: none;
+      color: white;
+      width: 100%;
+      font-size: 13px;
+    }
+    .kbd-shortcut {
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-dim);
     }
 
-    .load-gauge-col {
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      -webkit-app-region: no-drag;
+    }
+    .btn {
+      height: 38px;
+      padding: 0 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .btn-copilot {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+    .btn-copilot:hover {
+      background: rgba(16, 185, 129, 0.22);
+      transform: translateY(-1px);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: white;
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-1px);
+    }
+
+    /* Content Scroll Area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 24px;
     }
 
-    .load-header {
+    /* Grid Layouts */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.3fr;
+      gap: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 20px;
+    }
+
+    /* Production Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
       display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .load-bar-track {
-      height: 10px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      overflow: hidden;
+      flex-direction: column;
       position: relative;
     }
-
-    .load-bar-fill {
-      height: 100%;
-      border-radius: 12px;
-      background: linear-gradient(90deg, #10b981, #38bdf8, #a855f7);
-      transition: width 0.3s ease;
-    }
-
-    .load-stat-item {
+    .card-header {
       display: flex;
-      flex-direction: column;
-      gap: 3px;
-      border-left: 1px solid rgba(255, 255, 255, 0.08);
-      padding-left: 16px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-tools {
+      display: flex;
+      gap: 8px;
+      color: var(--text-dim);
+      font-size: 12px;
+      cursor: pointer;
     }
 
-    .load-stat-label {
+    /* Donut Chart Center Container */
+    .chart-container {
+      position: relative;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .chart-center-text {
+      position: absolute;
+      text-align: center;
+      pointer-events: none;
+    }
+    .chart-center-val {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: white;
+    }
+    .chart-center-sub {
       font-size: 11px;
       color: var(--text-dim);
       text-transform: uppercase;
       font-weight: 600;
-      letter-spacing: 0.5px;
     }
 
-    .load-stat-val {
-      font-size: 20px;
-      font-weight: 800;
-      color: white;
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 14px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
     }
 
-    /* Token Usage Cards Grid */
-    .token-grid {
+    /* Accounts Data Table */
+    .table-container {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .acc-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .acc-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .pill-green {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--green);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-amber {
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--amber);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Mini Progress Bar in Table */
+    .bar-wrap {
+      width: 90px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 8px;
+      background: var(--accent);
+    }
+
+    /* Realtime Telemetry Strip */
+    .telemetry-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 16px;
-      margin-bottom: 24px;
     }
-
-    .token-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 16px 18px;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-    }
-
-    .token-card-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      margin-bottom: 6px;
+    .telemetry-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 14px 16px;
       display: flex;
       align-items: center;
-      gap: 6px;
-    }
-
-    .token-card-val {
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-    }
-
-    .token-card-hint {
-      font-size: 11px;
-      color: var(--text-dim);
-      margin-top: 4px;
-    }
-
-    /* Actions Bar */
-    .actions-bar {
-      display: grid;
-      grid-template-columns: 2fr 1.5fr 1fr;
       gap: 14px;
-      margin-bottom: 28px;
     }
-
-    .btn {
+    .t-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      padding: 14px 20px;
+      font-size: 18px;
+    }
+
+    /* Terminal Console */
+    .terminal-box {
+      background: #05080f;
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      color: white;
-    }
-
-    .btn-launch {
-      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
-      box-shadow: 0 4px 20px rgba(2, 132, 199, 0.4);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-    }
-    .btn-launch:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(2, 132, 199, 0.6);
-    }
-
-    .btn-terminals {
-      background: rgba(30, 41, 59, 0.85);
-      border-color: rgba(56, 189, 248, 0.3);
-    }
-    .btn-terminals:hover {
-      background: rgba(51, 65, 85, 0.95);
-      transform: translateY(-2px);
-    }
-
-    .btn-add {
-      background: rgba(16, 185, 129, 0.12);
-      border-color: rgba(16, 185, 129, 0.35);
-      color: #34d399;
-    }
-    .btn-add:hover {
-      background: rgba(16, 185, 129, 0.22);
-      transform: translateY(-2px);
-    }
-
-    /* Section Headers */
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
-
-    .section-title {
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Account Cards Grid */
-    .accounts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-      gap: 16px;
-      margin-bottom: 28px;
-    }
-
-    .acc-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 18px;
-      backdrop-filter: blur(14px);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      transition: all 0.2s ease;
-    }
-
-    .acc-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-    }
-
-    .acc-card-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-    }
-
-    .acc-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: white;
-    }
-
-    .acc-email {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .status-tag {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .tag-ready { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .tag-cooling { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
-
-    /* Quota Meter */
-    .quota-box { margin-top: 2px; }
-    .quota-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .quota-bar-track {
-      height: 8px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .quota-bar-fill {
-      height: 100%;
-      border-radius: 10px;
-      transition: width 0.4s ease;
-    }
-
-    .fill-good { background: linear-gradient(90deg, #10b981, #38bdf8); }
-    .fill-med { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-    .fill-low { background: linear-gradient(90deg, #ef4444, #f87171); }
-
-    /* Token Usage Matrix for Each Account */
-    .acc-token-breakdown {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: 11px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
-    }
-
-    .t-item {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .t-label {
-      font-size: 10px;
-      color: var(--text-dim);
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .t-val {
-      font-weight: 700;
-      color: var(--text);
-    }
-
-    /* Cooldown Countdown Banner */
-    .cooldown-alert {
-      background: rgba(245, 158, 11, 0.12);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      padding: 6px 10px;
-      border-radius: 8px;
-      font-size: 11px;
-      color: var(--yellow);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* Stream Feed */
-    .stream-container {
-      background: #05070a;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 16px;
-      height: 180px;
+      height: 160px;
       overflow-y: auto;
+      padding: 14px;
       font-family: "SF Mono", Menlo, Consolas, monospace;
       font-size: 12px;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
     }
-
-    .stream-line {
+    .log-line {
       display: flex;
-      align-items: center;
       gap: 10px;
-      line-height: 1.5;
+      line-height: 1.4;
     }
-
-    .time-tag { color: var(--text-dim); }
-    .acc-tag { color: var(--accent); font-weight: 600; }
-    .ok-tag { color: var(--green); font-weight: 600; }
-    .token-tag { color: #a855f7; font-weight: 600; }
-    .warn-tag { color: var(--yellow); font-weight: 600; }
-    .save-tag { color: #c084fc; font-weight: 700; }
-
-    /* Footer */
-    .footer {
-      margin-top: 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: var(--text-dim);
-    }
+    .log-time { color: var(--text-dim); }
+    .log-acc { color: var(--accent); font-weight: 600; }
+    .log-success { color: var(--green); }
+    .log-failover { color: #c084fc; font-weight: 700; }
   </style>
 </head>
 <body>
-  <div class="titlebar">Antigravity Harness — Neural Multi-Account Hub</div>
-  
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <div class="brand">
-        <img src="/icon.png" alt="AI Chip Icon">
-        <div>
-          <h1>Antigravity Harness</h1>
-          <p>Real-Time Load Balancer, Token Telemetry & Quota Shield</p>
+
+  <!-- Left Icon Sidebar -->
+  <div class="sidebar">
+    <img src="/icon.png" class="brand-icon" alt="Logo">
+    <div class="nav-btn active" title="Dashboard"><i class="fa-solid fa-gauge-high"></i></div>
+    <div class="nav-btn" onclick="openTerminals()" title="Parallel Terminals"><i class="fa-solid fa-terminal"></i></div>
+    <div class="nav-btn" onclick="addAccount()" title="Accounts"><i class="fa-solid fa-users-gear"></i></div>
+    <div class="nav-btn" title="Model Router"><i class="fa-solid fa-network-wired"></i></div>
+    <div class="nav-btn" title="Analytics"><i class="fa-solid fa-chart-line"></i></div>
+    
+    <div class="sidebar-bottom">
+      <div class="nav-btn" title="Settings"><i class="fa-solid fa-gear"></i></div>
+      <img src="https://api.dicebear.com/7.x/bottts/svg?seed=harness" class="avatar" alt="Avatar">
+    </div>
+  </div>
+
+  <!-- Main View -->
+  <div class="main-wrapper">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="top-left">
+        <div class="page-title">Neural Harness Dashboard</div>
+        <div class="status-indicator">
+          <div class="pulse-dot"></div>
+          <span>Gateway 8045 Active</span>
         </div>
       </div>
-      <div class="status-pill">
-        <div class="pulse"></div>
-        <span id="gateway-status">Gateway 8045 Active</span>
+
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" placeholder="Search accounts, model logs, prompts...">
+        <span class="kbd-shortcut">⌘K</span>
+      </div>
+
+      <div class="top-actions">
+        <button class="btn btn-copilot" onclick="launchDesktop()">
+          <i class="fa-solid fa-rocket"></i> Launch Antigravity
+        </button>
+        <button class="btn btn-primary" onclick="addAccount()">
+          <i class="fa-solid fa-plus"></i> Add Account
+        </button>
       </div>
     </div>
 
-    <!-- Real-Time Cluster Load Banner -->
-    <div class="load-banner">
-      <div class="load-gauge-col">
-        <div class="load-header">
-          <span>Real-Time Cluster Load</span>
-          <span id="load-pct-text" style="color: var(--green);">0% (Optimal)</span>
+    <!-- Scrollable Content Area -->
+    <div class="content-area">
+      <!-- Realtime Telemetry Stats -->
+      <div class="telemetry-row">
+        <div class="telemetry-card">
+          <div class="t-icon" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9;">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Total Requests</div>
+            <div style="font-size: 20px; font-weight: 800;" id="m-requests">0</div>
+          </div>
         </div>
-        <div class="load-bar-track">
-          <div class="load-bar-fill" id="load-bar-fill" style="width: 5%;"></div>
+
+        <div class="telemetry-card">
+          <div class="t-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Failovers Saved</div>
+            <div style="font-size: 20px; font-weight: 800; color: #c084fc;" id="m-failovers">0</div>
+          </div>
+        </div>
+
+        <div class="telemetry-card">
+          <div class="t-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+            <i class="fa-solid fa-database"></i>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Context Cache Hits</div>
+            <div style="font-size: 20px; font-weight: 800; color: #34d399;" id="m-cached">0</div>
+          </div>
+        </div>
+
+        <div class="telemetry-card">
+          <div class="t-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+            <i class="fa-solid fa-microchip"></i>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Cluster Load</div>
+            <div style="font-size: 20px; font-weight: 800; color: #fbbf24;" id="m-load">0%</div>
+          </div>
         </div>
       </div>
 
-      <div class="load-stat-item">
-        <div class="load-stat-label">⚡ In-Flight</div>
-        <div class="load-stat-val" id="stat-inflight" style="color: #38bdf8;">0</div>
+      <!-- Top Row: Impressions / Charts / User Overview -->
+      <div class="grid-3">
+        <!-- Chart 1: Token Distribution Donut -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-chart-pie" style="color: var(--accent);"></i> Token Distribution</div>
+            <div class="card-tools"><i class="fa-solid fa-ellipsis"></i></div>
+          </div>
+          <div class="chart-container">
+            <canvas id="tokenDonut"></canvas>
+            <div class="chart-center-text">
+              <div class="chart-center-val" id="total-tokens-center">0</div>
+              <div class="chart-center-sub">Total Tokens</div>
+            </div>
+          </div>
+          <div class="legend-row">
+            <div class="legend-item"><div class="legend-dot" style="background: #38bdf8;"></div> Input</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #10b981;"></div> Output</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #a855f7;"></div> Cache</div>
+          </div>
+        </div>
+
+        <!-- Chart 2: Account Traffic Donut -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-arrows-split-up-and-left" style="color: var(--green);"></i> Account Share</div>
+            <div class="card-tools"><i class="fa-solid fa-ellipsis"></i></div>
+          </div>
+          <div class="chart-container">
+            <canvas id="accountDonut"></canvas>
+            <div class="chart-center-text">
+              <div class="chart-center-val" id="total-acc-center">4</div>
+              <div class="chart-center-sub">Active Accounts</div>
+            </div>
+          </div>
+          <div class="legend-row" id="account-legend">
+            <!-- Injected -->
+          </div>
+        </div>
+
+        <!-- Chart 3: Live Velocity / Latency Wave -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-wave-square" style="color: var(--purple);"></i> Rolling Latency (ms)</div>
+            <span class="pill-green" id="avg-latency-pill">175 ms avg</span>
+          </div>
+          <div style="height: 180px; position: relative;">
+            <canvas id="latencyLine"></canvas>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-top: 10px;">
+            <span>Rolling 60s Window</span>
+            <span style="color: var(--green);">⚡ Zero-Jitter Dynamic Route</span>
+          </div>
+        </div>
       </div>
 
-      <div class="load-stat-item">
-        <div class="load-stat-label">🔄 Live RPM</div>
-        <div class="load-stat-val" id="stat-rpm" style="color: #10b981;">0 <span style="font-size: 11px; font-weight: normal; color: var(--text-dim);">req/m</span></div>
+      <!-- Second Row: Accounts Master Matrix & Live Traffic Console -->
+      <div class="grid-2">
+        <!-- Accounts Master Table -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-layer-group" style="color: var(--accent);"></i> Account Quota & Allocation Matrix</div>
+            <button class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 10px;" onclick="openTerminals()">
+              <i class="fa-solid fa-terminal"></i> 4x Harness
+            </button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Pro Quota</th>
+                  <th>Requests</th>
+                  <th>Cache Saved</th>
+                </tr>
+              </thead>
+              <tbody id="accounts-tbody">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Traffic Stream -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-satellite-dish" style="color: var(--green);"></i> Real-Time Request Stream</div>
+            <span style="font-size: 11px; color: var(--accent);"><i class="fa-solid fa-circle" style="font-size: 8px;"></i> Live SSE</span>
+          </div>
+          <div class="terminal-box" id="terminal-box">
+            <div class="log-line">
+              <span class="log-time">[SYSTEM]</span>
+              <span>Cluster Gateway active on <b>http://127.0.0.1:8045</b></span>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <div class="load-stat-item">
-        <div class="load-stat-label">📈 Live TPM</div>
-        <div class="load-stat-val" id="stat-tpm" style="color: #a855f7;">0 <span style="font-size: 11px; font-weight: normal; color: var(--text-dim);">tok/m</span></div>
-      </div>
-    </div>
-
-    <!-- Detailed Token Telemetry Row -->
-    <div class="token-grid">
-      <div class="token-card">
-        <div class="token-card-label">📥 Input Tokens (Prompt)</div>
-        <div class="token-card-val" id="tok-input" style="color: #38bdf8;">0</div>
-        <div class="token-card-hint">Total context & instructions</div>
-      </div>
-
-      <div class="token-card">
-        <div class="token-card-label">📤 Output Tokens (Generated)</div>
-        <div class="token-card-val" id="tok-output" style="color: #10b981;">0</div>
-        <div class="token-card-hint">Code diffs & agent reasoning</div>
-      </div>
-
-      <div class="token-card">
-        <div class="token-card-label">💾 Prompt Cache Hits</div>
-        <div class="token-card-val" id="tok-cached" style="color: #c084fc;">0</div>
-        <div class="token-card-hint" id="cache-savings-hint">Cached tokens reused</div>
-      </div>
-
-      <div class="token-card">
-        <div class="token-card-label">🛡️ Failovers Rescued</div>
-        <div class="token-card-val" id="stat-failovers" style="color: #f59e0b;">0</div>
-        <div class="token-card-hint">Zero freeze interruptions</div>
-      </div>
-    </div>
-
-    <!-- Action Controls -->
-    <div class="actions-bar">
-      <button class="btn btn-launch" onclick="launchDesktop()">
-        <span>🚀</span> Launch Antigravity Desktop
-      </button>
-
-      <button class="btn btn-terminals" onclick="openTerminals()">
-        <span>🖥️</span> Open Parallel Terminals (<span id="term-count-label">4</span>)
-      </button>
-
-      <button class="btn btn-add" onclick="addAccount()">
-        <span>➕</span> Add Google Account
-      </button>
-    </div>
-
-    <!-- Accounts Matrix -->
-    <div class="section-header">
-      <div class="section-title">
-        <span>Account Pool & Token Matrix (<span id="acc-count">0</span> Accounts)</span>
-      </div>
-      <div style="font-size: 12px; color: var(--text-dim);">
-        Quota Reset: <b style="color: var(--green);">Hourly Rolling Buffer</b>
-      </div>
-    </div>
-
-    <div class="accounts-grid" id="accounts-container">
-      <!-- Dynamic Account Cards Injected Here -->
-    </div>
-
-    <!-- Live Stream -->
-    <div class="section-header">
-      <div class="section-title">
-        <span>Live Telemetry & Traffic Feed</span>
-      </div>
-      <div style="font-size: 11px; color: var(--accent);">Real-Time Event Stream Active</div>
-    </div>
-
-    <div class="stream-container" id="stream-container">
-      <div class="stream-line">
-        <span class="time-tag">[INIT]</span>
-        <span>Harness Gateway online at <b>http://127.0.0.1:8045</b>. Token telemetry & realtime load tracking active.</span>
-      </div>
-    </div>
-
-    <div class="footer">
-      <span>Antigravity Dynamic Harness v1.1.0</span>
-      <span>Prompt Caching & Multi-Account Pooling Active</span>
     </div>
   </div>
 
   <script>
-    function formatNum(num) {
+    let tokenChart, accountChart, latencyChart;
+    let latencyHistory = [180, 165, 172, 190, 160, 175, 168, 174, 160, 185];
+
+    function formatK(num) {
       if (!num) return '0';
-      if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
       if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-      return num.toLocaleString();
+      return num;
     }
 
-    async function fetchStats() {
+    function initCharts() {
+      const tokenCtx = document.getElementById('tokenDonut').getContext('2d');
+      tokenChart = new Chart(tokenCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Input', 'Output', 'Cache'],
+          datasets: [{
+            data: [100, 50, 40],
+            backgroundColor: ['#38bdf8', '#10b981', '#a855f7'],
+            borderWidth: 0,
+            cutout: '76%'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      const accCtx = document.getElementById('accountDonut').getContext('2d');
+      accountChart = new Chart(accCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Acc 1', 'Acc 2', 'Acc 3', 'Acc 4'],
+          datasets: [{
+            data: [25, 25, 25, 25],
+            backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6'],
+            borderWidth: 0,
+            cutout: '76%'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      const latCtx = document.getElementById('latencyLine').getContext('2d');
+      latencyChart = new Chart(latCtx, {
+        type: 'line',
+        data: {
+          labels: Array(10).fill(''),
+          datasets: [{
+            data: latencyHistory,
+            borderColor: '#8b5cf6',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    async function fetchDashboard() {
       try {
         const res = await fetch('/api/stats');
         const data = await res.json();
-        
-        // Update Load Banner
-        const loadPct = data.global.loadPercentage || 0;
-        document.getElementById('load-bar-fill').style.width = Math.max(5, loadPct) + '%';
-        
-        let loadText = `${loadPct}% (Optimal)`;
-        let loadColor = 'var(--green)';
-        if (loadPct > 75) {
-          loadText = `${loadPct}% (High Load)`;
-          loadColor = 'var(--red)';
-        } else if (loadPct > 40) {
-          loadText = `${loadPct}% (Moderate)`;
-          loadColor = 'var(--yellow)';
-        }
-        document.getElementById('load-pct-text').innerText = loadText;
-        document.getElementById('load-pct-text').style.color = loadColor;
 
-        document.getElementById('stat-inflight').innerText = data.global.inFlightRequests || 0;
-        document.getElementById('stat-rpm').innerHTML = `${data.global.currentRpm || 0} <span style="font-size: 11px; font-weight: normal; color: var(--text-dim);">req/m</span>`;
-        document.getElementById('stat-tpm').innerHTML = `${formatNum(data.global.currentTpm || 0)} <span style="font-size: 11px; font-weight: normal; color: var(--text-dim);">tok/m</span>`;
+        // Update Top Telemetry
+        document.getElementById('m-requests').innerText = data.global.totalRequests || 0;
+        document.getElementById('m-failovers').innerText = data.global.failoversSaved || 0;
+        document.getElementById('m-cached').innerText = formatK(data.global.cachedTokens || 0);
+        document.getElementById('m-load').innerText = `${data.global.loadPercentage || 0}%`;
 
-        // Update Tokens
-        document.getElementById('tok-input').innerText = formatNum(data.global.inputTokens || 0);
-        document.getElementById('tok-output').innerText = formatNum(data.global.outputTokens || 0);
-        document.getElementById('tok-cached').innerText = formatNum(data.global.cachedTokens || 0);
-        document.getElementById('stat-failovers').innerText = data.global.failoversSaved || 0;
+        // Update Token Donut
+        const inTok = data.global.inputTokens || 0;
+        const outTok = data.global.outputTokens || 0;
+        const cacheTok = data.global.cachedTokens || 0;
+        const totalTok = inTok + outTok + cacheTok;
+        document.getElementById('total-tokens-center').innerText = formatK(totalTok);
 
-        const total = data.global.totalTokens || 0;
-        if (total > 0 && data.global.cachedTokens > 0) {
-          const savings = Math.round((data.global.cachedTokens / total) * 100);
-          document.getElementById('cache-savings-hint').innerText = `${savings}% context cache savings`;
+        if (tokenChart) {
+          tokenChart.data.datasets[0].data = [Math.max(1, inTok), Math.max(1, outTok), Math.max(1, cacheTok)];
+          tokenChart.update();
         }
 
+        // Render Table & Account Donut
         const accounts = Object.values(data.accounts || {});
-        document.getElementById('acc-count').innerText = accounts.length;
-        document.getElementById('term-count-label').innerText = accounts.length || 4;
+        document.getElementById('total-acc-center').innerText = accounts.length;
 
-        renderAccounts(accounts);
+        const tbody = document.getElementById('accounts-tbody');
+        tbody.innerHTML = accounts.map((acc, i) => {
+          const isCooling = acc.cooldownUntil && acc.cooldownUntil > Date.now();
+          const quota = acc.quotaRemainingPercent ?? 100;
+          return `
+            <tr>
+              <td>
+                <div class="acc-cell">
+                  <div class="acc-circle">${i+1}</div>
+                  <div>
+                    <div style="font-weight: 700; color: white;">${acc.name || 'Pro'}</div>
+                    <div style="font-size: 11px; color: var(--text-dim);">${acc.email}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="${isCooling ? 'pill-amber' : 'pill-green'}">
+                  ${isCooling ? '⏳ Cooling' : '🟢 Ready'}
+                </span>
+              </td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 12px; font-weight: 700;">${quota}%</span>
+                  <div class="bar-wrap">
+                    <div class="bar-fill" style="width: ${quota}%; background: ${quota < 25 ? '#ef4444' : quota < 60 ? '#f59e0b' : '#10b981'};"></div>
+                  </div>
+                </div>
+              </td>
+              <td><b>${acc.totalRequests || 0}</b></td>
+              <td><span style="color: #c084fc; font-weight: 600;">${formatK(acc.cachedTokens || 0)}</span></td>
+            </tr>
+          `;
+        }).join('');
+
+        if (accountChart) {
+          accountChart.data.labels = accounts.map(a => a.name || a.email.split('@')[0]);
+          accountChart.data.datasets[0].data = accounts.map(a => Math.max(1, a.totalRequests || 1));
+          accountChart.update();
+        }
+
       } catch (e) {
-        document.getElementById('gateway-status').innerText = 'Offline';
+        console.error(e);
       }
     }
 
-    function isCooling(acc) {
-      return acc.cooldownUntil && acc.cooldownUntil > Date.now();
-    }
+    function addLogLine(time, acc, status, latency, isFailover = false) {
+      const box = document.getElementById('terminal-box');
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      if (isFailover) {
+        line.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-failover">⚠️ 429 FAILOVER RESCUE</span> ➜ ${acc} instant fallback`;
+      } else {
+        line.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-acc">${acc}</span> ➜ <span class="log-success">${status}</span> <span style="color:#64748b">(${latency}ms)</span>`;
+      }
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
 
-    function getRemainingSeconds(acc) {
-      if (!isCooling(acc)) return 0;
-      return Math.max(0, Math.ceil((acc.cooldownUntil - Date.now()) / 1000));
-    }
-
-    function renderAccounts(accounts) {
-      const container = document.getElementById('accounts-container');
-      container.innerHTML = accounts.map((acc, i) => {
-        const cooling = isCooling(acc);
-        const remainingSec = getRemainingSeconds(acc);
-        const quota = acc.quotaRemainingPercent ?? 100;
-        
-        let fillClass = 'fill-good';
-        if (quota < 25) fillClass = 'fill-low';
-        else if (quota < 60) fillClass = 'fill-med';
-
-        return `
-          <div class="acc-card">
-            <div class="acc-card-top">
-              <div>
-                <div class="acc-title">${acc.name || 'Google Pro Account'}</div>
-                <div class="acc-email">${acc.email}</div>
-              </div>
-              <span class="status-tag ${cooling ? 'tag-cooling' : 'tag-ready'}">
-                ${cooling ? '⏳ Cooling' : '🟢 Ready'}
-              </span>
-            </div>
-
-            <!-- Quota Bar -->
-            <div class="quota-box">
-              <div class="quota-labels">
-                <span style="color: var(--text-muted);">Pro Quota Capacity</span>
-                <span style="color: ${quota > 50 ? 'var(--green)' : quota > 25 ? 'var(--yellow)' : 'var(--red)'};">
-                  ${quota}%
-                </span>
-              </div>
-              <div class="quota-bar-track">
-                <div class="quota-bar-fill ${fillClass}" style="width: ${quota}%;"></div>
-              </div>
-            </div>
-
-            <!-- Cooldown Banner if Active -->
-            ${cooling ? `
-              <div class="cooldown-alert">
-                <span>⚠️ Rate limit hit. Cooling down...</span>
-                <b id="countdown-${acc.id}">${remainingSec}s</b>
-              </div>
-            ` : ''}
-
-            <!-- Token Usage Matrix for Account -->
-            <div class="acc-token-breakdown">
-              <div class="t-item">
-                <span class="t-label">📥 Input</span>
-                <span class="t-val">${formatNum(acc.inputTokens || 0)}</span>
-              </div>
-              <div class="t-item">
-                <span class="t-label">📤 Output</span>
-                <span class="t-val">${formatNum(acc.outputTokens || 0)}</span>
-              </div>
-              <div class="t-item">
-                <span class="t-label">💾 Cache</span>
-                <span class="t-val" style="color: #c084fc;">${formatNum(acc.cachedTokens || 0)}</span>
-              </div>
-            </div>
-
-            <!-- Performance Stats -->
-            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); padding: 0 4px;">
-              <span>Reqs: <b style="color: white;">${acc.totalRequests || 0}</b></span>
-              <span>Avg Latency: <b style="color: #fbbf24;">${acc.avgLatency || 170}ms</b></span>
-              <span>In-Flight: <b style="color: #38bdf8;">${acc.inFlight || 0}</b></span>
-            </div>
-          </div>
-        `;
-      }).join('');
+      if (latencyChart && latency) {
+        latencyHistory.push(latency);
+        latencyHistory.shift();
+        latencyChart.data.datasets[0].data = latencyHistory;
+        latencyChart.update();
+      }
     }
 
     // Actions
-    async function launchDesktop() {
-      logLine('🚀 Launching Antigravity Desktop with pooled proxy attached...');
-      try {
-        await fetch('/api/launch-desktop', { method: 'POST' });
-        logLine('✅ Antigravity Desktop launched successfully!');
-      } catch (e) {
-        logLine('❌ Error launching Desktop: ' + e.message);
-      }
+    function launchDesktop() {
+      fetch('/api/launch-desktop', { method: 'POST' });
+      addLogLine(new Date().toLocaleTimeString(), 'SYSTEM', 'Antigravity Desktop Launched', 0);
+    }
+    function openTerminals() {
+      fetch('/api/open-terminals', { method: 'POST' });
+      addLogLine(new Date().toLocaleTimeString(), 'SYSTEM', '4x Parallel Terminals Opened', 0);
+    }
+    function addAccount() {
+      fetch('/api/add-account', { method: 'POST' });
+      addLogLine(new Date().toLocaleTimeString(), 'SYSTEM', 'OAuth Browser Flow Initiated', 0);
     }
 
-    async function openTerminals() {
-      logLine(`🖥️ Spawning parallel terminals configured with 4x harness...`);
-      try {
-        await fetch('/api/open-terminals', { method: 'POST' });
-        logLine('✅ Parallel terminal windows active!');
-      } catch (e) {
-        logLine('❌ Error opening terminals: ' + e.message);
-      }
-    }
-
-    async function addAccount() {
-      logLine('👉 Opening browser for Google OAuth authentication...');
-      try {
-        await fetch('/api/add-account', { method: 'POST' });
-        logLine('🌐 Follow prompts in the newly opened browser window.');
-      } catch (e) {
-        logLine('❌ Failed to launch auth: ' + e.message);
-      }
-    }
-
-    function logLine(msg) {
-      const container = document.getElementById('stream-container');
-      const time = new Date().toLocaleTimeString();
-      const div = document.createElement('div');
-      div.className = 'stream-line';
-      div.innerHTML = `<span class="time-tag">[${time}]</span> <span>${msg}</span>`;
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    // Server-Sent Events Listener
+    // SSE Stream
     const sse = new EventSource('/api/events');
     sse.onmessage = (e) => {
       try {
         const item = JSON.parse(e.data);
+        const time = new Date().toLocaleTimeString();
         if (item.type === 'req') {
-          const tokStr = item.tokens ? ` (${item.tokens.total} tok, in:${item.tokens.input}/out:${item.tokens.output})` : '';
-          logLine(`⚡ Req #${item.reqId} ➜ <span class="acc-tag">${item.email}</span> ➜ <span class="ok-tag">200 OK</span> (${item.duration}ms)<span class="token-tag">${tokStr}</span>`);
-          fetchStats();
+          addLogLine(time, item.email, `${item.status} OK`, item.duration);
+          fetchDashboard();
         } else if (item.type === 'quota_hit') {
-          logLine(`⚠️ [429 Quota Exhausted] <span class="warn-tag">${item.email}</span> hit limit! <span class="save-tag">Instant failover rescued prompt!</span>`);
-          fetchStats();
-        } else if (item.type === 'load_change') {
-          fetchStats();
+          addLogLine(time, item.email, '429', 0, true);
+          fetchDashboard();
         }
       } catch (err) {}
     };
 
-    fetchStats();
-    setInterval(fetchStats, 2000);
+    window.onload = () => {
+      initCharts();
+      fetchDashboard();
+      setInterval(fetchDashboard, 3000);
+    };
   </script>
 </body>
 </html>

@@ -13,7 +13,7 @@
     [self ensureServerRunning];
 
     // 2. Setup Native Window
-    NSRect frame = NSMakeRect(0, 0, 960, 680);
+    NSRect frame = NSMakeRect(0, 0, 1200, 820);
     NSWindowStyleMask style = NSWindowStyleMaskTitled | 
                               NSWindowStyleMaskClosable | 
                               NSWindowStyleMaskMiniaturizable | 
