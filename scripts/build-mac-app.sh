@@ -46,10 +46,17 @@ rm -f "$TMP_SCRIPT"
 
 # Copy official Antigravity app icon
 if [ -f "/Applications/Antigravity.app/Contents/Resources/icon.icns" ]; then
+    cp "/Applications/Antigravity.app/Contents/Resources/icon.icns" "$APP_DEST/Contents/Resources/icon.icns"
     cp "/Applications/Antigravity.app/Contents/Resources/icon.icns" "$APP_DEST/Contents/Resources/applet.icns"
+    rm -f "$APP_DEST/Contents/Resources/Assets.car"
+    if command -v fileicon >/dev/null 2>&1; then
+        fileicon set "$APP_DEST" "/Applications/Antigravity.app/Contents/Resources/icon.icns" >/dev/null 2>&1 || true
+    fi
 fi
 
 touch "$APP_DEST"
+killall Finder 2>/dev/null || true
+killall Dock 2>/dev/null || true
 
 echo "✅ Successfully built: $APP_DEST"
 echo "👉 You can now drag '$APP_DEST' to your Dock and double-click to launch anytime!"
