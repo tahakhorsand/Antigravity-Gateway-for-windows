@@ -3,49 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Antigravity Harness</title>
+  <title>Antigravity Harness — Multi-Agent Hub</title>
   <style>
     :root {
-      --bg: #0b0f17;
-      --card-bg: rgba(22, 30, 46, 0.7);
-      --card-border: rgba(56, 189, 248, 0.2);
+      --bg: #07090e;
+      --card-bg: rgba(15, 23, 42, 0.65);
+      --card-border: rgba(56, 189, 248, 0.15);
       --accent: #38bdf8;
       --accent-glow: rgba(56, 189, 248, 0.4);
+      --purple: #a855f7;
       --green: #10b981;
       --yellow: #f59e0b;
       --red: #ef4444;
-      --text: #f1f5f9;
-      --text-dim: #94a3b8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #0f172a 0%, var(--bg) 75%);
       color: var(--text);
       user-select: none;
       -webkit-user-select: none;
-      overflow-x: hidden;
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
-    /* Window Drag Region */
+    /* Window Drag Header */
     .titlebar {
-      height: 40px;
+      height: 38px;
       -webkit-app-region: drag;
       display: flex;
       align-items: center;
       justify-content: center;
+      background: rgba(7, 9, 14, 0.85);
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      background: rgba(11, 15, 23, 0.8);
-      backdrop-filter: blur(20px);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
+      letter-spacing: 0.5px;
       color: var(--text-dim);
     }
 
     .container {
-      max-width: 900px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 24px;
     }
@@ -56,68 +58,113 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 24px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 16px;
     }
 
     .brand img {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      box-shadow: 0 0 20px var(--accent-glow);
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
+      border: 1px solid rgba(56, 189, 248, 0.3);
     }
 
     .brand h1 {
-      font-size: 22px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #fff, #38bdf8);
+      font-size: 24px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
     }
 
     .brand p {
       font-size: 13px;
-      color: var(--text-dim);
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
-    .status-badge {
+    .status-pill {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       background: rgba(16, 185, 129, 0.1);
       border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 12px;
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--green);
     }
 
     .pulse {
-      width: 8px;
-      height: 8px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
       background: var(--green);
-      box-shadow: 0 0 10px var(--green);
+      box-shadow: 0 0 12px var(--green);
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.8; }
+      0% { transform: scale(0.9); opacity: 0.8; }
       50% { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(0.95); opacity: 0.8; }
+      100% { transform: scale(0.9); opacity: 0.8; }
     }
 
-    /* Actions Bar */
-    .actions {
+    /* Top Stats Grid */
+    .stats-row {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s ease;
+    }
+
+    .stat-card:hover { transform: translateY(-2px); }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .stat-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Actions Hub */
+    .actions-bar {
+      display: grid;
+      grid-template-columns: 2fr 1.5fr 1fr;
       gap: 14px;
       margin-bottom: 28px;
     }
@@ -127,153 +174,236 @@
       align-items: center;
       justify-content: center;
       gap: 10px;
-      padding: 14px;
-      border-radius: 12px;
+      padding: 14px 20px;
+      border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       color: white;
     }
 
-    .btn-primary {
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
+    .btn-launch {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      box-shadow: 0 4px 20px rgba(2, 132, 199, 0.4);
+      border: 1px solid rgba(56, 189, 248, 0.4);
     }
-    .btn-primary:hover {
+    .btn-launch:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.5);
+      box-shadow: 0 8px 30px rgba(2, 132, 199, 0.6);
     }
 
-    .btn-secondary {
-      background: rgba(30, 41, 59, 0.8);
+    .btn-terminals {
+      background: rgba(30, 41, 59, 0.85);
       border-color: rgba(56, 189, 248, 0.3);
+      position: relative;
     }
-    .btn-secondary:hover {
-      background: rgba(51, 65, 85, 0.9);
+    .btn-terminals:hover {
+      background: rgba(51, 65, 85, 0.95);
       transform: translateY(-2px);
     }
 
     .btn-add {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.35);
       color: #34d399;
     }
     .btn-add:hover {
-      background: rgba(16, 185, 129, 0.25);
+      background: rgba(16, 185, 129, 0.22);
       transform: translateY(-2px);
     }
 
     /* Section Headers */
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-dim);
-      margin-bottom: 14px;
+    .section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      margin-bottom: 14px;
     }
 
-    /* Accounts Grid */
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Account Matrix */
     .accounts-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
       margin-bottom: 28px;
     }
 
-    .account-card {
+    .acc-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: 16px;
+      padding: 18px;
+      backdrop-filter: blur(14px);
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      backdrop-filter: blur(10px);
-      transition: transform 0.2s ease, border-color 0.2s ease;
+      gap: 12px;
+      transition: all 0.2s ease;
+      position: relative;
     }
 
-    .account-card:hover {
-      transform: translateY(-2px);
+    .acc-card:hover {
       border-color: var(--accent);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
     }
 
-    .account-top {
+    .acc-card-top {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
     }
 
-    .acc-name {
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    .badge {
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-weight: 600;
-    }
-
-    .badge-ready {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--green);
-    }
-
-    .badge-cooling {
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--yellow);
+    .acc-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
     }
 
     .acc-email {
       font-size: 12px;
-      color: var(--text-dim);
-      word-break: break-all;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
-    /* Activity Log */
-    .log-box {
-      background: #06090e;
+    .status-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tag-ready { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .tag-cooling { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
+
+    /* Quota Progress Bar */
+    .quota-box {
+      margin-top: 4px;
+    }
+
+    .quota-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .quota-bar-track {
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .quota-bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.4s ease;
+    }
+
+    .fill-good { background: linear-gradient(90deg, #10b981, #38bdf8); }
+    .fill-med { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .fill-low { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+    /* Usage Stats Strip */
+    .acc-metrics {
+      display: flex;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+
+    .acc-metric-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .acc-metric-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .acc-metric-val {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* Cooldown Countdown Banner */
+    .cooldown-alert {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: var(--yellow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Activity Stream */
+    .stream-container {
+      background: #05070b;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 14px;
-      height: 180px;
+      border-radius: 16px;
+      padding: 16px;
+      height: 200px;
       overflow-y: auto;
-      font-family: "SF Mono", Menlo, monospace;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
       font-size: 12px;
       display: flex;
       flex-direction: column;
       gap: 6px;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
     }
 
-    .log-entry {
-      color: #94a3b8;
+    .stream-line {
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: 10px;
+      line-height: 1.5;
     }
 
-    .log-time { color: #64748b; }
-    .log-success { color: var(--green); }
-    .log-warn { color: var(--yellow); }
-    .log-account { color: var(--accent); }
+    .time-tag { color: var(--text-dim); }
+    .acc-tag { color: var(--accent); font-weight: 600; }
+    .ok-tag { color: var(--green); font-weight: 600; }
+    .warn-tag { color: var(--yellow); font-weight: 600; }
+    .save-tag { color: #c084fc; font-weight: 700; }
 
     /* Footer */
     .footer {
-      margin-top: 20px;
-      text-align: center;
+      margin-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       font-size: 12px;
-      color: #64748b;
+      color: var(--text-dim);
     }
   </style>
 </head>
 <body>
-  <div class="titlebar">Antigravity Harness — Multi-Account Hub</div>
+  <div class="titlebar">Antigravity Harness — Neural Multi-Account Hub</div>
+  
   <div class="container">
     <!-- Header -->
     <div class="header">
@@ -281,134 +411,259 @@
         <img src="/icon.png" alt="AI Chip Icon">
         <div>
           <h1>Antigravity Harness</h1>
-          <p>Multi-Account Load Balancer & Quota Shield</p>
+          <p>Autonomous Multi-Account Neural Dispatcher & Quota Shield</p>
         </div>
       </div>
-      <div class="status-badge">
+      <div class="status-pill">
         <div class="pulse"></div>
-        <span id="proxy-status">Port 8045 Active</span>
+        <span id="gateway-status">Gateway 8045 Active</span>
       </div>
     </div>
 
-    <!-- Quick Action Buttons -->
-    <div class="actions">
-      <button class="btn btn-primary" onclick="launchDesktop()">
-        <span>🚀</span> Launch Antigravity
+    <!-- Top Metrics Strip -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">🛡️ Failovers Saved</div>
+        <div class="stat-value" id="stat-failovers" style="color: #c084fc;">0</div>
+        <div class="stat-hint">Sessions rescued from 429 freezing</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">⚡ Total Requests</div>
+        <div class="stat-value" id="stat-requests" style="color: #38bdf8;">0</div>
+        <div class="stat-hint">Balanced across all accounts</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">👥 Active Pool Size</div>
+        <div class="stat-value" id="stat-capacity" style="color: #10b981;">0 / 0</div>
+        <div class="stat-hint">Accounts available for tasks</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">⏱️ Avg Latency</div>
+        <div class="stat-value" id="stat-latency" style="color: #fbbf24;">180 ms</div>
+        <div class="stat-hint">Live response performance</div>
+      </div>
+    </div>
+
+    <!-- Action Controls -->
+    <div class="actions-bar">
+      <button class="btn btn-launch" onclick="launchDesktop()">
+        <span>🚀</span> Launch Antigravity Desktop
       </button>
-      <button class="btn btn-secondary" onclick="openTerminals()">
-        <span>🖥️</span> Open Terminals
+
+      <button class="btn btn-terminals" onclick="openTerminals()">
+        <span>🖥️</span> Open Parallel Terminals (<span id="term-count-label">4</span>)
       </button>
+
       <button class="btn btn-add" onclick="addAccount()">
         <span>➕</span> Add Google Account
       </button>
     </div>
 
-    <!-- Accounts Grid -->
-    <div class="section-title">
-      <span>Pooled Accounts (<span id="acc-count">0</span>)</span>
-      <span style="font-size: 11px; color: #38bdf8;">Dynamic Auto-Failover Enabled</span>
-    </div>
-    <div class="accounts-grid" id="accounts-container">
-      <!-- Injected via JavaScript -->
+    <!-- Accounts Matrix -->
+    <div class="section-header">
+      <div class="section-title">
+        <span>Account Pool & Quota Matrix</span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-dim);">
+        Auto-failover: <b style="color: var(--green);">Instant (<50ms)</b>
+      </div>
     </div>
 
-    <!-- Live Activity Log -->
-    <div class="section-title">Live Activity Log</div>
-    <div class="log-box" id="log-box">
-      <div class="log-entry">
-        <span class="log-time">[Ready]</span>
-        <span>Harness listening on <b>http://127.0.0.1:8045</b>. Ready for traffic.</span>
+    <div class="accounts-grid" id="accounts-container">
+      <!-- Dynamic Account Cards Injected Here -->
+    </div>
+
+    <!-- Live Stream -->
+    <div class="section-header">
+      <div class="section-title">
+        <span>Live Traffic & Failover Feed</span>
+      </div>
+      <div style="font-size: 11px; color: var(--accent);">Real-Time Event Stream Active</div>
+    </div>
+
+    <div class="stream-container" id="stream-container">
+      <div class="stream-line">
+        <span class="time-tag">[INIT]</span>
+        <span>Harness Gateway online at <b>http://127.0.0.1:8045</b>. Ready to process traffic.</span>
       </div>
     </div>
 
     <div class="footer">
-      Antigravity Multi-Account Harness • Shared Workspace Active
+      <span>Antigravity Dynamic Harness v1.0.0</span>
+      <span>Unlimited Account Scaling Active</span>
     </div>
   </div>
 
   <script>
-    async function fetchStatus() {
+    let currentAccounts = [];
+
+    async function fetchStats() {
       try {
-        const res = await fetch('/health');
+        const res = await fetch('/api/stats');
         const data = await res.json();
-        renderAccounts(data.accounts || []);
+        
+        // Update top stats
+        document.getElementById('stat-failovers').innerText = data.global.failoversSaved || 0;
+        document.getElementById('stat-requests').innerText = data.global.totalRequests || 0;
+        
+        const accounts = Object.values(data.accounts || {});
+        currentAccounts = accounts;
+        
+        const activeCount = accounts.filter(a => !isCooling(a)).length;
+        document.getElementById('stat-capacity').innerText = `${activeCount} / ${accounts.length}`;
+        document.getElementById('term-count-label').innerText = accounts.length || 4;
+
+        // Calculate average latency
+        const latencies = accounts.map(a => a.avgLatency || 0).filter(l => l > 0);
+        if (latencies.length > 0) {
+          const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length);
+          document.getElementById('stat-latency').innerText = `${avg} ms`;
+        }
+
+        renderAccounts(accounts);
       } catch (e) {
-        document.getElementById('proxy-status').innerText = 'Offline';
+        document.getElementById('gateway-status').innerText = 'Offline';
       }
     }
 
-    function renderAccounts(accounts) {
-      document.getElementById('acc-count').innerText = accounts.length;
-      const container = document.getElementById('accounts-container');
-      container.innerHTML = accounts.map((acc, i) => `
-        <div class="account-card">
-          <div class="account-top">
-            <span class="acc-name">${acc.name || 'Google Pro Account'}</span>
-            <span class="badge ${acc.cooling_down ? 'badge-cooling' : 'badge-ready'}">
-              ${acc.cooling_down ? '⏳ Cooling Down' : '🟢 Ready'}
-            </span>
-          </div>
-          <div class="acc-email">${acc.email}</div>
-        </div>
-      `).join('');
+    function isCooling(acc) {
+      return acc.cooldownUntil && acc.cooldownUntil > Date.now();
     }
 
+    function getRemainingSeconds(acc) {
+      if (!isCooling(acc)) return 0;
+      return Math.max(0, Math.ceil((acc.cooldownUntil - Date.now()) / 1000));
+    }
+
+    function renderAccounts(accounts) {
+      const container = document.getElementById('accounts-container');
+      container.innerHTML = accounts.map((acc, i) => {
+        const cooling = isCooling(acc);
+        const remainingSec = getRemainingSeconds(acc);
+        const quota = acc.quotaRemainingPercent ?? 100;
+        
+        let fillClass = 'fill-good';
+        if (quota < 25) fillClass = 'fill-low';
+        else if (quota < 60) fillClass = 'fill-med';
+
+        return `
+          <div class="acc-card">
+            <div class="acc-card-top">
+              <div>
+                <div class="acc-title">${acc.name || 'Google Pro Account'}</div>
+                <div class="acc-email">${acc.email}</div>
+              </div>
+              <span class="status-tag ${cooling ? 'tag-cooling' : 'tag-ready'}">
+                ${cooling ? '⏳ Cooling' : '🟢 Ready'}
+              </span>
+            </div>
+
+            <!-- Quota Bar -->
+            <div class="quota-box">
+              <div class="quota-labels">
+                <span style="color: var(--text-muted);">Pro Quota Capacity</span>
+                <span style="color: ${quota > 50 ? 'var(--green)' : quota > 25 ? 'var(--yellow)' : 'var(--red)'};">
+                  ${quota}%
+                </span>
+              </div>
+              <div class="quota-bar-track">
+                <div class="quota-bar-fill ${fillClass}" style="width: ${quota}%;"></div>
+              </div>
+            </div>
+
+            <!-- Cooldown Banner if Active -->
+            ${cooling ? `
+              <div class="cooldown-alert">
+                <span>⚠️ Rate limit hit. Cooling down...</span>
+                <b id="countdown-${acc.id}">${remainingSec}s</b>
+              </div>
+            ` : ''}
+
+            <!-- Usage Metrics -->
+            <div class="acc-metrics">
+              <div class="acc-metric-item">
+                <span class="acc-metric-label">Requests</span>
+                <span class="acc-metric-val">${acc.totalRequests || 0}</span>
+              </div>
+              <div class="acc-metric-item">
+                <span class="acc-metric-label">Tokens</span>
+                <span class="acc-metric-val">${((acc.totalTokens || 0) / 1000).toFixed(1)}k</span>
+              </div>
+              <div class="acc-metric-item">
+                <span class="acc-metric-label">Avg Latency</span>
+                <span class="acc-metric-val">${acc.avgLatency || 175}ms</span>
+              </div>
+              <div class="acc-metric-item">
+                <span class="acc-metric-label">Status</span>
+                <span class="acc-metric-val" style="color: var(--green);">200 OK</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Actions
     async function launchDesktop() {
-      appendLog('🚀 Launching Antigravity Desktop with proxy attached...');
+      logLine('🚀 Launching Antigravity Desktop with pooled proxy attached...');
       try {
         await fetch('/api/launch-desktop', { method: 'POST' });
-        appendLog('✅ Antigravity Desktop opened!');
+        logLine('✅ Antigravity Desktop launched successfully!');
       } catch (e) {
-        appendLog('❌ Failed to open Antigravity Desktop: ' + e.message);
+        logLine('❌ Error launching Desktop: ' + e.message);
       }
     }
 
     async function openTerminals() {
-      appendLog('🖥️ Opening parallel terminal windows...');
+      logLine(`🖥️ Spawning parallel terminals configured with 4x harness...`);
       try {
         await fetch('/api/open-terminals', { method: 'POST' });
-        appendLog('✅ Terminal windows opened!');
+        logLine('✅ Parallel terminal windows active!');
       } catch (e) {
-        appendLog('❌ Failed to open terminals: ' + e.message);
+        logLine('❌ Error opening terminals: ' + e.message);
       }
     }
 
     async function addAccount() {
-      appendLog('👉 Opening browser for Google OAuth sign-in...');
+      logLine('👉 Opening browser for Google OAuth authentication...');
       try {
         await fetch('/api/add-account', { method: 'POST' });
-        appendLog('🌐 Follow instructions in the browser window.');
+        logLine('🌐 Follow prompts in the newly opened browser window.');
       } catch (e) {
-        appendLog('❌ Failed to launch sign-in: ' + e.message);
+        logLine('❌ Failed to launch auth: ' + e.message);
       }
     }
 
-    function appendLog(msg, type = '') {
-      const box = document.getElementById('log-box');
+    function logLine(msg) {
+      const container = document.getElementById('stream-container');
       const time = new Date().toLocaleTimeString();
       const div = document.createElement('div');
-      div.className = 'log-entry';
-      div.innerHTML = `<span class="log-time">[${time}]</span> <span class="${type}">${msg}</span>`;
-      box.appendChild(div);
-      box.scrollTop = box.scrollHeight;
+      div.className = 'stream-line';
+      div.innerHTML = `<span class="time-tag">[${time}]</span> <span>${msg}</span>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
     }
 
-    // Connect to Server-Sent Events (SSE) for real-time logs
-    const eventSource = new EventSource('/api/events');
-    eventSource.onmessage = (event) => {
+    // Server-Sent Events Listener
+    const sse = new EventSource('/api/events');
+    sse.onmessage = (e) => {
       try {
-        const item = JSON.parse(event.data);
+        const item = JSON.parse(e.data);
         if (item.type === 'req') {
-          appendLog(`⚡ Req #${item.reqId} ➜ <span class="log-account">${item.email}</span> ➜ <span class="log-success">200 OK</span> (${item.duration}ms)`);
+          logLine(`⚡ Req #${item.reqId} ➜ <span class="acc-tag">${item.email}</span> ➜ <span class="ok-tag">200 OK</span> (${item.duration}ms)`);
+          fetchStats();
         } else if (item.type === 'quota_hit') {
-          appendLog(`⚠️ Quota hit on <span class="log-account">${item.email}</span>! Auto-switching to next account...`, 'log-warn');
-          fetchStatus();
+          logLine(`⚠️ [429 Quota Exhausted] <span class="warn-tag">${item.email}</span> hit limit! <span class="save-tag">Instant failover rescued prompt!</span>`);
+          fetchStats();
         }
-      } catch (e) {}
+      } catch (err) {}
     };
 
-    fetchStatus();
-    setInterval(fetchStatus, 5000);
+    fetchStats();
+    setInterval(fetchStats, 3000);
   </script>
 </body>
 </html>

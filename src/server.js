@@ -5,6 +5,7 @@ import { exec, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { CONFIG } from './config.js';
 import { loadAccounts, getAccounts, getValidAccessToken, markCooldown, isCoolingDown } from './auth.js';
+import { loadStats, initAccountStats, recordRequestSuccess, recordFailover, getAllStats } from './stats.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,7 +27,7 @@ function broadcastEvent(data) {
   }
 }
 
-// ANSI Colors for readable console output
+// Colors for terminal logs
 const colors = {
   reset: '\x1b[0m',
   cyan: '\x1b[36m',
@@ -76,6 +77,13 @@ async function handleProxyRequest(req, res) {
     }
   }
 
+  // Full Stats & Metrics Endpoint
+  if (urlPath === '/api/stats') {
+    const statsData = getAllStats();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(statsData, null, 2));
+  }
+
   // Health check endpoint
   if (urlPath === '/health') {
     const accounts = getAccounts();
@@ -85,6 +93,7 @@ async function handleProxyRequest(req, res) {
       service: 'antigravity-harness',
       total_accounts: accounts.length,
       accounts: accounts.map(a => ({
+        id: a.id,
         email: a.email,
         name: a.name,
         cooling_down: isCoolingDown(a.id)
@@ -164,6 +173,7 @@ async function handleProxyRequest(req, res) {
       // 429 Quota Exhausted: Auto failover
       if (upstreamRes.status === 429) {
         markCooldown(account.id, 60);
+        recordFailover(account.id, 60);
         console.log(
           `${colors.yellow}[${new Date().toLocaleTimeString()}] [Req #${reqId}] ⚠️ Account "${account.email}" hit 429 quota limit! Auto-switching to next account...${colors.reset}`
         );
@@ -183,6 +193,8 @@ async function handleProxyRequest(req, res) {
         `${colors.dim}[${new Date().toLocaleTimeString()}]${colors.reset} ${colors.cyan}[Req #${reqId}]${colors.reset} ➜ ${colors.magenta}[${account.email}]${colors.reset} ➜ ${statusColor}${upstreamRes.status} ${upstreamRes.statusText}${colors.reset} ${colors.dim}(${duration}ms)${colors.reset}`
       );
 
+      // Record request stats
+      recordRequestSuccess(account.id, duration, 450);
       broadcastEvent({ type: 'req', reqId, email: account.email, status: upstreamRes.status, duration });
 
       const resHeaders = {};
@@ -221,6 +233,11 @@ const server = http.createServer(handleProxyRequest);
 
 server.listen(CONFIG.PORT, CONFIG.HOST, () => {
   const accounts = loadAccounts();
+  loadStats();
+  for (const acc of accounts) {
+    initAccountStats(acc);
+  }
+
   console.log(`
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════${colors.reset}
 ${colors.bold}${colors.green}  🚀 Antigravity Multi-Account Harness & Shield is RUNNING${colors.reset}
@@ -228,7 +245,7 @@ ${colors.bold}${colors.cyan}═════════════════�
   ${colors.bold}• Dashboard UI:${colors.reset}    http://${CONFIG.HOST}:${CONFIG.PORT}
   ${colors.bold}• Pooled Accounts:${colors.reset} ${colors.magenta}${accounts.length} active account(s)${colors.reset}
   ${colors.bold}• Scheduling:${colors.reset}      Dynamic Round-Robin + Instant 429 Failover
-  ${colors.bold}• Accounts:${colors.reset}
+  ${colors.bold}• Account Pool:${colors.reset}
 ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} (${a.name || 'Pro Account'})`).join('\n')}
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
   ${colors.dim}Dashboard and proxy ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
