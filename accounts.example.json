@@ -1,0 +1,20 @@
+{
+  "accounts": [
+    {
+      "id": "account-1",
+      "email": "teammate1@example.com",
+      "name": "Teammate 1",
+      "refresh_token": "1//04_SAMPLE_REFRESH_TOKEN",
+      "access_token": "",
+      "expiry_timestamp": 0
+    },
+    {
+      "id": "account-2",
+      "email": "teammate2@example.com",
+      "name": "Teammate 2",
+      "refresh_token": "1//04_SAMPLE_REFRESH_TOKEN",
+      "access_token": "",
+      "expiry_timestamp": 0
+    }
+  ]
+}
