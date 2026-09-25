@@ -44,13 +44,14 @@ EOF
 osacompile -o "$APP_DEST" "$TMP_SCRIPT"
 rm -f "$TMP_SCRIPT"
 
-# Copy official Antigravity app icon
-if [ -f "/Applications/Antigravity.app/Contents/Resources/icon.icns" ]; then
-    cp "/Applications/Antigravity.app/Contents/Resources/icon.icns" "$APP_DEST/Contents/Resources/icon.icns"
-    cp "/Applications/Antigravity.app/Contents/Resources/icon.icns" "$APP_DEST/Contents/Resources/applet.icns"
+# Copy and set distinct 4-Agent Harness icon
+HARNESS_ICNS="$REPO_DIR/assets/harness_icon.icns"
+if [ -f "$HARNESS_ICNS" ]; then
+    cp "$HARNESS_ICNS" "$APP_DEST/Contents/Resources/icon.icns"
+    cp "$HARNESS_ICNS" "$APP_DEST/Contents/Resources/applet.icns"
     rm -f "$APP_DEST/Contents/Resources/Assets.car"
     if command -v fileicon >/dev/null 2>&1; then
-        fileicon set "$APP_DEST" "/Applications/Antigravity.app/Contents/Resources/icon.icns" >/dev/null 2>&1 || true
+        fileicon set "$APP_DEST" "$HARNESS_ICNS" >/dev/null 2>&1 || true
     fi
 fi
 
