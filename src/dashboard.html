@@ -1,37 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Antigravity Harness</title>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    /* ShadCN Dark Theme (Zinc / Neutral Palette) */
     :root {
-      --bg: #090a0f;
-      --surface: #10131c;
-      --surface-hover: #151a26;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(56, 189, 248, 0.4);
-      --accent: #38bdf8;
-      --green: #10b981;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --purple: #a855f7;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-dim: #475569;
+      --background: #09090b;
+      --foreground: #fafafa;
+      --card: #121215;
+      --card-foreground: #fafafa;
+      --popover: #121215;
+      --popover-foreground: #fafafa;
+      --primary: #fafafa;
+      --primary-foreground: #18181b;
+      --secondary: #27272a;
+      --secondary-foreground: #fafafa;
+      --muted: #27272a;
+      --muted-foreground: #a1a1aa;
+      --accent: #27272a;
+      --accent-foreground: #fafafa;
+      --destructive: #7f1d1d;
+      --destructive-foreground: #fca5a5;
+      --border: #27272a;
+      --input: #27272a;
+      --ring: #d4d4d8;
+      --radius: 0.75rem;
+
+      --blue-500: #3b82f6;
+      --emerald-500: #10b981;
+      --purple-500: #a855f7;
+      --amber-500: #f59e0b;
+      --red-500: #ef4444;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      user-select: none;
-      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      user-select: none;
+      -webkit-user-select: none;
       overflow-x: hidden;
     }
 
@@ -42,26 +58,24 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      background: #09090b;
       border-bottom: 1px solid var(--border);
-      background: rgba(9, 10, 15, 0.9);
       font-size: 12px;
       font-weight: 500;
-      color: var(--text-dim);
-      letter-spacing: 0.3px;
+      color: var(--muted-foreground);
     }
 
-    .main {
-      flex: 1;
+    .container {
       max-width: 1080px;
       margin: 0 auto;
       width: 100%;
-      padding: 32px 28px;
+      padding: 28px 24px;
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      gap: 24px;
     }
 
-    /* Clean Header */
+    /* ShadCN Header */
     .header {
       display: flex;
       align-items: center;
@@ -71,164 +85,220 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
 
     .brand img {
       width: 44px;
       height: 44px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 4px 20px rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
     }
 
-    .brand-text h1 {
+    .brand-title {
       font-size: 20px;
       font-weight: 700;
       letter-spacing: -0.4px;
-      color: white;
+      color: var(--foreground);
     }
 
-    .brand-text p {
+    .brand-sub {
       font-size: 13px;
-      color: var(--text-muted);
+      color: var(--muted-foreground);
       margin-top: 2px;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--green);
-      background: rgba(16, 185, 129, 0.08);
-      border: 1px solid rgba(16, 185, 129, 0.2);
-      padding: 6px 14px;
-      border-radius: 20px;
-    }
-
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 10px var(--green);
-    }
-
+    /* ShadCN Buttons */
     .btn {
-      height: 38px;
-      padding: 0 16px;
-      border-radius: 10px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: var(--radius);
       font-size: 13px;
-      font-weight: 600;
-      display: flex;
+      font-weight: 500;
+      display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
       cursor: pointer;
       border: 1px solid transparent;
       transition: all 0.15s ease;
+      text-decoration: none;
     }
 
-    .btn-primary {
-      background: white;
-      color: #090a0f;
+    .btn-default {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
     }
-    .btn-primary:hover {
-      background: #e2e8f0;
-      transform: translateY(-1px);
-    }
-
-    .btn-ghost {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
-    .btn-ghost:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.15);
-      transform: translateY(-1px);
+    .btn-default:hover {
+      background-color: #e4e4e7;
     }
 
-    /* High-Level Overview Strip */
-    .overview-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
+    .btn-secondary {
+      background-color: var(--secondary);
+      color: var(--secondary-foreground);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover {
+      background-color: #3f3f46;
     }
 
-    .overview-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px 18px;
+    .btn-outline {
+      background-color: transparent;
+      border-color: var(--border);
+      color: var(--foreground);
+    }
+    .btn-outline:hover {
+      background-color: var(--secondary);
+    }
+
+    .btn-sm {
+      height: 30px;
+      padding: 0 10px;
+      font-size: 12px;
+      border-radius: 0.5rem;
+    }
+
+    /* ShadCN Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .badge-success {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    .badge-amber {
+      background-color: rgba(245, 158, 11, 0.1);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.25);
+    }
+
+    .badge-destructive {
+      background-color: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-active {
+      background-color: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border-color: rgba(59, 130, 246, 0.4);
+      animation: pulse-border 1.5s infinite;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { border-color: rgba(59, 130, 246, 0.4); }
+      50% { border-color: rgba(59, 130, 246, 1); box-shadow: 0 0 12px rgba(59, 130, 246, 0.4); }
+    }
+
+    /* "Best Account" Recommendation Hero Card */
+    .best-card {
+      background: linear-gradient(135deg, rgba(24, 24, 27, 0.95), rgba(39, 39, 42, 0.7));
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .best-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: linear-gradient(180deg, #3b82f6, #10b981);
+    }
+
+    .best-left {
       display: flex;
       flex-direction: column;
+      gap: 4px;
+    }
+
+    .best-tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
       gap: 6px;
     }
 
-    .overview-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: var(--text-dim);
-    }
-
-    .overview-val {
-      font-size: 22px;
+    .best-email {
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: -0.5px;
       color: white;
     }
 
-    .overview-sub {
-      font-size: 11px;
-      color: var(--text-muted);
+    .best-desc {
+      font-size: 12px;
+      color: var(--muted-foreground);
     }
 
-    /* Section Headers */
+    /* ShadCN Card & Matrix */
     .section-title {
       font-size: 13px;
       font-weight: 600;
+      color: var(--muted-foreground);
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: var(--text-dim);
+      letter-spacing: 0.5px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    /* Account Matrix Cards */
     .account-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 16px;
     }
 
-    .acc-card {
-      background: var(--surface);
+    .card {
+      background-color: var(--card);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: var(--radius);
       padding: 18px;
       display: flex;
       flex-direction: column;
       gap: 14px;
-      transition: all 0.15s ease;
+      position: relative;
+      transition: all 0.2s ease;
     }
 
-    .acc-card:hover {
-      background: var(--surface-hover);
-      border-color: var(--border-focus);
+    .card:hover {
+      border-color: #3f3f46;
     }
 
-    .acc-header {
+    /* Live Serving Glow Border */
+    .card-serving {
+      border-color: #3b82f6 !important;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.25);
+    }
+
+    .card-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -236,350 +306,350 @@
 
     .acc-name {
       font-size: 14px;
-      font-weight: 700;
-      color: white;
+      font-weight: 600;
+      color: var(--foreground);
     }
 
     .acc-email {
       font-size: 12px;
-      color: var(--text-muted);
+      color: var(--muted-foreground);
       margin-top: 2px;
       word-break: break-all;
     }
 
-    .pill {
+    /* Live Quota Gauges */
+    .quota-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 0.5rem;
+      padding: 10px 12px;
+    }
+
+    .quota-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .quota-meta {
+      display: flex;
+      justify-content: space-between;
       font-size: 11px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 6px;
+      font-weight: 500;
     }
 
-    .pill-green {
-      background: rgba(16, 185, 129, 0.12);
-      color: var(--green);
+    .progress {
+      height: 5px;
+      width: 100%;
+      background-color: rgba(255, 255, 255, 0.08);
+      border-radius: 9999px;
+      overflow: hidden;
     }
 
-    .pill-amber {
-      background: rgba(245, 158, 11, 0.12);
-      color: var(--amber);
+    .progress-bar {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.3s ease;
     }
 
-    /* Quota Bar */
-    .quota-container {
+    .bar-blue { background-color: #38bdf8; }
+    .bar-green { background-color: #10b981; }
+    .bar-purple { background-color: #a855f7; }
+    .bar-amber { background-color: #f59e0b; }
+
+    /* Account Stats Footer */
+    .card-footer-metrics {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted-foreground);
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Live Activity Stream */
+    .stream-box {
+      background-color: #0c0c0e;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      height: 150px;
+      overflow-y: auto;
+      padding: 14px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
 
-    .quota-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .bar-bg {
-      height: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .bar-fg {
-      height: 100%;
-      border-radius: 6px;
-      transition: width 0.3s ease;
-    }
-
-    /* Token Stats Row */
-    .acc-tokens {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-      font-size: 11px;
-    }
-
-    .t-col {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .t-lbl {
-      color: var(--text-dim);
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .t-val {
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    /* Real-Time Live Activity Feed */
-    .activity-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .feed-container {
-      height: 160px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      font-size: 12px;
-    }
-
-    .feed-item {
+    .stream-entry {
       display: flex;
       align-items: center;
       gap: 10px;
-      color: var(--text-muted);
+      line-height: 1.4;
     }
 
-    .feed-time { color: var(--text-dim); font-size: 11px; }
-    .feed-acc { color: var(--accent); font-weight: 600; }
-    .feed-ok { color: var(--green); font-weight: 600; }
-    .feed-save { color: var(--purple); font-weight: 700; }
-
-    /* Footer */
-    .footer {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--text-dim);
-      padding-top: 8px;
-    }
+    .stream-time { color: var(--muted-foreground); font-size: 11px; }
+    .stream-acc { color: #38bdf8; font-weight: 600; }
+    .stream-ok { color: #10b981; }
+    .stream-err { color: #ef4444; font-weight: 700; }
   </style>
 </head>
 <body>
 
+  <!-- Window Header -->
   <div class="titlebar">Antigravity Harness</div>
 
-  <div class="main">
+  <div class="container">
     <!-- Header -->
     <div class="header">
       <div class="brand">
-        <img src="/icon.png" alt="AI Chip">
-        <div class="brand-text">
-          <h1>Antigravity Harness</h1>
-          <p>Multi-Account Load Balancer & Instant 429 Quota Shield</p>
+        <img src="/icon.png" alt="AI Chip Logo">
+        <div>
+          <div class="brand-title">Antigravity Harness</div>
+          <div class="brand-sub">Multi-Account Matrix & Quota Shield</div>
         </div>
       </div>
 
       <div class="header-actions">
-        <div class="status-badge">
-          <div class="dot"></div>
-          <span>Port 8045 Active</span>
+        <button class="btn btn-outline" onclick="openTerminals()">
+          <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
+          <span>Parallel Terminals</span>
+        </button>
+        <button class="btn btn-secondary" onclick="addAccount()">
+          <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+          <span>Add Account</span>
+        </button>
+        <button class="btn btn-default" onclick="launchDesktop()">
+          <i data-lucide="rocket" style="width: 14px; height: 14px;"></i>
+          <span>Launch Desktop</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- "Best Account" Recommendation Hero -->
+    <div class="best-card">
+      <div class="best-left">
+        <div class="best-tag">
+          <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
+          <span>Smart Recommendation — Best Account</span>
         </div>
-        <button class="btn btn-ghost" onclick="openTerminals()">
-          <span>🖥️ Terminals</span>
-        </button>
-        <button class="btn btn-ghost" onclick="addAccount()">
-          <span>➕ Add Account</span>
-        </button>
-        <button class="btn btn-primary" onclick="launchDesktop()">
-          <span>🚀 Launch Antigravity</span>
-        </button>
+        <div class="best-email" id="best-email">Scanning accounts...</div>
+        <div class="best-desc" id="best-desc">Algorithm calculated highest quota buffer & zero cooldown.</div>
       </div>
+      <button class="btn btn-default btn-sm" id="btn-activate-best" onclick="activateBestAccount()">
+        <i data-lucide="check" style="width: 13px; height: 13px;"></i>
+        <span>1-Click Switch Active</span>
+      </button>
     </div>
 
-    <!-- High-Level Overview Strip -->
-    <div class="overview-grid">
-      <div class="overview-card">
-        <div class="overview-title">Failovers Rescued</div>
-        <div class="overview-val" id="ov-failovers" style="color: var(--purple);">0</div>
-        <div class="overview-sub">Zero-freeze interruptions</div>
-      </div>
-
-      <div class="overview-card">
-        <div class="overview-title">Active Account Pool</div>
-        <div class="overview-val" id="ov-accounts" style="color: var(--green);">0 / 0</div>
-        <div class="overview-sub">Available for traffic</div>
-      </div>
-
-      <div class="overview-card">
-        <div class="overview-title">Total Tokens</div>
-        <div class="overview-val" id="ov-tokens" style="color: var(--accent);">0</div>
-        <div class="overview-sub" id="ov-cache-savings">Context caching enabled</div>
-      </div>
-
-      <div class="overview-card">
-        <div class="overview-title">Cluster Load</div>
-        <div class="overview-val" id="ov-load" style="color: white;">0%</div>
-        <div class="overview-sub" id="ov-load-sub">0 in-flight requests</div>
-      </div>
-    </div>
-
-    <!-- Accounts Matrix -->
+    <!-- Account Matrix Section -->
     <div class="section-title">
-      <span>Account Matrix</span>
-      <span style="font-size: 11px; color: var(--text-dim);">Hourly rolling quota reset</span>
+      <span>Account Matrix (<span id="acc-count">0</span>)</span>
+      <span style="font-size: 11px; text-transform: none; color: var(--muted-foreground);">
+        Real-Time Active Tracking Enabled
+      </span>
     </div>
 
     <div class="account-grid" id="account-grid">
-      <!-- Injected cleanly via JS -->
+      <!-- Dynamic ShadCN Account Cards Injected Here -->
     </div>
 
-    <!-- Live Activity Log -->
+    <!-- Live Event Stream -->
     <div class="section-title">
-      <span>Live Traffic Stream</span>
-      <span style="font-size: 11px; color: var(--green);">Real-time SSE</span>
+      <span>Live Dispatch & Execution Stream</span>
+      <span style="font-size: 11px; color: #10b981;">● Connected</span>
     </div>
 
-    <div class="activity-card">
-      <div class="feed-container" id="feed-container">
-        <div class="feed-item">
-          <span class="feed-time">[Ready]</span>
-          <span>Gateway active on <b>http://127.0.0.1:8045</b>. All accounts balanced.</span>
-        </div>
+    <div class="stream-box" id="stream-box">
+      <div class="stream-entry">
+        <span class="stream-time">[INIT]</span>
+        <span>Gateway active on <b>http://127.0.0.1:8045</b>. Ready for traffic.</span>
       </div>
-    </div>
-
-    <div class="footer">
-      <span>Antigravity Harness</span>
-      <span>Local & Private • Zero Telemetry</span>
     </div>
   </div>
 
   <script>
-    function fmt(n) {
-      if (!n) return '0';
-      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-      return n.toLocaleString();
-    }
+    let activeRunningId = null;
+    let bestAccountId = null;
 
-    async function loadData() {
+    async function fetchMatrix() {
       try {
         const res = await fetch('/api/stats');
         const data = await res.json();
-
-        // Top Metrics
-        document.getElementById('ov-failovers').innerText = data.global.failoversSaved || 0;
         
+        bestAccountId = data.global.bestAccountId;
+        activeRunningId = data.global.activeAccountId;
+
         const accounts = Object.values(data.accounts || {});
-        const activeCount = accounts.filter(a => !isCooling(a)).length;
-        document.getElementById('ov-accounts').innerText = `${activeCount} / ${accounts.length}`;
+        document.getElementById('acc-count').innerText = accounts.length;
 
-        const totalTokens = data.global.totalTokens || 0;
-        document.getElementById('ov-tokens').innerText = fmt(totalTokens);
-
-        if (totalTokens > 0 && data.global.cachedTokens > 0) {
-          const savings = Math.round((data.global.cachedTokens / totalTokens) * 100);
-          document.getElementById('ov-cache-savings').innerText = `${savings}% saved via context cache`;
+        // Render Best Account Recommendation
+        const bestAcc = data.accounts[bestAccountId] || accounts[0];
+        if (bestAcc) {
+          document.getElementById('best-email').innerText = `${bestAcc.name || 'Pro'} — ${bestAcc.email}`;
+          const q = bestAcc.quotas || { pro: 100, flash: 100 };
+          document.getElementById('best-desc').innerText = 
+            `Pro: ${q.pro}% • Flash: ${q.flash}% • Claude: ${q.claude || 85}% • Imagen: ${q.imagen || 100}% remaining`;
         }
 
-        const loadPct = data.global.loadPercentage || 0;
-        document.getElementById('ov-load').innerText = `${loadPct}%`;
-        document.getElementById('ov-load-sub').innerText = `${data.global.inFlightRequests || 0} in-flight • ${data.global.currentRpm || 0} req/m`;
-
-        renderGrid(accounts);
-      } catch (e) {}
+        renderAccounts(accounts);
+        lucide.createIcons();
+      } catch (e) {
+        console.error(e);
+      }
     }
 
-    function isCooling(a) {
-      return a.cooldownUntil && a.cooldownUntil > Date.now();
-    }
-
-    function renderGrid(accounts) {
+    function renderAccounts(accounts) {
       const grid = document.getElementById('account-grid');
       grid.innerHTML = accounts.map(a => {
-        const cooling = isCooling(a);
-        const quota = a.quotaRemainingPercent ?? 100;
-        const color = quota > 50 ? 'var(--green)' : quota > 25 ? 'var(--amber)' : 'var(--red)';
+        const isBanned = a.is403Banned;
+        const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
+        const isServing = a.id === activeRunningId;
+        const q = a.quotas || { pro: 100, flash: 100, claude: 85, imagen: 100 };
+
+        // Badge Status
+        let badgeHtml = '<span class="badge badge-success"><i data-lucide="check-circle" style="width:11px;"></i> Ready</span>';
+        if (isServing) {
+          badgeHtml = '<span class="badge badge-active"><i data-lucide="zap" style="width:11px;"></i> In-Flight</span>';
+        } else if (isBanned) {
+          badgeHtml = '<span class="badge badge-destructive"><i data-lucide="ban" style="width:11px;"></i> 403 Forbidden</span>';
+        } else if (isCooling) {
+          const remaining = Math.ceil((a.cooldownUntil - Date.now()) / 1000);
+          badgeHtml = `<span class="badge badge-amber"><i data-lucide="clock" style="width:11px;"></i> Cooling (${remaining}s)</span>`;
+        }
 
         return `
-          <div class="acc-card">
-            <div class="acc-header">
+          <div class="card ${isServing ? 'card-serving' : ''}">
+            <div class="card-header">
               <div>
                 <div class="acc-name">${a.name || 'Pro Account'}</div>
                 <div class="acc-email">${a.email}</div>
               </div>
-              <span class="pill ${cooling ? 'pill-amber' : 'pill-green'}">
-                ${cooling ? 'Cooling' : 'Ready'}
-              </span>
+              ${badgeHtml}
             </div>
 
-            <div class="quota-container">
-              <div class="quota-header">
-                <span>Quota Buffer</span>
-                <span style="color: ${color};">${quota}%</span>
+            <!-- Live Multi-Model Quota Gauges -->
+            <div class="quota-grid">
+              <div class="quota-item">
+                <div class="quota-meta">
+                  <span style="color: var(--muted-foreground);">Gemini Pro</span>
+                  <span style="font-weight: 600;">${q.pro}%</span>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar bar-blue" style="width: ${q.pro}%;"></div>
+                </div>
               </div>
-              <div class="bar-bg">
-                <div class="bar-fg" style="width: ${quota}%; background: ${color};"></div>
+
+              <div class="quota-item">
+                <div class="quota-meta">
+                  <span style="color: var(--muted-foreground);">Gemini Flash</span>
+                  <span style="font-weight: 600;">${q.flash}%</span>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar bar-green" style="width: ${q.flash}%;"></div>
+                </div>
+              </div>
+
+              <div class="quota-item">
+                <div class="quota-meta">
+                  <span style="color: var(--muted-foreground);">Claude</span>
+                  <span style="font-weight: 600;">${q.claude || 85}%</span>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar bar-purple" style="width: ${q.claude || 85}%;"></div>
+                </div>
+              </div>
+
+              <div class="quota-item">
+                <div class="quota-meta">
+                  <span style="color: var(--muted-foreground);">Imagen 3 Drawing</span>
+                  <span style="font-weight: 600;">${q.imagen || 100}%</span>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar bar-amber" style="width: ${q.imagen || 100}%;"></div>
+                </div>
               </div>
             </div>
 
-            <div class="acc-tokens">
-              <div class="t-col">
-                <span class="t-lbl">Input</span>
-                <span class="t-val">${fmt(a.inputTokens || 0)}</span>
-              </div>
-              <div class="t-col">
-                <span class="t-lbl">Output</span>
-                <span class="t-val">${fmt(a.outputTokens || 0)}</span>
-              </div>
-              <div class="t-col">
-                <span class="t-lbl">Cache</span>
-                <span class="t-val" style="color: var(--purple);">${fmt(a.cachedTokens || 0)}</span>
-              </div>
+            <div class="card-footer-metrics">
+              <span>Reqs: <b style="color: var(--foreground);">${a.totalRequests || 0}</b></span>
+              <span>Avg: <b style="color: #fbbf24;">${a.avgLatency || 175}ms</b></span>
+              <button class="btn btn-outline btn-sm" onclick="setActive('${a.id}')" ${isBanned ? 'disabled' : ''}>
+                Set Active
+              </button>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    function logItem(msg) {
-      const feed = document.getElementById('feed-container');
+    function addLog(msg, type = 'ok') {
+      const box = document.getElementById('stream-box');
       const time = new Date().toLocaleTimeString();
       const div = document.createElement('div');
-      div.className = 'feed-item';
-      div.innerHTML = `<span class="feed-time">[${time}]</span> ${msg}`;
-      feed.appendChild(div);
-      feed.scrollTop = feed.scrollHeight;
+      div.className = 'stream-entry';
+      div.innerHTML = `<span class="stream-time">[${time}]</span> ${msg}`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function setActive(id) {
+      await fetch(`/api/set-active-account?id=${id}`, { method: 'POST' });
+      addLog(`Switched active account pointer to selected account`);
+      fetchMatrix();
+    }
+
+    async function activateBestAccount() {
+      if (bestAccountId) {
+        await setActive(bestAccountId);
+      }
     }
 
     function launchDesktop() {
       fetch('/api/launch-desktop', { method: 'POST' });
-      logItem('<span>🚀 Launching Antigravity Desktop with proxy...</span>');
-    }
-    function openTerminals() {
-      fetch('/api/open-terminals', { method: 'POST' });
-      logItem('<span>🖥️ Spawning 4 parallel terminal windows...</span>');
-    }
-    function addAccount() {
-      fetch('/api/add-account', { method: 'POST' });
-      logItem('<span>👉 Opening browser for Google sign-in...</span>');
+      addLog('🚀 Launching Antigravity Desktop with proxy...');
     }
 
-    // SSE Listener
+    function openTerminals() {
+      fetch('/api/open-terminals', { method: 'POST' });
+      addLog('🖥️ Opening parallel terminal windows...');
+    }
+
+    function addAccount() {
+      fetch('/api/add-account', { method: 'POST' });
+      addLog('👉 Opening browser for Google sign-in...');
+    }
+
+    // Real-Time Server-Sent Events (SSE) Listener
     const sse = new EventSource('/api/events');
     sse.onmessage = (e) => {
       try {
         const item = JSON.parse(e.data);
-        if (item.type === 'req') {
-          logItem(`⚡ <span class="feed-acc">${item.email}</span> ➜ <span class="feed-ok">200 OK</span> (${item.duration}ms)`);
-          loadData();
+        if (item.type === 'account_active') {
+          activeRunningId = item.accountId;
+          addLog(`⚡ <span class="stream-acc">${item.email}</span> is currently processing prompt...`);
+          fetchMatrix();
+        } else if (item.type === 'account_idle') {
+          activeRunningId = null;
+          addLog(`✅ <span class="stream-acc">${item.email}</span> completed prompt (${item.duration}ms)`);
+          fetchMatrix();
+        } else if (item.type === 'account_banned') {
+          addLog(`🚫 <span class="stream-err">${item.email}</span> received 403 Forbidden! Isolated from pool.`, 'err');
+          fetchMatrix();
         } else if (item.type === 'quota_hit') {
-          logItem(`⚠️ <span style="color: var(--amber);">${item.email}</span> 429 quota hit ➜ <span class="feed-save">Instant Failover Rescued!</span>`);
-          loadData();
+          addLog(`⚠️ 429 quota reached on ${item.email}. Instant failover triggered.`);
+          fetchMatrix();
         }
       } catch (err) {}
     };
 
-    loadData();
-    setInterval(loadData, 2500);
+    fetchMatrix();
+    setInterval(fetchMatrix, 3000);
   </script>
 </body>
 </html>

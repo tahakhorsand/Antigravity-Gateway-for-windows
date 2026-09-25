@@ -11,6 +11,8 @@ import {
   recordRequestStart,
   recordRequestSuccess, 
   recordFailover, 
+  record403Banned,
+  setActiveAccount,
   getAllStats 
 } from './stats.js';
 
@@ -46,16 +48,24 @@ const colors = {
   bold: '\x1b[1m'
 };
 
-function getNextAccountCandidates(accounts) {
+function getNextAccountCandidates(accounts, statsData) {
   if (accounts.length === 0) return [];
   
+  // Filter out 403 banned accounts entirely!
+  const validAccounts = accounts.filter(a => {
+    const accStats = statsData.accounts[a.id];
+    return !accStats || !accStats.is403Banned;
+  });
+
+  if (validAccounts.length === 0) return [];
+
   const order = [];
-  for (let i = 0; i < accounts.length; i++) {
-    const idx = (roundRobinIndex + i) % accounts.length;
-    order.push(accounts[idx]);
+  for (let i = 0; i < validAccounts.length; i++) {
+    const idx = (roundRobinIndex + i) % validAccounts.length;
+    order.push(validAccounts[idx]);
   }
   
-  roundRobinIndex = (roundRobinIndex + 1) % accounts.length;
+  roundRobinIndex = (roundRobinIndex + 1) % validAccounts.length;
   
   const available = order.filter(a => !isCoolingDown(a.id));
   const cooling = order.filter(a => isCoolingDown(a.id));
@@ -66,7 +76,6 @@ function getNextAccountCandidates(accounts) {
 function parseTokenUsageFromBuffer(buffer, requestLength) {
   try {
     const text = buffer.toString('utf-8');
-    // Try to find usageMetadata in JSON
     const match = text.match(/"usageMetadata"\s*:\s*\{([^}]+)\}/);
     if (match) {
       const promptMatch = match[1].match(/"promptTokenCount"\s*:\s*(\d+)/);
@@ -85,7 +94,6 @@ function parseTokenUsageFromBuffer(buffer, requestLength) {
     }
   } catch (e) {}
 
-  // Fallback estimation based on character counts
   const estimatedInput = Math.max(20, Math.round(requestLength / 4));
   const estimatedOutput = Math.max(10, Math.round(buffer.length / 4));
   return {
@@ -124,24 +132,41 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify(statsData, null, 2));
   }
 
+  // 1-Click Set Active Account Endpoint
+  if (urlPath.startsWith('/api/set-active-account') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const accountId = query.get('id');
+    if (accountId) {
+      setActiveAccount(accountId);
+      broadcastEvent({ type: 'account_switch', accountId });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, activeId: accountId }));
+  }
+
   // Health check endpoint
   if (urlPath === '/health') {
     const accounts = getAccounts();
+    const statsData = getAllStats();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       status: 'ok',
       service: 'antigravity-harness',
       total_accounts: accounts.length,
-      accounts: accounts.map(a => ({
-        id: a.id,
-        email: a.email,
-        name: a.name,
-        cooling_down: isCoolingDown(a.id)
-      }))
+      accounts: accounts.map(a => {
+        const s = statsData.accounts[a.id];
+        return {
+          id: a.id,
+          email: a.email,
+          name: a.name,
+          is403Banned: s ? s.is403Banned : false,
+          cooling_down: isCoolingDown(a.id)
+        };
+      })
     }, null, 2));
   }
 
-  // Server-Sent Events for Live Dashboard Logs & Telemetry
+  // Server-Sent Events for Live Telemetry & Real-Time Tracking
   if (urlPath === '/api/events') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -185,20 +210,28 @@ async function handleProxyRequest(req, res) {
   const bodyBuffer = Buffer.concat(bodyChunks);
 
   const accounts = getAccounts();
-  if (accounts.length === 0) {
-    console.error(`${colors.red}[Req #${reqId}] ❌ No accounts configured in accounts.json! Run 'npm run add-account'${colors.reset}`);
+  const statsData = getAllStats();
+  const candidates = getNextAccountCandidates(accounts, statsData);
+
+  if (candidates.length === 0) {
+    console.error(`${colors.red}[Req #${reqId}] ❌ No valid accounts available (all banned or none configured)!${colors.reset}`);
     res.writeHead(503, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'No Google Pro accounts configured. Run npm run add-account' }));
+    return res.end(JSON.stringify({ error: 'No active Google Pro accounts available. All accounts may be 403 restricted.' }));
   }
 
-  const candidates = getNextAccountCandidates(accounts);
   const targetBaseUrl = CONFIG.UPSTREAM_BASE_URL;
 
   for (let attempt = 0; attempt < candidates.length; attempt++) {
     const account = candidates[attempt];
     try {
+      // 1. Mark account as actively running right now (Real-Time Tracker)
       recordRequestStart(account.id);
-      broadcastEvent({ type: 'load_change', inFlight: true, email: account.email });
+      broadcastEvent({ 
+        type: 'account_active', 
+        accountId: account.id, 
+        email: account.email,
+        reqId 
+      });
 
       const accessToken = await getValidAccessToken(account);
       const upstreamUrl = new URL(urlPath, targetBaseUrl).toString();
@@ -213,6 +246,20 @@ async function handleProxyRequest(req, res) {
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : bodyBuffer
       });
 
+      // 403 Forbidden Detection: Account banned / restricted!
+      if (upstreamRes.status === 403) {
+        record403Banned(account.id, '403 Forbidden - Access Denied');
+        console.error(
+          `${colors.red}[Req #${reqId}] 🚫 [403 FORBIDDEN DETECTED] Account "${account.email}" is restricted! Auto-skipping...${colors.reset}`
+        );
+        broadcastEvent({ 
+          type: 'account_banned', 
+          accountId: account.id, 
+          email: account.email 
+        });
+        continue;
+      }
+
       // 429 Quota Exhausted: Auto failover
       if (upstreamRes.status === 429) {
         markCooldown(account.id, 60);
@@ -220,7 +267,11 @@ async function handleProxyRequest(req, res) {
         console.log(
           `${colors.yellow}[${new Date().toLocaleTimeString()}] [Req #${reqId}] ⚠️ Account "${account.email}" hit 429 quota limit! Auto-switching to next account...${colors.reset}`
         );
-        broadcastEvent({ type: 'quota_hit', email: account.email });
+        broadcastEvent({ 
+          type: 'quota_hit', 
+          accountId: account.id, 
+          email: account.email 
+        });
         continue;
       }
 
@@ -245,7 +296,6 @@ async function handleProxyRequest(req, res) {
 
       res.writeHead(upstreamRes.status, resHeaders);
 
-      // Collect streamed output chunks to extract real usageMetadata
       const responseChunks = [];
       if (upstreamRes.body) {
         const reader = upstreamRes.body.getReader();
@@ -258,13 +308,19 @@ async function handleProxyRequest(req, res) {
       }
       res.end();
 
-      // Parse tokens and record success
       const fullResponseBuffer = Buffer.concat(responseChunks);
       const tokenUsage = parseTokenUsageFromBuffer(fullResponseBuffer, bodyBuffer.length);
-      recordRequestSuccess(account.id, duration, tokenUsage);
+      
+      // Determine model used from URL or header
+      let modelUsed = 'gemini-2.5-pro';
+      if (urlPath.includes('flash')) modelUsed = 'gemini-2.5-flash';
+      if (urlPath.includes('image')) modelUsed = 'imagen-3';
+
+      recordRequestSuccess(account.id, duration, tokenUsage, modelUsed);
 
       broadcastEvent({ 
-        type: 'req', 
+        type: 'account_idle',
+        accountId: account.id,
         reqId, 
         email: account.email, 
         status: upstreamRes.status, 
@@ -303,10 +359,10 @@ ${colors.bold}${colors.cyan}═════════════════�
   ${colors.bold}• Dashboard UI:${colors.reset}    http://${CONFIG.HOST}:${CONFIG.PORT}
   ${colors.bold}• Pooled Accounts:${colors.reset} ${colors.magenta}${accounts.length} active account(s)${colors.reset}
   ${colors.bold}• Scheduling:${colors.reset}      Dynamic Round-Robin + Instant 429 Failover
-  ${colors.bold}• Token Tracking:${colors.reset}  Input, Output, Prompt Cache & Real-time Load
+  ${colors.bold}• Quotas Tracked:${colors.reset}  Pro, Flash, Claude & Imagen 3
   ${colors.bold}• Accounts:${colors.reset}
 ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} (${a.name || 'Pro Account'})`).join('\n')}
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
-  ${colors.dim}Dashboard and proxy ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
+  ${colors.dim}Ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
 `);
 });
