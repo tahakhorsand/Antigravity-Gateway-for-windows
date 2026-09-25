@@ -2,11 +2,16 @@
 set -e
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DEST="/Applications/Antigravity (Pro).app"
+APP_NAME="Antigravity Harness"
+APP_DEST="/Applications/$APP_NAME.app"
+HARNESS_ICNS="$REPO_DIR/assets/harness_icon.icns"
 
-echo "🔨 Building Antigravity (Pro).app..."
+echo "🔨 Building '$APP_DEST'..."
 
-TMP_SCRIPT=$(mktemp /tmp/antigravity_launcher.XXXXXX.applescript)
+# Remove old bundle if exists
+rm -rf "$APP_DEST"
+
+TMP_SCRIPT=$(mktemp /tmp/antigravity_harness_launcher.XXXXXX.applescript)
 
 cat << EOF > "$TMP_SCRIPT"
 on run
@@ -21,7 +26,7 @@ on run
     end try
 
     if not isRunning then
-        display notification "Starting Multi-Account Harness in background..." with title "Antigravity (Pro)"
+        display notification "Starting Multi-Account Harness in background..." with title "Antigravity Harness"
         do shell script "nohup /opt/homebrew/bin/node '$REPO_DIR/src/server.js' > /tmp/antigravity-harness.log 2>&1 &"
         repeat 15 times
             delay 0.3
@@ -35,7 +40,7 @@ on run
         end repeat
     end if
 
-    display notification "Connected to Multi-Account Balance Harness (Port 8045)" with title "Antigravity (Pro) Active 🚀" subtitle "Pooled accounts & instant 429 failover active"
+    display notification "Connected to Multi-Account Balance Harness (Port 8045)" with title "Antigravity Harness Active 🚀" subtitle "Pooled accounts & instant 429 failover active"
 
     do shell script "HTTPS_PROXY='http://127.0.0.1:8045' HTTP_PROXY='http://127.0.0.1:8045' open -a 'Antigravity'"
 end run
@@ -44,20 +49,29 @@ EOF
 osacompile -o "$APP_DEST" "$TMP_SCRIPT"
 rm -f "$TMP_SCRIPT"
 
-# Copy and set distinct 4-Agent Harness icon
-HARNESS_ICNS="$REPO_DIR/assets/harness_icon.icns"
+# Configure Bundle Plist with unique bundle identifier and name
+plutil -replace CFBundleName -string "$APP_NAME" "$APP_DEST/Contents/Info.plist"
+plutil -replace CFBundleDisplayName -string "$APP_NAME" "$APP_DEST/Contents/Info.plist"
+plutil -replace CFBundleIdentifier -string "com.antigravity.harness.app" "$APP_DEST/Contents/Info.plist"
+plutil -replace CFBundleIconFile -string "applet" "$APP_DEST/Contents/Info.plist"
+
+# Copy custom AI Circuit Processor icon
 if [ -f "$HARNESS_ICNS" ]; then
-    cp "$HARNESS_ICNS" "$APP_DEST/Contents/Resources/icon.icns"
-    cp "$HARNESS_ICNS" "$APP_DEST/Contents/Resources/applet.icns"
+    cp -f "$HARNESS_ICNS" "$APP_DEST/Contents/Resources/applet.icns"
+    cp -f "$HARNESS_ICNS" "$APP_DEST/Contents/Resources/icon.icns"
     rm -f "$APP_DEST/Contents/Resources/Assets.car"
+    
     if command -v fileicon >/dev/null 2>&1; then
         fileicon set "$APP_DEST" "$HARNESS_ICNS" >/dev/null 2>&1 || true
     fi
 fi
 
 touch "$APP_DEST"
+touch "$APP_DEST/Contents/Info.plist"
+
+# Refresh macOS Finder & Dock caches
 killall Finder 2>/dev/null || true
 killall Dock 2>/dev/null || true
 
 echo "✅ Successfully built: $APP_DEST"
-echo "👉 You can now drag '$APP_DEST' to your Dock and double-click to launch anytime!"
+echo "👉 You can now find '$APP_NAME' in your /Applications folder with the new AI Chip icon!"

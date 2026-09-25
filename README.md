@@ -37,14 +37,14 @@ npm run add-account
 ## 🖥️ Using with Antigravity Desktop
 
 ### Option 1: 1-Click macOS Desktop App (Recommended)
-Build the native **Antigravity (Pro)** app for your `/Applications` folder:
+Build the native **Antigravity Harness** app for your `/Applications` folder:
 ```bash
 npm run build:app
 ```
 1. Open your Mac's `/Applications` folder.
-2. Drag **`Antigravity (Pro).app`** to your **Dock**.
+2. Drag **`Antigravity Harness.app`** to your **Dock**.
 3. Click it anytime you want to code!
-   * It displays a native notification: `Antigravity (Pro) Active 🚀`.
+   * It displays a native notification: `Antigravity Harness Active 🚀`.
    * It starts the harness in the background if it's not already running.
    * It launches Antigravity connected to all your pooled accounts.
 
