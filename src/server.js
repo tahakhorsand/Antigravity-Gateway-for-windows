@@ -5,7 +5,14 @@ import { exec, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { CONFIG } from './config.js';
 import { loadAccounts, getAccounts, getValidAccessToken, markCooldown, isCoolingDown } from './auth.js';
-import { loadStats, initAccountStats, recordRequestSuccess, recordFailover, getAllStats } from './stats.js';
+import { 
+  loadStats, 
+  initAccountStats, 
+  recordRequestStart,
+  recordRequestSuccess, 
+  recordFailover, 
+  getAllStats 
+} from './stats.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +63,39 @@ function getNextAccountCandidates(accounts) {
   return [...available, ...cooling];
 }
 
+function parseTokenUsageFromBuffer(buffer, requestLength) {
+  try {
+    const text = buffer.toString('utf-8');
+    // Try to find usageMetadata in JSON
+    const match = text.match(/"usageMetadata"\s*:\s*\{([^}]+)\}/);
+    if (match) {
+      const promptMatch = match[1].match(/"promptTokenCount"\s*:\s*(\d+)/);
+      const candMatch = match[1].match(/"candidatesTokenCount"\s*:\s*(\d+)/);
+      const cacheMatch = match[1].match(/"cachedContentTokenCount"\s*:\s*(\d+)/);
+      const totalMatch = match[1].match(/"totalTokenCount"\s*:\s*(\d+)/);
+
+      const input = promptMatch ? parseInt(promptMatch[1], 10) : 0;
+      const output = candMatch ? parseInt(candMatch[1], 10) : 0;
+      const cached = cacheMatch ? parseInt(cacheMatch[1], 10) : 0;
+      const total = totalMatch ? parseInt(totalMatch[1], 10) : (input + output + cached);
+
+      if (total > 0) {
+        return { input, output, cached, total };
+      }
+    }
+  } catch (e) {}
+
+  // Fallback estimation based on character counts
+  const estimatedInput = Math.max(20, Math.round(requestLength / 4));
+  const estimatedOutput = Math.max(10, Math.round(buffer.length / 4));
+  return {
+    input: estimatedInput,
+    output: estimatedOutput,
+    cached: 0,
+    total: estimatedInput + estimatedOutput
+  };
+}
+
 async function handleProxyRequest(req, res) {
   const reqId = ++requestCounter;
   const startTime = Date.now();
@@ -101,7 +141,7 @@ async function handleProxyRequest(req, res) {
     }, null, 2));
   }
 
-  // Server-Sent Events for Live Dashboard Logs
+  // Server-Sent Events for Live Dashboard Logs & Telemetry
   if (urlPath === '/api/events') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -157,6 +197,9 @@ async function handleProxyRequest(req, res) {
   for (let attempt = 0; attempt < candidates.length; attempt++) {
     const account = candidates[attempt];
     try {
+      recordRequestStart(account.id);
+      broadcastEvent({ type: 'load_change', inFlight: true, email: account.email });
+
       const accessToken = await getValidAccessToken(account);
       const upstreamUrl = new URL(urlPath, targetBaseUrl).toString();
 
@@ -193,10 +236,6 @@ async function handleProxyRequest(req, res) {
         `${colors.dim}[${new Date().toLocaleTimeString()}]${colors.reset} ${colors.cyan}[Req #${reqId}]${colors.reset} ➜ ${colors.magenta}[${account.email}]${colors.reset} ➜ ${statusColor}${upstreamRes.status} ${upstreamRes.statusText}${colors.reset} ${colors.dim}(${duration}ms)${colors.reset}`
       );
 
-      // Record request stats
-      recordRequestSuccess(account.id, duration, 450);
-      broadcastEvent({ type: 'req', reqId, email: account.email, status: upstreamRes.status, duration });
-
       const resHeaders = {};
       upstreamRes.headers.forEach((val, key) => {
         if (key.toLowerCase() !== 'content-encoding') {
@@ -206,15 +245,34 @@ async function handleProxyRequest(req, res) {
 
       res.writeHead(upstreamRes.status, resHeaders);
 
+      // Collect streamed output chunks to extract real usageMetadata
+      const responseChunks = [];
       if (upstreamRes.body) {
         const reader = upstreamRes.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          responseChunks.push(value);
           res.write(value);
         }
       }
-      return res.end();
+      res.end();
+
+      // Parse tokens and record success
+      const fullResponseBuffer = Buffer.concat(responseChunks);
+      const tokenUsage = parseTokenUsageFromBuffer(fullResponseBuffer, bodyBuffer.length);
+      recordRequestSuccess(account.id, duration, tokenUsage);
+
+      broadcastEvent({ 
+        type: 'req', 
+        reqId, 
+        email: account.email, 
+        status: upstreamRes.status, 
+        duration,
+        tokens: tokenUsage
+      });
+
+      return;
 
     } catch (err) {
       console.error(`${colors.red}[Req #${reqId}] Error on ${account.email}: ${err.message}${colors.reset}`);
@@ -245,7 +303,8 @@ ${colors.bold}${colors.cyan}═════════════════�
   ${colors.bold}• Dashboard UI:${colors.reset}    http://${CONFIG.HOST}:${CONFIG.PORT}
   ${colors.bold}• Pooled Accounts:${colors.reset} ${colors.magenta}${accounts.length} active account(s)${colors.reset}
   ${colors.bold}• Scheduling:${colors.reset}      Dynamic Round-Robin + Instant 429 Failover
-  ${colors.bold}• Account Pool:${colors.reset}
+  ${colors.bold}• Token Tracking:${colors.reset}  Input, Output, Prompt Cache & Real-time Load
+  ${colors.bold}• Accounts:${colors.reset}
 ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} (${a.name || 'Pro Account'})`).join('\n')}
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
   ${colors.dim}Dashboard and proxy ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
