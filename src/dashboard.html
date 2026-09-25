@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Harness</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --card-bg: rgba(22, 30, 46, 0.7);
+      --card-border: rgba(56, 189, 248, 0.2);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.4);
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* Window Drag Region */
+    .titlebar {
+      height: 40px;
+      -webkit-app-region: drag;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(11, 15, 23, 0.8);
+      backdrop-filter: blur(20px);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .brand h1 {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand p {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green);
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* Actions Bar */
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: white;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(30, 41, 59, 0.8);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+    .btn-secondary:hover {
+      background: rgba(51, 65, 85, 0.9);
+      transform: translateY(-2px);
+    }
+
+    .btn-add {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+    .btn-add:hover {
+      background: rgba(16, 185, 129, 0.25);
+      transform: translateY(-2px);
+    }
+
+    /* Section Headers */
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Accounts Grid */
+    .accounts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .account-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .account-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+
+    .account-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .acc-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .badge-ready {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+    }
+
+    .badge-cooling {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--yellow);
+    }
+
+    .acc-email {
+      font-size: 12px;
+      color: var(--text-dim);
+      word-break: break-all;
+    }
+
+    /* Activity Log */
+    .log-box {
+      background: #06090e;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px;
+      height: 180px;
+      overflow-y: auto;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-entry {
+      color: #94a3b8;
+      display: flex;
+      gap: 8px;
+    }
+
+    .log-time { color: #64748b; }
+    .log-success { color: var(--green); }
+    .log-warn { color: var(--yellow); }
+    .log-account { color: var(--accent); }
+
+    /* Footer */
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">Antigravity Harness — Multi-Account Hub</div>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <img src="/icon.png" alt="AI Chip Icon">
+        <div>
+          <h1>Antigravity Harness</h1>
+          <p>Multi-Account Load Balancer & Quota Shield</p>
+        </div>
+      </div>
+      <div class="status-badge">
+        <div class="pulse"></div>
+        <span id="proxy-status">Port 8045 Active</span>
+      </div>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="actions">
+      <button class="btn btn-primary" onclick="launchDesktop()">
+        <span>🚀</span> Launch Antigravity
+      </button>
+      <button class="btn btn-secondary" onclick="openTerminals()">
+        <span>🖥️</span> Open Terminals
+      </button>
+      <button class="btn btn-add" onclick="addAccount()">
+        <span>➕</span> Add Google Account
+      </button>
+    </div>
+
+    <!-- Accounts Grid -->
+    <div class="section-title">
+      <span>Pooled Accounts (<span id="acc-count">0</span>)</span>
+      <span style="font-size: 11px; color: #38bdf8;">Dynamic Auto-Failover Enabled</span>
+    </div>
+    <div class="accounts-grid" id="accounts-container">
+      <!-- Injected via JavaScript -->
+    </div>
+
+    <!-- Live Activity Log -->
+    <div class="section-title">Live Activity Log</div>
+    <div class="log-box" id="log-box">
+      <div class="log-entry">
+        <span class="log-time">[Ready]</span>
+        <span>Harness listening on <b>http://127.0.0.1:8045</b>. Ready for traffic.</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      Antigravity Multi-Account Harness • Shared Workspace Active
+    </div>
+  </div>
+
+  <script>
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/health');
+        const data = await res.json();
+        renderAccounts(data.accounts || []);
+      } catch (e) {
+        document.getElementById('proxy-status').innerText = 'Offline';
+      }
+    }
+
+    function renderAccounts(accounts) {
+      document.getElementById('acc-count').innerText = accounts.length;
+      const container = document.getElementById('accounts-container');
+      container.innerHTML = accounts.map((acc, i) => `
+        <div class="account-card">
+          <div class="account-top">
+            <span class="acc-name">${acc.name || 'Google Pro Account'}</span>
+            <span class="badge ${acc.cooling_down ? 'badge-cooling' : 'badge-ready'}">
+              ${acc.cooling_down ? '⏳ Cooling Down' : '🟢 Ready'}
+            </span>
+          </div>
+          <div class="acc-email">${acc.email}</div>
+        </div>
+      `).join('');
+    }
+
+    async function launchDesktop() {
+      appendLog('🚀 Launching Antigravity Desktop with proxy attached...');
+      try {
+        await fetch('/api/launch-desktop', { method: 'POST' });
+        appendLog('✅ Antigravity Desktop opened!');
+      } catch (e) {
+        appendLog('❌ Failed to open Antigravity Desktop: ' + e.message);
+      }
+    }
+
+    async function openTerminals() {
+      appendLog('🖥️ Opening parallel terminal windows...');
+      try {
+        await fetch('/api/open-terminals', { method: 'POST' });
+        appendLog('✅ Terminal windows opened!');
+      } catch (e) {
+        appendLog('❌ Failed to open terminals: ' + e.message);
+      }
+    }
+
+    async function addAccount() {
+      appendLog('👉 Opening browser for Google OAuth sign-in...');
+      try {
+        await fetch('/api/add-account', { method: 'POST' });
+        appendLog('🌐 Follow instructions in the browser window.');
+      } catch (e) {
+        appendLog('❌ Failed to launch sign-in: ' + e.message);
+      }
+    }
+
+    function appendLog(msg, type = '') {
+      const box = document.getElementById('log-box');
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span class="log-time">[${time}]</span> <span class="${type}">${msg}</span>`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    // Connect to Server-Sent Events (SSE) for real-time logs
+    const eventSource = new EventSource('/api/events');
+    eventSource.onmessage = (event) => {
+      try {
+        const item = JSON.parse(event.data);
+        if (item.type === 'req') {
+          appendLog(`⚡ Req #${item.reqId} ➜ <span class="log-account">${item.email}</span> ➜ <span class="log-success">200 OK</span> (${item.duration}ms)`);
+        } else if (item.type === 'quota_hit') {
+          appendLog(`⚠️ Quota hit on <span class="log-account">${item.email}</span>! Auto-switching to next account...`, 'log-warn');
+          fetchStatus();
+        }
+      } catch (e) {}
+    };
+
+    fetchStatus();
+    setInterval(fetchStatus, 5000);
+  </script>
+</body>
+</html>

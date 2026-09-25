@@ -1,9 +1,30 @@
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { exec, spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 import { CONFIG } from './config.js';
 import { loadAccounts, getAccounts, getValidAccessToken, markCooldown, isCoolingDown } from './auth.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DASHBOARD_PATH = path.resolve(__dirname, 'dashboard.html');
+const ICON_PATH = path.resolve(__dirname, '../assets/chip_ai_1024.png');
+
 let requestCounter = 0;
 let roundRobinIndex = 0;
+const eventSubscribers = new Set();
+
+function broadcastEvent(data) {
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of eventSubscribers) {
+    try {
+      client.write(payload);
+    } catch (e) {
+      eventSubscribers.delete(client);
+    }
+  }
+}
 
 // ANSI Colors for readable console output
 const colors = {
@@ -20,17 +41,14 @@ const colors = {
 function getNextAccountCandidates(accounts) {
   if (accounts.length === 0) return [];
   
-  // Build order starting from current roundRobinIndex
   const order = [];
   for (let i = 0; i < accounts.length; i++) {
     const idx = (roundRobinIndex + i) % accounts.length;
     order.push(accounts[idx]);
   }
   
-  // Advance pointer for next request
   roundRobinIndex = (roundRobinIndex + 1) % accounts.length;
   
-  // Prioritize accounts not in cooldown
   const available = order.filter(a => !isCoolingDown(a.id));
   const cooling = order.filter(a => isCoolingDown(a.id));
   
@@ -42,8 +60,24 @@ async function handleProxyRequest(req, res) {
   const startTime = Date.now();
   const urlPath = req.url;
 
+  // Serve Dashboard HTML
+  if (urlPath === '/' || urlPath === '/dashboard') {
+    if (fs.existsSync(DASHBOARD_PATH)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(fs.readFileSync(DASHBOARD_PATH));
+    }
+  }
+
+  // Serve AI Chip icon
+  if (urlPath === '/icon.png') {
+    if (fs.existsSync(ICON_PATH)) {
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      return res.end(fs.readFileSync(ICON_PATH));
+    }
+  }
+
   // Health check endpoint
-  if (urlPath === '/' || urlPath === '/health') {
+  if (urlPath === '/health') {
     const accounts = getAccounts();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
@@ -56,6 +90,42 @@ async function handleProxyRequest(req, res) {
         cooling_down: isCoolingDown(a.id)
       }))
     }, null, 2));
+  }
+
+  // Server-Sent Events for Live Dashboard Logs
+  if (urlPath === '/api/events') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    res.write(': connected\n\n');
+    eventSubscribers.add(res);
+    req.on('close', () => eventSubscribers.delete(res));
+    return;
+  }
+
+  // API Action: Launch Desktop App
+  if (urlPath === '/api/launch-desktop' && req.method === 'POST') {
+    exec('HTTPS_PROXY="http://127.0.0.1:8045" HTTP_PROXY="http://127.0.0.1:8045" open -a "Antigravity"');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // API Action: Open Parallel Terminals
+  if (urlPath === '/api/open-terminals' && req.method === 'POST') {
+    const scriptPath = path.resolve(__dirname, '../scripts/start-terminals.sh');
+    exec(`bash "${scriptPath}"`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // API Action: Add Account
+  if (urlPath === '/api/add-account' && req.method === 'POST') {
+    const addAccountPath = path.resolve(__dirname, 'add-account.js');
+    spawn('node', [addAccountPath], { detached: true, stdio: 'ignore' }).unref();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true }));
   }
 
   // Buffer request body
@@ -91,16 +161,16 @@ async function handleProxyRequest(req, res) {
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : bodyBuffer
       });
 
-      // 429 RESOURCE_EXHAUSTED / RATE_LIMIT: Catch and failover!
+      // 429 Quota Exhausted: Auto failover
       if (upstreamRes.status === 429) {
         markCooldown(account.id, 60);
         console.log(
           `${colors.yellow}[${new Date().toLocaleTimeString()}] [Req #${reqId}] ⚠️ Account "${account.email}" hit 429 quota limit! Auto-switching to next account...${colors.reset}`
         );
+        broadcastEvent({ type: 'quota_hit', email: account.email });
         continue;
       }
 
-      // If status is 401, force token refresh and try once more
       if (upstreamRes.status === 401 && attempt < candidates.length - 1) {
         account.access_token = '';
         account.expiry_timestamp = 0;
@@ -113,10 +183,10 @@ async function handleProxyRequest(req, res) {
         `${colors.dim}[${new Date().toLocaleTimeString()}]${colors.reset} ${colors.cyan}[Req #${reqId}]${colors.reset} ➜ ${colors.magenta}[${account.email}]${colors.reset} ➜ ${statusColor}${upstreamRes.status} ${upstreamRes.statusText}${colors.reset} ${colors.dim}(${duration}ms)${colors.reset}`
       );
 
-      // Forward response headers
+      broadcastEvent({ type: 'req', reqId, email: account.email, status: upstreamRes.status, duration });
+
       const resHeaders = {};
       upstreamRes.headers.forEach((val, key) => {
-        // Skip content-encoding if raw stream is forwarded
         if (key.toLowerCase() !== 'content-encoding') {
           resHeaders[key] = val;
         }
@@ -124,7 +194,6 @@ async function handleProxyRequest(req, res) {
 
       res.writeHead(upstreamRes.status, resHeaders);
 
-      // Stream response chunks straight back to Antigravity
       if (upstreamRes.body) {
         const reader = upstreamRes.body.getReader();
         while (true) {
@@ -141,7 +210,6 @@ async function handleProxyRequest(req, res) {
     }
   }
 
-  // All accounts failed
   console.error(`${colors.red}[Req #${reqId}] ❌ All ${candidates.length} Google accounts exhausted their quotas!${colors.reset}`);
   res.writeHead(429, { 'Content-Type': 'application/json' });
   return res.end(JSON.stringify({
@@ -157,12 +225,12 @@ server.listen(CONFIG.PORT, CONFIG.HOST, () => {
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════${colors.reset}
 ${colors.bold}${colors.green}  🚀 Antigravity Multi-Account Harness & Shield is RUNNING${colors.reset}
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════${colors.reset}
-  ${colors.bold}• Proxy URL:${colors.reset}       http://${CONFIG.HOST}:${CONFIG.PORT}
+  ${colors.bold}• Dashboard UI:${colors.reset}    http://${CONFIG.HOST}:${CONFIG.PORT}
   ${colors.bold}• Pooled Accounts:${colors.reset} ${colors.magenta}${accounts.length} active account(s)${colors.reset}
   ${colors.bold}• Scheduling:${colors.reset}      Dynamic Round-Robin + Instant 429 Failover
-  ${colors.bold}• Account Pool:${colors.reset}
+  ${colors.bold}• Accounts:${colors.reset}
 ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} (${a.name || 'Pro Account'})`).join('\n')}
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
-  ${colors.dim}Ready! Add unlimited accounts anytime via 'npm run add-account'.${colors.reset}
+  ${colors.dim}Dashboard and proxy ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
 `);
 });
