@@ -206,6 +206,18 @@
       animation: pulse-border 1.5s infinite;
     }
 
+    .badge-session {
+      background-color: rgba(14, 165, 233, 0.18);
+      color: #38bdf8;
+      border-color: rgba(14, 165, 233, 0.45);
+      font-weight: 700;
+    }
+
+    .card-session {
+      border-color: rgba(56, 189, 248, 0.45) !important;
+      background: linear-gradient(180deg, rgba(14, 165, 233, 0.05), rgba(18, 18, 21, 1));
+    }
+
     @keyframes pulse-border {
       0%, 100% { border-color: rgba(59, 130, 246, 0.4); }
       50% { border-color: rgba(59, 130, 246, 1); box-shadow: 0 0 12px rgba(59, 130, 246, 0.4); }
@@ -579,30 +591,66 @@
         const accounts = Object.values(data.accounts || {});
         document.getElementById('acc-count').innerText = accounts.length;
 
-        // Render Best Account Recommendation
+        // Render Active Antigravity Session & Recommendation
+        const activeSessionEmail = data.global.activeSessionEmail;
+        const activeSessionId = data.global.activeSessionAccountId;
+        const isGenerating = data.global.isSessionGenerating;
         const bestAcc = data.accounts[bestAccountId] || accounts[0];
-        if (bestAcc) {
+        const activeAcc = data.accounts[activeSessionId] || accounts.find(a => a.email.toLowerCase() === (activeSessionEmail || '').toLowerCase());
+
+        if (activeAcc) {
+          const statusText = isGenerating 
+            ? '⚡ Antigravity Prompt Active — Generating response right now' 
+            : 'Antigravity Session Active & Ready';
+          
+          document.getElementById('best-email').innerHTML = `
+            <span>${activeAcc.name || 'Pro Account'} — ${activeAcc.email}</span>
+            <span class="badge ${isGenerating ? 'badge-active' : 'badge-session'}" style="margin-left: 8px;">
+              <i data-lucide="${isGenerating ? 'zap' : 'radio'}" style="width:11px;"></i>
+              ${isGenerating ? '⚡ Generating' : 'Active Session'}
+            </span>
+          `;
+
+          if (bestAcc && bestAcc.id !== activeAcc.id) {
+            document.getElementById('best-desc').innerText = 
+              `${statusText}. Recommendation: 1-Click switch to ${bestAcc.name} (${bestAcc.email}) for ${bestAcc.geminiWeekly?.pct || 100}% full quota buffer.`;
+            const btn = document.getElementById('btn-activate-best');
+            btn.style.display = 'inline-flex';
+            btn.innerHTML = `
+              <i data-lucide="check" style="width: 13px; height: 13px;"></i>
+              <span>Switch to ${bestAcc.name.split(' ')[0]}</span>
+            `;
+          } else {
+            document.getElementById('best-desc').innerText = 
+              `${statusText}. Active account currently has the optimal quota availability (${activeAcc.geminiWeekly?.pct || 100}%).`;
+            document.getElementById('btn-activate-best').style.display = 'none';
+          }
+        } else if (bestAcc) {
           const gw = bestAcc.geminiWeekly?.pct ?? 100;
-          const g5 = bestAcc.gemini5h?.pct ?? 100;
-          const cw = bestAcc.claudeWeekly?.pct ?? 100;
           document.getElementById('best-email').innerText = `${bestAcc.name || 'Pro Account'} — ${bestAcc.email}`;
           document.getElementById('best-desc').innerText = 
-            `Live Limits: Weekly Gemini ${gw}% (${bestAcc.geminiWeekly?.resetText || 'Active'}) • 5-Hour ${g5}% • Claude ${cw}%`;
+            `Optimal Google Account: Weekly Gemini ${gw}% (${bestAcc.geminiWeekly?.resetText || 'Active'}) • 5-Hour ${bestAcc.gemini5h?.pct ?? 100}%`;
         }
 
-        renderAccounts(accounts);
+        renderAccounts(accounts, data);
         lucide.createIcons();
       } catch (e) {
         console.error(e);
       }
     }
 
-    function renderAccounts(accounts) {
+    function renderAccounts(accounts, data = { global: {} }) {
       const grid = document.getElementById('account-grid');
+      const activeSessionEmail = data.global?.activeSessionEmail;
+      const activeSessionId = data.global?.activeSessionAccountId;
+      const isGenerating = data.global?.isSessionGenerating;
+
       grid.innerHTML = accounts.map(a => {
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
         const isServing = a.id === activeRunningId;
+        const isActiveSession = a.id === activeSessionId || 
+          a.email.toLowerCase() === (activeSessionEmail || '').toLowerCase();
 
         const gw = a.geminiWeekly || { pct: 100, resetText: 'Active', desc: '' };
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active', desc: '' };
@@ -610,20 +658,27 @@
         const q = a.quotas || { pro: gw.pct, flash: gw.pct, claude: cw.pct, imagen: 100 };
 
         // Badge Status
-        let badgeHtml = '<span class="badge badge-success"><i data-lucide="check-circle" style="width:11px;"></i> Ready</span>';
-        if (isServing) {
-          badgeHtml = '<span class="badge badge-active"><i data-lucide="zap" style="width:11px;"></i> In-Flight</span>';
+        let badgeHtml = '';
+        if (isServing || (isActiveSession && isGenerating)) {
+          badgeHtml = '<span class="badge badge-active"><i data-lucide="zap" style="width:11px;"></i> ⚡ Generating</span>';
+        } else if (isActiveSession) {
+          badgeHtml = '<span class="badge badge-session"><i data-lucide="radio" style="width:11px;"></i> Active Session</span>';
         } else if (isBanned) {
           badgeHtml = '<span class="badge badge-destructive"><i data-lucide="ban" style="width:11px;"></i> 403 Forbidden</span>';
         } else if (isCooling) {
           const remaining = Math.ceil((a.cooldownUntil - Date.now()) / 1000);
           badgeHtml = `<span class="badge badge-amber"><i data-lucide="clock" style="width:11px;"></i> Cooling (${remaining}s)</span>`;
+        } else {
+          badgeHtml = '<span class="badge badge-success"><i data-lucide="check-circle" style="width:11px;"></i> Ready</span>';
         }
 
         const tierBadge = `<span class="badge badge-tier"><i data-lucide="shield-check" style="width:11px;"></i> ${a.subscriptionTier || 'PRO'}</span>`;
+        const cardClass = (isServing || (isActiveSession && isGenerating)) 
+          ? 'card-serving' 
+          : (isActiveSession ? 'card-session' : '');
 
         return `
-          <div class="card ${isServing ? 'card-serving' : ''}">
+          <div class="card ${cardClass}">
             <div class="card-header">
               <div>
                 <div class="acc-name">

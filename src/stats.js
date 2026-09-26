@@ -18,6 +18,10 @@ let stats = {
     totalTokens: 0,
     inFlightRequests: 0,
     activeAccountId: null,
+    activeSessionAccountId: null,
+    activeSessionEmail: null,
+    isSessionGenerating: false,
+    currentConversationId: null,
     bestAccountId: null,
     currentRpm: 0,
     currentTpm: 0,
@@ -278,8 +282,117 @@ function updateLoadMetrics() {
   stats.global.loadPercentage = Math.min(100, Math.round(concurrencyLoad + rpmLoad));
 }
 
-// Clean up expired cooldowns
+const GEMINI_DIR = path.resolve(process.env.HOME || '/Users/nabiaz', '.gemini');
+const GEMINI_ACCOUNTS_FILE = path.join(GEMINI_DIR, 'google_accounts.json');
+const GEMINI_CREDS_FILE = path.join(GEMINI_DIR, 'oauth_creds.json');
+const BRAIN_DIR = path.join(GEMINI_DIR, 'antigravity/brain');
+
+export function checkAntigravityLiveSession() {
+  try {
+    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
+      const activeEmail = (data.active || '').toLowerCase();
+      if (activeEmail) {
+        stats.global.activeSessionEmail = activeEmail;
+        for (const id in stats.accounts) {
+          if (stats.accounts[id].email.toLowerCase() === activeEmail) {
+            stats.global.activeSessionAccountId = id;
+            break;
+          }
+        }
+      }
+    }
+
+    // Check if any active Antigravity conversation is writing logs right now (< 5000ms)
+    let isCurrentlyGenerating = false;
+    let activeConvId = null;
+    const now = Date.now();
+
+    if (fs.existsSync(BRAIN_DIR)) {
+      const convs = fs.readdirSync(BRAIN_DIR);
+      for (const conv of convs) {
+        const logFile = path.join(BRAIN_DIR, conv, '.system_generated/logs/transcript.jsonl');
+        if (fs.existsSync(logFile)) {
+          const stat = fs.statSync(logFile);
+          if (now - stat.mtimeMs < 5000) {
+            isCurrentlyGenerating = true;
+            activeConvId = conv.slice(0, 8);
+            break;
+          }
+        }
+      }
+    }
+
+    stats.global.isSessionGenerating = isCurrentlyGenerating;
+    stats.global.currentConversationId = activeConvId;
+
+    const activeId = stats.global.activeSessionAccountId;
+    if (activeId && stats.accounts[activeId]) {
+      if (isCurrentlyGenerating) {
+        stats.global.inFlightRequests = Math.max(1, stats.global.inFlightRequests);
+        stats.global.activeAccountId = activeId;
+        stats.accounts[activeId].inFlight = 1;
+        stats.accounts[activeId].lastUsed = now;
+      } else {
+        if (stats.global.activeAccountId === activeId && stats.global.inFlightRequests <= 1) {
+          stats.global.inFlightRequests = 0;
+          stats.global.activeAccountId = null;
+          stats.accounts[activeId].inFlight = 0;
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+export function switchAntigravityActiveAccount(accountId, accountDetails) {
+  loadStats();
+  const acc = stats.accounts[accountId];
+  if (!acc || acc.is403Banned) return false;
+
+  stats.global.activeSessionAccountId = accountId;
+  stats.global.activeSessionEmail = acc.email;
+  stats.global.bestAccountId = accountId;
+
+  // 1. Update ~/.gemini/google_accounts.json
+  try {
+    let existingOld = [];
+    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
+      const curr = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
+      if (curr.active && curr.active !== acc.email) {
+        existingOld = Array.from(new Set([...(curr.old || []), curr.active]));
+      }
+    }
+    fs.writeFileSync(GEMINI_ACCOUNTS_FILE, JSON.stringify({
+      active: acc.email,
+      old: existingOld
+    }, null, 2));
+  } catch (e) {
+    console.error('Failed to update google_accounts.json:', e.message);
+  }
+
+  // 2. Update ~/.gemini/oauth_creds.json if account details provided
+  if (accountDetails && accountDetails.access_token) {
+    try {
+      const creds = {
+        access_token: accountDetails.access_token,
+        refresh_token: accountDetails.refresh_token,
+        token_type: 'Bearer',
+        expiry_date: accountDetails.expiry_timestamp ? accountDetails.expiry_timestamp * 1000 : Date.now() + 3600000,
+        scope: 'https://www.googleapis.com/auth/userinfo.email openid https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.profile'
+      };
+      fs.writeFileSync(GEMINI_CREDS_FILE, JSON.stringify(creds, null, 2));
+    } catch (e) {
+      console.error('Failed to update oauth_creds.json:', e.message);
+    }
+  }
+
+  saveStats();
+  return true;
+}
+
+// Clean up expired cooldowns & track live Antigravity sessions
 setInterval(() => {
+  checkAntigravityLiveSession();
   updateLoadMetrics();
   let changed = false;
   const now = Date.now();
@@ -294,10 +407,11 @@ setInterval(() => {
     computeBestAccount();
     saveStats();
   }
-}, 5000);
+}, 1500);
 
 export function getAllStats() {
   loadStats();
+  checkAntigravityLiveSession();
   computeBestAccount();
   updateLoadMetrics();
   return stats;

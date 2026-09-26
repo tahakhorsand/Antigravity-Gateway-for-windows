@@ -9,6 +9,7 @@ import {
   loadStats, 
   initAccountStats, 
   updateAccountLiveQuota,
+  switchAntigravityActiveAccount,
   recordRequestStart,
   recordRequestSuccess, 
   recordFailover, 
@@ -164,8 +165,15 @@ async function handleProxyRequest(req, res) {
     const query = new URL(req.url, 'http://localhost').searchParams;
     const accountId = query.get('id');
     if (accountId) {
+      const accounts = getAccounts();
+      const targetAcc = accounts.find(a => a.id === accountId);
+      switchAntigravityActiveAccount(accountId, targetAcc);
       setActiveAccount(accountId);
-      broadcastEvent({ type: 'account_switch', accountId });
+      broadcastEvent({ 
+        type: 'account_switch', 
+        accountId, 
+        email: targetAcc ? targetAcc.email : null 
+      });
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, activeId: accountId }));
