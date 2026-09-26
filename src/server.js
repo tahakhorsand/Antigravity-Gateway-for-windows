@@ -17,7 +17,8 @@ import {
   setActiveAccount,
   getAllStats,
   getRecentLogsDb,
-  getDailyAnalyticsDb
+  getDailyAnalyticsDb,
+  setBroadcastCallback
 } from './stats.js';
 import { getMetadataDb, setMetadataDb, queryLogsDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
@@ -54,6 +55,9 @@ function broadcastEvent(data) {
     }
   }
 }
+
+// Connect Antigravity IDE live transcript tailer to SSE broadcaster
+setBroadcastCallback(broadcastEvent);
 
 export async function syncAllQuotas() {
   if (isSyncingQuotas) return;
