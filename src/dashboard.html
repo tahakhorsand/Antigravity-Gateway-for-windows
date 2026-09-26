@@ -945,26 +945,51 @@
       </div>
 
       <!-- Smart Quota Shield Banner -->
-      <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #34d399;">
-            <i data-lucide="shield" style="width: 17px; height: 17px;"></i>
+      <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 9px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #34d399;">
+            <i data-lucide="shield" style="width: 19px; height: 19px;"></i>
           </div>
           <div>
             <div style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px;">
-              <span>Smart Quota Shield</span>
+              <span>Smart Quota Shield & Routing</span>
               <span class="badge badge-success" id="smart-shield-badge" style="font-size: 10px;">Auto Protection Active</span>
             </div>
-            <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 1px;">
-              Proactively rotates active session before weekly or 5h burst quota drops below 20%.
+            <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 2px;">
+              Proactively rotates active session before weekly or 5h burst quota drops below threshold.
             </div>
           </div>
         </div>
 
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
-          <span style="font-size: 11px; font-weight: 500; color: #34d399;" id="smart-shield-label">Auto-Switch: ON</span>
-          <input type="checkbox" id="smart-shield-toggle" checked onchange="toggleSmartShield(this.checked)" style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer;">
-        </label>
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <!-- Threshold Control -->
+          <div style="display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 6px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">Rotate at:</span>
+            <select id="smart-shield-threshold" onchange="updateShieldThreshold(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #34d399; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;">
+              <option value="10">&lt; 10% (Aggressive)</option>
+              <option value="15">&lt; 15%</option>
+              <option value="20" selected>&lt; 20% (Default)</option>
+              <option value="25">&lt; 25%</option>
+              <option value="30">&lt; 30% (High Safety)</option>
+              <option value="40">&lt; 40% (Ultra Safe)</option>
+            </select>
+          </div>
+
+          <!-- Claude Mode Control -->
+          <div style="display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 6px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">Claude Mode:</span>
+            <select id="smart-shield-claude-mode" onchange="updateClaudeMode(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #f472b6; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;">
+              <option value="native" selected>Native Claude Sonnet &amp; Opus</option>
+              <option value="gemini">Fallback to Gemini 2.5 Pro</option>
+            </select>
+          </div>
+
+          <!-- Auto Switch Toggle -->
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+            <span style="font-size: 11px; font-weight: 500; color: #34d399;" id="smart-shield-label">Auto-Switch: ON</span>
+            <input type="checkbox" id="smart-shield-toggle" checked onchange="toggleSmartShield(this.checked)" style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer;">
+          </label>
+        </div>
       </div>
 
       <!-- Account Matrix Section -->
@@ -1152,6 +1177,45 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination Controls Bar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 10px; font-size: 11px;">
+        <div style="display: flex; align-items: center; gap: 8px; color: var(--muted-foreground);">
+          <span id="log-pagination-info">Showing 0–0 of 0 requests</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground);">
+            <span>Rows per page:</span>
+            <select id="log-page-size" onchange="changeLogPageSize(this.value)" style="background: #090d16; border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px; color: #fff; outline: none; cursor: pointer;">
+              <option value="15">15</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <button class="btn btn-secondary btn-sm" id="btn-page-first" onclick="goToLogPage(1)" style="padding: 4px 8px;" title="First Page">
+              <i data-lucide="chevrons-left" style="width: 13px; height: 13px;"></i>
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-page-prev" onclick="goToLogPage(currentLogPage - 1)" style="padding: 4px 8px;" title="Previous Page">
+              <i data-lucide="chevron-left" style="width: 13px; height: 13px;"></i>
+            </button>
+            
+            <span style="padding: 0 8px; font-weight: 500; color: #fff;" id="log-page-indicator">
+              Page 1 of 1
+            </span>
+
+            <button class="btn btn-secondary btn-sm" id="btn-page-next" onclick="goToLogPage(currentLogPage + 1)" style="padding: 4px 8px;" title="Next Page">
+              <i data-lucide="chevron-right" style="width: 13px; height: 13px;"></i>
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-page-last" onclick="goToLogPage(totalLogPages)" style="padding: 4px 8px;" title="Last Page">
+              <i data-lucide="chevrons-right" style="width: 13px; height: 13px;"></i>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1353,10 +1417,10 @@ response = client.chat.completions.create(
 
           <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-              <span style="font-weight: 600; font-size: 12px; color: #ec4899;">Claude 3.5 Sonnet</span>
-              <span class="badge" style="background: rgba(236, 72, 153, 0.1); color: #f472b6; font-size: 9px;">V1 Adapter</span>
+              <span style="font-weight: 600; font-size: 12px; color: #ec4899;">Claude 3.5 Sonnet &amp; Opus</span>
+              <span class="badge" style="background: rgba(236, 72, 153, 0.1); color: #f472b6; font-size: 9px;">Native Google PA</span>
             </div>
-            <div style="font-size: 11px; color: var(--muted-foreground);">Translates Anthropic JSON structures on-the-fly for seamless Claude Code CLI pairing.</div>
+            <div style="font-size: 11px; color: var(--muted-foreground);">Direct Anthropic Claude Sonnet &amp; Opus execution via Google Cloud Code with 100% quota headroom.</div>
           </div>
 
           <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
@@ -1467,10 +1531,26 @@ response = client.chat.completions.create(
 
     let logsCache = new Map();
     let filterDebounceTimer = null;
+    let currentLogPage = 1;
+    let totalLogPages = 1;
+    let logPageSize = 25;
+
+    function goToLogPage(page) {
+      if (page < 1 || (totalLogPages > 0 && page > totalLogPages)) return;
+      currentLogPage = page;
+      fetchDbLogs();
+    }
+
+    function changeLogPageSize(size) {
+      logPageSize = parseInt(size, 10) || 25;
+      currentLogPage = 1;
+      fetchDbLogs();
+    }
 
     function debounceFilterLogs() {
       clearTimeout(filterDebounceTimer);
       filterDebounceTimer = setTimeout(() => {
+        currentLogPage = 1;
         fetchDbLogs();
       }, 250);
     }
@@ -1482,6 +1562,7 @@ response = client.chat.completions.create(
       if (searchInput) searchInput.value = '';
       if (modelSelect) modelSelect.value = '';
       if (accSelect) accSelect.value = '';
+      currentLogPage = 1;
       fetchDbLogs();
     }
 
@@ -1493,7 +1574,10 @@ response = client.chat.completions.create(
       const model = document.getElementById('log-model-filter')?.value || '';
       const account = document.getElementById('log-account-filter')?.value || '';
 
-      const params = new URLSearchParams({ limit: '50' });
+      const params = new URLSearchParams({
+        limit: String(logPageSize),
+        page: String(currentLogPage)
+      });
       if (search) params.set('search', search);
       if (model) params.set('model', model);
       if (account) params.set('account', account);
@@ -1501,7 +1585,44 @@ response = client.chat.completions.create(
       try {
         const res = await fetch(`/api/db/logs?${params.toString()}`);
         if (!res.ok) return;
-        const logs = await res.json();
+        const data = await res.json();
+        const logs = Array.isArray(data) ? data : (data.logs || []);
+        const pagination = data.pagination || {
+          page: currentLogPage,
+          limit: logPageSize,
+          total: logs.length,
+          totalPages: Math.ceil(logs.length / logPageSize) || 1,
+          hasPrev: currentLogPage > 1,
+          hasNext: false
+        };
+
+        currentLogPage = pagination.page;
+        totalLogPages = pagination.totalPages;
+
+        const pageIndicator = document.getElementById('log-page-indicator');
+        const pageInfo = document.getElementById('log-pagination-info');
+        const btnPrev = document.getElementById('btn-page-prev');
+        const btnNext = document.getElementById('btn-page-next');
+        const btnFirst = document.getElementById('btn-page-first');
+        const btnLast = document.getElementById('btn-page-last');
+
+        if (pageIndicator) {
+          pageIndicator.innerText = `Page ${pagination.page} of ${pagination.totalPages}`;
+        }
+
+        const startIdx = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+        const endIdx = Math.min(pagination.total, pagination.page * pagination.limit);
+        if (pageInfo) {
+          pageInfo.innerText = pagination.total === 0
+            ? 'No request logs found'
+            : `Showing ${startIdx}–${endIdx} of ${pagination.total.toLocaleString()} requests`;
+        }
+
+        if (btnPrev) btnPrev.disabled = !pagination.hasPrev;
+        if (btnFirst) btnFirst.disabled = !pagination.hasPrev;
+        if (btnNext) btnNext.disabled = !pagination.hasNext;
+        if (btnLast) btnLast.disabled = !pagination.hasNext;
+
         logsCache.clear();
 
         if (!logs || logs.length === 0) {
@@ -1528,6 +1649,10 @@ response = client.chat.completions.create(
             </tr>
           `;
         }).join('');
+
+        if (window.lucide && typeof lucide.createIcons === 'function') {
+          lucide.createIcons();
+        }
       } catch (e) {
         console.error('Error fetching DB logs:', e);
       }
@@ -1592,6 +1717,30 @@ response = client.chat.completions.create(
       }
     }
 
+    async function updateShieldThreshold(threshold) {
+      try {
+        await fetch('/api/config/smart-shield', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ threshold: parseInt(threshold, 10) })
+        });
+      } catch (e) {
+        console.error('Error updating threshold:', e);
+      }
+    }
+
+    async function updateClaudeMode(claudeMode) {
+      try {
+        await fetch('/api/config/smart-shield', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claudeMode })
+        });
+      } catch (e) {
+        console.error('Error updating claude mode:', e);
+      }
+    }
+
     async function fetchSmartShieldConfig() {
       try {
         const res = await fetch('/api/config/smart-shield');
@@ -1600,6 +1749,9 @@ response = client.chat.completions.create(
         const toggle = document.getElementById('smart-shield-toggle');
         const label = document.getElementById('smart-shield-label');
         const badge = document.getElementById('smart-shield-badge');
+        const threshSelect = document.getElementById('smart-shield-threshold');
+        const claudeSelect = document.getElementById('smart-shield-claude-mode');
+
         const enabled = data.enabled !== false;
         if (toggle) toggle.checked = enabled;
         if (label) {
@@ -1609,6 +1761,12 @@ response = client.chat.completions.create(
         if (badge) {
           badge.className = enabled ? 'badge badge-success' : 'badge';
           badge.innerText = enabled ? 'Auto Protection Active' : 'Shield Standby';
+        }
+        if (threshSelect && data.threshold) {
+          threshSelect.value = String(data.threshold);
+        }
+        if (claudeSelect && data.claudeMode) {
+          claudeSelect.value = data.claudeMode;
         }
       } catch (e) {}
     }

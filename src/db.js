@@ -376,31 +376,51 @@ export function setMetadataDb(key, value) {
   }
 }
 
-export function queryLogsDb({ limit = 50, account = '', model = '', search = '' } = {}) {
+export function queryLogsDb({ limit = 25, page = 1, account = '', model = '', search = '' } = {}) {
   try {
     const db = getDatabase();
-    let sql = 'SELECT * FROM request_logs WHERE 1=1';
+    let whereSql = ' WHERE 1=1';
     const params = [];
 
     if (account) {
-      sql += ' AND account_email LIKE ?';
+      whereSql += ' AND account_email LIKE ?';
       params.push(`%${account}%`);
     }
     if (model) {
-      sql += ' AND model LIKE ?';
+      whereSql += ' AND model LIKE ?';
       params.push(`%${model}%`);
     }
     if (search) {
-      sql += ' AND (account_email LIKE ? OR model LIKE ? OR endpoint LIKE ? OR CAST(request_id AS TEXT) LIKE ?)';
+      whereSql += ' AND (account_email LIKE ? OR model LIKE ? OR endpoint LIKE ? OR CAST(request_id AS TEXT) LIKE ?)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    sql += ' ORDER BY id DESC LIMIT ?';
-    params.push(limit);
+    // Total count query
+    const countSql = `SELECT COUNT(*) AS total FROM request_logs${whereSql}`;
+    const totalRow = db.prepare(countSql).get(...params);
+    const total = totalRow ? Number(totalRow.total || 0) : 0;
 
-    return db.prepare(sql).all(...params);
+    const safeLimit = Math.max(1, Math.min(200, parseInt(limit, 10) || 25));
+    const totalPages = Math.max(1, Math.ceil(total / safeLimit));
+    const safePage = Math.max(1, Math.min(totalPages, parseInt(page, 10) || 1));
+    const offset = (safePage - 1) * safeLimit;
+
+    const dataSql = `SELECT * FROM request_logs${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`;
+    const rows = db.prepare(dataSql).all(...params, safeLimit, offset);
+
+    return {
+      logs: rows,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages,
+        hasPrev: safePage > 1,
+        hasNext: safePage < totalPages
+      }
+    };
   } catch (err) {
     console.error('[SQLite] Error querying logs:', err.message);
-    return [];
+    return { logs: [], pagination: { page: 1, limit, total: 0, totalPages: 1, hasPrev: false, hasNext: false } };
   }
 }

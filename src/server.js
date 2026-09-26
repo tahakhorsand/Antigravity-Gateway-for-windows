@@ -114,17 +114,20 @@ export function checkAndApplySmartShield() {
   const weeklyPct = currentStats.geminiWeekly?.pct ?? 100;
   const burstPct = currentStats.gemini5h?.pct ?? 100;
 
-  // If weekly or burst quota drops below 20%
-  if (weeklyPct < 20 || burstPct < 20) {
+  const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10) || 20;
+
+  // If weekly or burst quota drops below threshold
+  if (weeklyPct < threshold || burstPct < threshold) {
     const bestId = stats.global?.bestAccountId;
     if (bestId && bestId !== currentAcc.id) {
       const targetAcc = accounts.find(a => a.id === bestId);
       const targetStats = stats.accounts?.[bestId];
       const targetWeekly = targetStats?.geminiWeekly?.pct ?? 0;
 
-      // Only switch if the target account has healthy headroom (> 40%)
-      if (targetAcc && targetWeekly > 40) {
-        console.log(`${colors.cyan}[SmartShield] 🛡️ Proactive Switch: ${currentAcc.email} (${weeklyPct}% weekly, ${burstPct}% 5h) ➜ ${targetAcc.email} (${targetWeekly}% headroom)${colors.reset}`);
+      // Only switch if the target account has healthy headroom (> threshold + 10%)
+      const minHeadroom = Math.max(30, threshold + 10);
+      if (targetAcc && targetWeekly > minHeadroom) {
+        console.log(`${colors.cyan}[SmartShield] 🛡️ Proactive Switch: ${currentAcc.email} (${weeklyPct}% weekly, ${burstPct}% 5h) ➜ ${targetAcc.email} (${targetWeekly}% headroom, threshold ${threshold}%)${colors.reset}`);
         switchAntigravityActiveAccount(bestId, targetAcc);
         setActiveAccount(bestId);
 
@@ -133,12 +136,13 @@ export function checkAndApplySmartShield() {
           from: currentAcc.email,
           to: targetAcc.email,
           fromWeekly: weeklyPct,
-          toWeekly: targetWeekly
+          toWeekly: targetWeekly,
+          threshold
         });
 
         sendMacNotification(
           'Antigravity Smart Shield 🛡️',
-          `Proactive switch: ${currentAcc.email} (${weeklyPct}%) ➜ ${targetAcc.email} (${targetWeekly}%). Session kept uninterrupted!`
+          `Proactive switch (${threshold}% threshold): ${currentAcc.email} (${weeklyPct}%) ➜ ${targetAcc.email} (${targetWeekly}%). Session kept uninterrupted!`
         );
       }
     }
@@ -291,7 +295,8 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
         });
 
       const accessToken = await getValidAccessToken(account);
-      const payload = wrapGeminiV1Internal(geminiBody, targetModel, account.project_id);
+      const claudeMode = getMetadataDb('smart_shield_claude_mode', 'native');
+      const payload = wrapGeminiV1Internal(geminiBody, targetModel, account.project_id, claudeMode);
       const ua = 'antigravity/4.3.0 darwin/arm64';
       const endpoints = isStream ? CLOUDCODE_STREAM_ENDPOINTS : CLOUDCODE_GENERATE_ENDPOINTS;
 
@@ -545,16 +550,17 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify(statsData, null, 2));
   }
 
-  // SQLite Persistent Request Logs with Search & Filter
+  // SQLite Persistent Request Logs with Search, Filter & Pagination
   if (urlPath.startsWith('/api/db/logs')) {
     const query = new URL(req.url, 'http://localhost').searchParams;
-    const limit = parseInt(query.get('limit') || '50', 10);
+    const limit = parseInt(query.get('limit') || '25', 10);
+    const page = parseInt(query.get('page') || '1', 10);
     const account = query.get('account') || '';
     const model = query.get('model') || '';
     const search = query.get('search') || '';
-    const logs = queryLogsDb({ limit, account, model, search });
+    const result = queryLogsDb({ limit, page, account, model, search });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify(logs, null, 2));
+    return res.end(JSON.stringify(result, null, 2));
   }
 
   // Smart Quota Shield Config Endpoint
@@ -564,18 +570,33 @@ async function handleProxyRequest(req, res) {
       for await (const chunk of req) bodyStr += chunk;
       try {
         const bodyJson = JSON.parse(bodyStr);
-        const enabled = !!bodyJson.enabled;
-        setMetadataDb('smart_shield_enabled', enabled);
+        if (bodyJson.enabled !== undefined) {
+          setMetadataDb('smart_shield_enabled', !!bodyJson.enabled);
+        }
+        if (bodyJson.threshold !== undefined) {
+          const t = parseInt(bodyJson.threshold, 10);
+          if (t >= 5 && t <= 50) {
+            setMetadataDb('smart_shield_threshold', t);
+          }
+        }
+        if (bodyJson.claudeMode !== undefined) {
+          setMetadataDb('smart_shield_claude_mode', bodyJson.claudeMode);
+        }
+        const enabled = getMetadataDb('smart_shield_enabled', true);
+        const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10);
+        const claudeMode = getMetadataDb('smart_shield_claude_mode', 'native');
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ ok: true, enabled }));
+        return res.end(JSON.stringify({ ok: true, enabled, threshold, claudeMode }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
       }
     } else {
       const enabled = getMetadataDb('smart_shield_enabled', true);
+      const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10);
+      const claudeMode = getMetadataDb('smart_shield_claude_mode', 'native');
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ enabled }));
+      return res.end(JSON.stringify({ enabled, threshold, claudeMode }));
     }
   }
 

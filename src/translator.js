@@ -34,6 +34,14 @@ export function normalizeModelName(inputModel) {
     return 'gemini-3.8-flash';
   }
 
+  // Claude models - Route to Google Native Claude models
+  if (m.includes('opus')) {
+    return 'claude-opus-4-6-thinking';
+  }
+  if (m.includes('claude') || m.includes('sonnet')) {
+    return 'claude-sonnet-4-6';
+  }
+
   // Pro & Frontier models
   if (m.includes('3.1-pro') || m.includes('3-1-pro')) {
     return 'gemini-3.1-pro-high';
@@ -41,7 +49,7 @@ export function normalizeModelName(inputModel) {
   if (m.includes('2.5-pro') || m.includes('2-5-pro')) {
     return 'gemini-2.5-pro';
   }
-  if (m.includes('pro') || m.includes('4o') || m.includes('claude') || m.includes('sonnet') || m.includes('opus')) {
+  if (m.includes('pro') || m.includes('4o')) {
     return 'gemini-2.5-pro';
   }
 
@@ -174,7 +182,7 @@ export const CLOUDCODE_STREAM_ENDPOINTS = [
   'https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse'
 ];
 
-export function mapToGoogleInternalModel(model) {
+export function mapToGoogleInternalModel(model, claudeMode = 'native') {
   if (!model) return 'gemini-3.8-flash-medium';
   const m = model.toLowerCase().trim();
   if (m === 'gemini-3.8-flash' || m.includes('3.8-flash') || m.includes('3.8')) {
@@ -192,11 +200,17 @@ export function mapToGoogleInternalModel(model) {
   if (m === 'gemini-2.5-pro' || m.includes('2.5-pro')) {
     return 'gemini-2.5-pro';
   }
+  if (m.includes('opus')) {
+    return claudeMode === 'gemini' ? 'gemini-2.5-pro' : 'claude-opus-4-6-thinking';
+  }
+  if (m.includes('claude') || m.includes('sonnet')) {
+    return claudeMode === 'gemini' ? 'gemini-2.5-pro' : 'claude-sonnet-4-6';
+  }
   return model;
 }
 
-export function wrapGeminiV1Internal(geminiBody, model, projectId) {
-  const internalModel = mapToGoogleInternalModel(model);
+export function wrapGeminiV1Internal(geminiBody, model, projectId, claudeMode = 'native') {
+  const internalModel = mapToGoogleInternalModel(model, claudeMode);
   return {
     project: projectId || undefined,
     model: internalModel,
@@ -288,8 +302,11 @@ export function getOpenAIModelsList() {
       { id: 'gemini-2.5-flash', object: 'model', created: 1715000000, owned_by: 'google' },
       { id: 'gemini-2.5-pro', object: 'model', created: 1715000000, owned_by: 'google' },
       { id: 'gemini-3.1-pro-high', object: 'model', created: 1715000000, owned_by: 'google' },
+      { id: 'claude-sonnet-4-6', object: 'model', created: 1715000000, owned_by: 'anthropic-native' },
+      { id: 'claude-opus-4-6-thinking', object: 'model', created: 1715000000, owned_by: 'anthropic-native' },
       { id: 'claude-3-5-sonnet', object: 'model', created: 1715000000, owned_by: 'anthropic-alias' },
       { id: 'claude-3-7-sonnet', object: 'model', created: 1715000000, owned_by: 'anthropic-alias' },
+      { id: 'claude-3-opus', object: 'model', created: 1715000000, owned_by: 'anthropic-alias' },
       { id: 'gpt-4o', object: 'model', created: 1715000000, owned_by: 'openai-alias' },
       { id: 'gpt-4o-mini', object: 'model', created: 1715000000, owned_by: 'openai-alias' }
     ]
