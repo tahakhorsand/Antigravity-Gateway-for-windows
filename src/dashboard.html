@@ -1082,7 +1082,14 @@
             </tr>
           </thead>
           <tbody id="accounts-table-body">
-            <!-- Dynamic Rows -->
+            <tr>
+              <td colspan="8" style="text-align: center; padding: 28px; color: var(--text-3);">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <span class="pulse-dot" style="background: var(--blue);"></span>
+                  <span>Syncing live account pool telemetry...</span>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1523,8 +1530,8 @@
       if (tabId === 'pane-logs') {
         fetchDbLogs();
       }
-      if (window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (e) {}
       }
     }
 
@@ -1876,19 +1883,32 @@
           chartSaved.innerText = `$${(todayStats.dollarsSaved || 0).toFixed(2)} Saved Today`;
         }
 
+        // Header Next in Line
+        const nextRecEl = document.getElementById('header-next-rec');
+        if (nextRecEl) {
+          if (accounts.length > 1 && accounts[1]) {
+            const nextAcc = accounts[1];
+            const nextGw = nextAcc.geminiWeekly?.pct ?? 100;
+            nextRecEl.innerText = `${nextAcc.email.split('@')[0]} (${nextGw}%)`;
+            nextRecEl.title = `Next recommended: ${nextAcc.email} (${nextGw}% quota)`;
+          } else {
+            nextRecEl.innerText = 'None';
+          }
+        }
+
         // Badges
         const tabAccBadge = document.getElementById('tab-badge-accounts');
         if (tabAccBadge) tabAccBadge.innerText = String(accounts.length);
         const tblCount = document.getElementById('table-acc-count');
         if (tblCount) tblCount.innerText = String(accounts.length);
 
-        renderDailyChart(data.global?.dailyAnalytics || []);
-        renderModelShare(data.global?.modelDistribution || []);
-        renderAccountsTable(accounts, data, ideStatus);
-        renderAccountsGrid(accounts, data, ideStatus);
+        try { renderDailyChart(data.global?.dailyAnalytics || []); } catch (e) { console.error('Error rendering daily chart:', e); }
+        try { renderModelShare(data.global?.modelDistribution || []); } catch (e) { console.error('Error rendering model share:', e); }
+        try { renderAccountsTable(accounts, data, ideStatus); } catch (e) { console.error('Error rendering accounts table:', e); }
+        try { renderAccountsGrid(accounts, data, ideStatus); } catch (e) { console.error('Error rendering accounts grid:', e); }
 
-        if (window.lucide && typeof lucide.createIcons === 'function') {
-          lucide.createIcons();
+        if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+          try { window.lucide.createIcons(); } catch (e) {}
         }
       } catch (e) {
         console.error('Error in fetchMatrix:', e);
@@ -1956,12 +1976,21 @@
       const tbody = document.getElementById('accounts-table-body');
       if (!tbody) return;
 
+      if (!accounts || accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 32px; color: var(--text-4);">No accounts found in pool. Click "Add Account" to get started.</td></tr>';
+        return;
+      }
+
       const activeSessionEmail = (ideStatus?.ideEmail || data.global?.activeSessionEmail || '').toLowerCase();
       const activeSessionId = data.global?.activeSessionAccountId;
       const isGenerating = !!data.global?.isSessionGenerating;
       const pendingEmail = (data.global?.pendingSwitch?.email || '').toLowerCase();
 
       tbody.innerHTML = accounts.map((a, idx) => {
+        const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
+        const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
+        const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
+
         const isQueued = !!pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
@@ -1983,14 +2012,10 @@
           const rem = Math.ceil((a.cooldownUntil - Date.now()) / 1000);
           statusHtml = `<span class="status-badge cooling">Cooling (${rem}s)</span>`;
         } else if (isNextRecommended) {
-          statusHtml = '<span class="status-badge" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); color: var(--blue);"><i data-lucide="sparkles" style="width:10px;height:10px;"></i> Recommended</span>';
-        } else if (isLowest && (gw.pct < 20 || g5.pct < 20)) {
+          statusHtml = '<span class="status-badge" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); color: var(--blue);"><i data-lucide="sparkles" style="width:10px;height:10px;display:inline-block;vertical-align:-1px;"></i> Recommended</span>';
+        } else if (isLowest) {
           statusHtml = '<span class="status-badge" style="background: var(--red-subtle); border-color: var(--red-border); color: var(--red);">Lowest Quota</span>';
         }
-
-        const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
-        const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
-        const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
 
         let actionBtn = `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>`;
         if (isActive) {
@@ -2063,12 +2088,21 @@
       const grid = document.getElementById('view-grid-wrapper');
       if (!grid) return;
 
+      if (!accounts || accounts.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding: 48px; color: var(--text-4);">No accounts found in pool. Click "Add Account" to get started.</div>';
+        return;
+      }
+
       const activeSessionEmail = (ideStatus?.ideEmail || data.global?.activeSessionEmail || '').toLowerCase();
       const activeSessionId = data.global?.activeSessionAccountId;
       const isGenerating = !!data.global?.isSessionGenerating;
       const pendingEmail = (data.global?.pendingSwitch?.email || '').toLowerCase();
 
       grid.innerHTML = accounts.map((a, idx) => {
+        const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
+        const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
+        const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
+
         const isQueued = !!pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
@@ -2081,14 +2115,19 @@
         if (isServing || (isActive && isGenerating)) {
           statusHtml = '<span class="status-badge generating"><span class="pulse-dot" style="background:var(--blue)"></span> Generating</span>';
         } else if (isActive) {
-          statusHtml = '<span class="status-badge active-now"><span class="pulse-dot"></span> Active</span>';
+          statusHtml = '<span class="status-badge active-now"><span class="pulse-dot"></span> Active Now</span>';
         } else if (isQueued) {
           statusHtml = '<span class="status-badge queued">Queued</span>';
+        } else if (isBanned) {
+          statusHtml = '<span class="status-badge restricted">403 Restricted</span>';
+        } else if (isCooling) {
+          const rem = Math.ceil((a.cooldownUntil - Date.now()) / 1000);
+          statusHtml = `<span class="status-badge cooling">Cooling (${rem}s)</span>`;
+        } else if (isNextRecommended) {
+          statusHtml = '<span class="status-badge" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); color: var(--blue);"><i data-lucide="sparkles" style="width:10px;height:10px;display:inline-block;vertical-align:-1px;"></i> Recommended</span>';
+        } else if (isLowest) {
+          statusHtml = '<span class="status-badge" style="background: var(--red-subtle); border-color: var(--red-border); color: var(--red);">Lowest Quota</span>';
         }
-
-        const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
-        const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
-        const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
 
         const hotkey = idx < 9 ? `<kbd>${idx + 1}</kbd>` : '';
 
