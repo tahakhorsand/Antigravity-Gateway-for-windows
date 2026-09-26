@@ -1,7 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import { exec, spawn } from 'child_process';
+import { exec, execFile, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { CONFIG } from './config.js';
 import { loadAccounts, getAccounts, getValidAccessToken, markCooldown, isCoolingDown } from './auth.js';
@@ -25,6 +25,7 @@ import {
 } from './stats.js';
 import { getMetadataDb, setMetadataDb, queryLogsDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
+import { createLoginUrl, completeLogin, loginResultPage } from './account-login.js';
 import crypto from 'crypto';
 import { 
   convertOpenAIToGemini, 
@@ -1164,13 +1165,49 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify({ ok: true }));
   }
 
-  // API Action: Add Account
-  if (urlPath === '/api/add-account' && req.method === 'POST') {
-    const addAccountPath = path.resolve(__dirname, 'add-account.js');
-    spawn('node', [addAccountPath], { detached: true, stdio: 'ignore' }).unref();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ok: true }));
+  // Add (or re-authorise) an account: returns the Google sign-in URL. With ?open=1 (or the
+  // legacy /api/add-account) the harness also opens it in the default browser.
+  if ((urlPath.startsWith('/api/accounts/login') || urlPath === '/api/add-account') && req.method === 'POST') {
+    const openExternally = urlPath === '/api/add-account' || new URL(req.url, 'http://localhost').searchParams.get('open') === '1';
+    try {
+      const { url } = createLoginUrl(`http://127.0.0.1:${CONFIG.PORT}/oauth/callback`);
+      if (openExternally) execFile('open', [url], () => {});
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, url, opened: openExternally }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: error.message }));
+    }
   }
+
+  // Google redirects here after sign-in
+  if (urlPath.startsWith('/oauth/callback') && req.method === 'GET') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const dashboardUrl = `http://127.0.0.1:${CONFIG.PORT}/`;
+    try {
+      const { account, isNew, total } = await completeLogin({ code: query.get('code'), state: query.get('state'), error: query.get('error') });
+      initAccountStats(account);
+      broadcastEvent({ type: 'account_added', accountId: account.id, email: account.email, isNew, total });
+      console.log(`${colors.green}[Accounts] ✅ ${isNew ? 'Added' : 'Re-authorised'} ${account.email} (${total} account(s) in the pool)${colors.reset}`);
+      // Load its quota right away instead of waiting for the next 3-minute sync
+      fetchLiveAccountQuota(account)
+        .then((quota) => { updateAccountLiveQuota(account.id, quota); broadcastEvent({ type: 'quotas_synced', timestamp: Date.now() }); })
+        .catch(() => {});
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(loginResultPage({
+        ok: true,
+        title: isNew ? 'Account added' : 'Account re-authorised',
+        message: `${account.email} is now in the pool (${total} account${total === 1 ? '' : 's'}). You can close this tab.`,
+        dashboardUrl
+      }));
+    } catch (error) {
+      console.error(`[Accounts] Sign-in failed: ${error.message}`);
+      broadcastEvent({ type: 'account_add_failed', reason: error.message });
+      res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(loginResultPage({ ok: false, title: 'Could not add the account', message: error.message, dashboardUrl }));
+    }
+  }
+
 
   // API Action: Live Refresh Quotas from Google
   if (urlPath === '/api/refresh-quotas' && req.method === 'POST') {

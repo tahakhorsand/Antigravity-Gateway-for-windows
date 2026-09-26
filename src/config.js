@@ -32,10 +32,12 @@ export const CONFIG = {
   UPSTREAM_BASE_URL: 'https://generativelanguage.googleapis.com',
   ACCOUNTS_FILE: path.resolve(__dirname, '../accounts.json'),
   OAUTH_REDIRECT_URI: 'http://localhost:8085/oauth/callback',
+  // Same scopes Antigravity itself signs in with; the OAuth client rejects anything else
+  // (e.g. generative-language gives "Error 403: restricted_client").
   SCOPES: [
+    'openid',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/cloud-platform',
-    'https://www.googleapis.com/auth/generative-language'
+    'https://www.googleapis.com/auth/cloud-platform'
   ]
 };

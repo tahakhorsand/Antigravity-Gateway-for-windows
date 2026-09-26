@@ -84,12 +84,6 @@ cp oauth-client.example.json oauth-client.json
 
 Fill in `oauth-client.json` with the OAuth client used to sign in the accounts. Antigravity refreshes the tokens itself after a switch, so they must be issued to an installed-app OAuth client that Antigravity accepts. This file is git-ignored; you can also use the `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` environment variables.
 
-Add each account (a browser window opens for Google sign-in; tokens are stored in the git-ignored `accounts.json`):
-
-```bash
-npm run add-account
-```
-
 Start the harness:
 
 ```bash
@@ -98,6 +92,18 @@ pm2 save            # and `pm2 startup` once, to start it after a reboot
 ```
 
 Or run it in the foreground with `npm start`. Open **http://127.0.0.1:8045**.
+
+### Adding accounts
+
+1. In the dashboard click **Add Account**. A Google sign-in tab opens (from the native app it opens in your default browser).
+2. Choose the account and approve. Google sends you back to `http://127.0.0.1:8045/oauth/callback`.
+3. The tab shows **Account added** and closes itself; the account appears in the dashboard with its quota a few seconds later.
+
+Signing in again with an account that is already in the pool refreshes its login instead of adding a duplicate. Tokens are stored in the git-ignored `accounts.json`.
+
+The sign-in asks only for the permissions Antigravity itself uses: `openid`, `userinfo.email`, `userinfo.profile` and `cloud-platform`. Each sign-in link uses PKCE and a one-time state, and expires after 10 minutes.
+
+Prefer the terminal? `npm run add-account` does the same (it returns to `http://localhost:8085/oauth/callback`).
 
 ## Settings
 
@@ -133,6 +139,8 @@ The server only listens on `127.0.0.1`, and POST requests coming from other webs
 | Dashboard says "Antigravity not detected" | Make sure Antigravity is open. Switching depends on reading its login. |
 | A switch stays "queued" | A task or background command (build, dev server) is still running. It happens when that finishes, or after 15 minutes without activity. |
 | An account shows *403 Forbidden* | Google restricted the account; the harness stops using it. |
+| Sign-in shows `Error 403: restricted_client` / "Unregistered scope(s)" | The OAuth client only allows the scopes listed under [Adding accounts](#adding-accounts). Don't add scopes to `SCOPES` in `src/config.js`. |
+| Sign-in tab says the link expired | Links are single-use and last 10 minutes. Click **Add Account** again. |
 
 Note: the switch restarts Antigravity's language server, so anything the agent left running in the background (for example a dev server) stops at that moment.
 

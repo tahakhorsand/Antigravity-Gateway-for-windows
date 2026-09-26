@@ -2106,6 +2106,16 @@ response = client.chat.completions.create(
       const isGenerating = !!data.global?.isSessionGenerating;
       const pendingEmail = (data.global?.pendingSwitch?.email || '').toLowerCase();
 
+      if (!accounts.length) {
+        grid.innerHTML = `
+          <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 28px;">
+            <div style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px;">No accounts yet</div>
+            <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 14px;">Add at least two Google accounts you use with Antigravity. Each one opens a Google sign-in tab.</div>
+            <button class="btn btn-secondary btn-sm" onclick="addAccount()">Add Account</button>
+          </div>`;
+        return;
+      }
+
       grid.innerHTML = accounts.map(a => {
         const isQueued = !!pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
@@ -2305,9 +2315,22 @@ response = client.chat.completions.create(
       addLog('🚀 Launching Antigravity Desktop with proxy...');
     }
 
-    function addAccount() {
-      fetch('/api/add-account', { method: 'POST' });
-      addLog('👉 Opening browser for Google sign-in...');
+    async function addAccount() {
+      try {
+        // Open the tab synchronously (inside the click) so pop-up blockers allow it
+        const tab = window.open('about:blank', '_blank');
+        const res = await fetch(`/api/accounts/login${tab ? '' : '?open=1'}`, { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) {
+          if (tab) tab.close();
+          addLog(`⚠️ Cannot start Google sign-in: ${data.error}`, 'err');
+          return;
+        }
+        if (tab) tab.location.href = data.url;
+        addLog('👉 Sign in with the Google account to add in the new tab. It appears here as soon as you finish.');
+      } catch (e) {
+        addLog(`⚠️ Cannot start Google sign-in: ${e.message}`, 'err');
+      }
     }
 
     async function runProxyTest() {
@@ -2410,6 +2433,12 @@ response = client.chat.completions.create(
               addLog(`${shield}: switch from <b>${item.from}</b> to <b>${item.to}</b> failed: ${item.error || 'unknown error'}`, 'err');
             }
             fetchMatrix();
+          } else if (item.type === 'account_added') {
+            addLog(`✅ ${item.isNew ? 'Added' : 'Re-authorised'} <span class="stream-acc">${item.email}</span> (${item.total} accounts). Loading its quota…`);
+            fetchMatrix();
+            if (typeof fetchSmartShieldConfig === 'function') fetchSmartShieldConfig();
+          } else if (item.type === 'account_add_failed') {
+            addLog(`⚠️ Adding the account failed: ${item.reason}`, 'err');
           } else if (item.type === 'auto_continue') {
             if (item.ok) addLog(`▶️ Smart Shield: told the agent to continue after the switch.`);
             else addLog(`⚠️ Smart Shield: switched, but could not resume the task (${item.reason}). Type "continue" in Antigravity.`, 'err');
