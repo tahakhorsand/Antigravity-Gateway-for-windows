@@ -62,13 +62,14 @@
     }
 
     .container {
-      max-width: 1280px;
+      max-width: 1480px;
       margin: 0 auto;
       padding: 24px 32px 48px;
-      width: 100%;
+      width: 95%;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 20px;
     }
 
     /* Header Bar */
@@ -676,6 +677,7 @@
     .code-pill code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 11px;
+      letter-spacing: -0.2px;
       white-space: nowrap;
       overflow-x: auto;
       scrollbar-width: none;
@@ -1267,12 +1269,12 @@
             </div>
           </div>
 
-          <div id="test-result-box" style="display: none; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; padding: 10px 12px; font-size: 11px;">
+          <div id="test-result-box" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 11px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-              <span style="font-weight: 600; color: #34d399;" id="test-result-status">● 200 OK</span>
-              <span style="color: var(--muted-foreground);" id="test-result-meta">Latency: 280ms • Output: 8 tokens</span>
+              <span style="font-weight: 600; color: #10b981;" id="test-result-status">● Gateway Ready</span>
+              <span style="color: var(--muted-foreground);" id="test-result-meta">Port 8045 • Click "Send Test Ping"</span>
             </div>
-            <div style="color: #e4e4e7; font-family: ui-monospace, monospace; word-break: break-all;" id="test-result-text">Response text...</div>
+            <div style="color: var(--muted-foreground); font-family: ui-monospace, monospace; word-break: break-all;" id="test-result-text">Ready to dispatch prompt through pooled Google Pro accounts.</div>
           </div>
         </div>
 
@@ -1312,6 +1314,63 @@ response = client.chat.completions.create(
             <span>Models: <b>gemini-3.8-flash</b>, <b>gemini-2.5-pro</b>, <b>claude-3-5-sonnet</b></span>
             <span style="color: #38bdf8;">Multi-Model</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Model Matrix & Protocol Routing Hub (Fills Full Screen Beautifully) -->
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; margin-top: 2px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="layers" style="width: 15px; height: 15px; color: #38bdf8;"></i>
+              <span>Active Model Matrix & Protocol Capabilities</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 2px;">
+              All requests automatically translate schemas and stream with zero latency through your pooled accounts.
+            </div>
+          </div>
+          <span class="badge" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 11px;">
+            4x Unified Headroom
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-weight: 600; font-size: 12px; color: #38bdf8;">Gemini 3.8 Flash</span>
+              <span class="badge badge-success" style="font-size: 9px;">Default • Fast</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground);">High throughput agentic coding, edits & real-time streaming. 1M Context Window.</div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-weight: 600; font-size: 12px; color: #a855f7;">Gemini 2.5 Pro</span>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; font-size: 9px;">Deep Reasoning</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground);">Complex architectural refactors, deep math & full project analysis. 2M Context Window.</div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-weight: 600; font-size: 12px; color: #ec4899;">Claude 3.5 Sonnet</span>
+              <span class="badge" style="background: rgba(236, 72, 153, 0.1); color: #f472b6; font-size: 9px;">V1 Adapter</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground);">Translates Anthropic JSON structures on-the-fly for seamless Claude Code CLI pairing.</div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-weight: 600; font-size: 12px; color: #10b981;">Smart Quota Shield</span>
+              <span class="badge badge-success" style="font-size: 9px;">Auto-Armed</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground);">Instant 429 failover + proactive session migration before accounts hit 20% limit.</div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted-foreground); border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+          <span>Zero cloud latency • Direct local proxy listening on <b>127.0.0.1:8045</b></span>
+          <span style="color: #10b981;">● All 4 Protocols Active & Healthy</span>
         </div>
       </div>
     </div>
