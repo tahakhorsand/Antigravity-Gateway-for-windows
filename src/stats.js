@@ -13,7 +13,7 @@ import {
   setMetadataDb
 } from './db.js';
 import { getAccounts } from './auth.js';
-import { syncAntigravityAccount } from './antigravity-auth-sync.js';
+import { syncAntigravityAccount, isQuotaErrorStep } from './antigravity-auth-sync.js';
 import { knownAccountRecord } from './account-pool.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -170,6 +170,7 @@ export function updateAccountLiveQuota(accountId, liveQuota) {
   } else {
     acc.is403Banned = false;
     acc.banReason = null;
+    acc.enabled = true; // a successful quota check lifts an earlier 403 block
     acc.subscriptionTier = liveQuota.subscriptionTier || acc.subscriptionTier || 'PRO';
     acc.lastSynced = liveQuota.lastSynced || new Date().toISOString();
     if (liveQuota.geminiWeekly) acc.geminiWeekly = liveQuota.geminiWeekly;
@@ -570,7 +571,8 @@ export function tailLiveAntigravityTranscripts() {
               tracker.lastIndex = stepIdx;
 
               // Immediate detection of 429 quota exhaustion in Antigravity app session
-              const isQuotaError = step.status === 'ERROR' && /quota|resource_exhausted|rate limit|exhausted your|429/i.test(step.content || '');
+              // Antigravity reports API failures as SYSTEM/ERROR_MESSAGE steps with the text in `error`
+              const isQuotaError = isQuotaErrorStep(step);
               if (isQuotaError && activeId && stats.accounts[activeId]) {
                 const accObj = stats.accounts[activeId];
                 if (!accObj.gemini5h) accObj.gemini5h = { pct: 0, resetText: 'Limit Hit' };
@@ -754,20 +756,44 @@ export async function switchAntigravityActiveAccount(accountId, accountDetails, 
   const liveAccount = accountDetails?.refresh_token
     ? accountDetails
     : getAccounts().find((item) => item.email && item.email.toLowerCase() === acc.email.toLowerCase());
+  let ideResult = null;
   if (liveAccount?.refresh_token) {
     try {
       const opts = { conversationId: getActiveConversationId(), ...options };
-      const result = await syncAntigravityAccount(liveAccount, undefined, opts);
-      if (result.ok) {
-        console.log(`[Antigravity] IDE credentials synchronized to ${result.email || acc.email} (restarted: ${!!result.restarted})`);
+      ideResult = await syncAntigravityAccount(liveAccount, undefined, opts);
+      if (ideResult.ok) {
+        console.log(`[Antigravity] IDE credentials synchronized to ${ideResult.email || acc.email} (restarted: ${!!ideResult.restarted}${ideResult.deferred ? ', restart deferred until idle' : ''})`);
       } else {
-        console.error(`[Antigravity] IDE sync notice: ${result.reason || 'unknown'}`);
+        console.error(`[Antigravity] IDE sync notice: ${ideResult.reason || 'unknown'}`);
       }
     } catch (error) {
+      ideResult = { ok: false, reason: error.message };
       console.error(`[Antigravity] IDE account sync error: ${error.message}`);
     }
+  } else {
+    ideResult = { ok: false, reason: 'No refresh token stored for this account; re-add it with npm run add-account' };
   }
 
+  return { ok: true, email: acc.email, ide: ideResult };
+}
+
+/**
+ * Make the harness follow whoever Antigravity is really signed in as (read from its
+ * language server). No credentials are written and nothing is restarted.
+ * Returns true when the harness state changed.
+ */
+export function adoptIdeAccount(email) {
+  const wanted = (email || '').trim().toLowerCase();
+  if (!wanted) return false;
+  loadStats();
+  const acc = getAccounts().find((a) => a.email && a.email.toLowerCase() === wanted);
+  const sameEmail = (stats.global.activeSessionEmail || '').toLowerCase() === wanted;
+  const sameId = (stats.global.activeSessionAccountId || null) === (acc ? acc.id : null);
+  if (sameEmail && sameId) return false;
+  stats.global.activeSessionEmail = wanted;
+  stats.global.activeSessionAccountId = acc ? acc.id : null;
+  writeKnownAntigravityAccounts(wanted);
+  saveStats();
   return true;
 }
 

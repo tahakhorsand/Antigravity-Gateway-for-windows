@@ -1883,16 +1883,33 @@ response = client.chat.completions.create(
         const sessionSub = document.getElementById('session-sub');
         const sessionSummary = document.getElementById('session-quota-summary');
 
-        if (activeAcc) {
+        const ideEmail = (data.global?.ideEmail || '').toLowerCase();
+        const ideDetected = !!data.global?.ideDetected;
+        const pendingSwitch = data.global?.pendingSwitch;
+        const ideInPool = !ideEmail || accounts.some(a => a.email.toLowerCase() === ideEmail);
+
+        if (ideEmail && !ideInPool) {
+          sessionEmail.innerText = `${ideEmail} (not in harness pool)`;
+          sessionLiveBadge.className = 'badge badge-amber';
+          sessionLiveBadge.innerHTML = 'Unmanaged account';
+          sessionSub.innerText = 'Antigravity is signed into an account the harness does not manage. Add it with Add Account, or click Set Active on a pool account.';
+          sessionSummary.innerText = '';
+        } else if (activeAcc) {
           sessionEmail.innerText = `${activeAcc.name || 'Pro Account'} — ${activeAcc.email}`;
-          if (isGenerating) {
+          if (pendingSwitch && pendingSwitch.email !== activeAcc.email.toLowerCase()) {
+            sessionLiveBadge.className = 'badge badge-amber';
+            sessionLiveBadge.innerHTML = '⏳ Switch queued';
+            sessionSub.innerText = `Switching to ${pendingSwitch.email} as soon as the current task finishes.`;
+          } else if (isGenerating) {
             sessionLiveBadge.className = 'badge badge-active';
             sessionLiveBadge.innerHTML = '<i data-lucide="zap" style="width: 11px; height: 11px;"></i> ⚡ Generating';
             sessionSub.innerText = 'Antigravity Prompt Active — Streaming model tokens right now';
           } else {
             sessionLiveBadge.className = 'badge badge-session';
             sessionLiveBadge.innerHTML = '<i data-lucide="radio" style="width: 11px; height: 11px;"></i> Active Session';
-            sessionSub.innerText = 'Antigravity IDE & local proxy dispatch active and ready.';
+            sessionSub.innerText = ideDetected
+              ? 'Confirmed from Antigravity: this is the account it is signed into.'
+              : 'Antigravity not detected right now (closed or restarting). Showing the last known account.';
           }
 
           const gw = activeAcc.geminiWeekly?.pct ?? 100;
@@ -2028,8 +2045,10 @@ response = client.chat.completions.create(
       const activeSessionEmail = data.global?.activeSessionEmail;
       const activeSessionId = data.global?.activeSessionAccountId;
       const isGenerating = !!data.global?.isSessionGenerating;
+      const pendingEmail = (data.global?.pendingSwitch?.email || '').toLowerCase();
 
       grid.innerHTML = accounts.map(a => {
+        const isQueued = !!pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
         const isServing = a.id === activeRunningId;
@@ -2046,6 +2065,8 @@ response = client.chat.completions.create(
           badgeHtml = '<span class="badge badge-active"><i data-lucide="zap" style="width:11px; height:11px;"></i> ⚡ Generating</span>';
         } else if (isActiveSession) {
           badgeHtml = '<span class="badge badge-session"><i data-lucide="radio" style="width:11px; height:11px;"></i> Active Session</span>';
+        } else if (isQueued) {
+          badgeHtml = '<span class="badge badge-amber">⏳ Switching next</span>';
         } else if (isBanned) {
           badgeHtml = '<span class="badge badge-destructive"><i data-lucide="ban" style="width:11px; height:11px;"></i> 403 Forbidden</span>';
         } else if (isCooling) {
@@ -2064,6 +2085,8 @@ response = client.chat.completions.create(
         let actionBtnHtml = '';
         if (isActiveSession) {
           actionBtnHtml = `<span class="badge badge-session" style="padding: 5px 10px;"><i data-lucide="check" style="width:11px; height:11px;"></i> Active Now</span>`;
+        } else if (isQueued) {
+          actionBtnHtml = `<span class="badge badge-amber" style="padding: 5px 10px;">Queued</span>`;
         } else if (isBanned) {
           actionBtnHtml = `<span class="badge badge-destructive" style="padding: 5px 10px;">Restricted</span>`;
         } else {
@@ -2191,8 +2214,21 @@ response = client.chat.completions.create(
 
     async function setActive(id) {
       try {
-        await fetch(`/api/set-active-account?id=${id}`, { method: 'POST' });
-        addLog(`Switched active account pointer to selected account.`);
+        const res = await fetch(`/api/set-active-account?id=${id}`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        const ide = data.ide || {};
+        const who = data.email || ide.email || 'selected account';
+        if (!res.ok || data.ok === false) {
+          addLog(`⚠️ Could not switch to ${who}: ${data.error || 'unknown error'}`, 'err');
+        } else if (ide.restarted || (ide.ok && !ide.deferred && !ide.note)) {
+          addLog(`✅ Antigravity is now signed in as <span class="stream-acc">${who}</span>.`);
+        } else if (ide.deferred) {
+          addLog(`⏳ Credentials set for <span class="stream-acc">${who}</span>. Antigravity will switch as soon as the current task goes idle.`);
+        } else if (ide.ok === false) {
+          addLog(`⚠️ Harness switched to ${who}, but Antigravity did not follow: ${ide.reason || 'unknown reason'}`, 'err');
+        } else {
+          addLog(`🔄 Switched to ${who}. ${ide.note || ''}`);
+        }
         await fetchMatrix();
       } catch (e) {
         console.error('Failed to set active account:', e);
@@ -2300,9 +2336,23 @@ response = client.chat.completions.create(
           } else if (item.type === 'account_switch') {
             addLog(`🔄 Active Antigravity session switched to <span class="stream-acc">${item.email}</span>`);
             fetchMatrix();
-          } else if (item.type === 'proactive_switch') {
-            addLog(`🛡️ <span style="color:#38bdf8; font-weight:600;">Smart Shield</span>: Proactively switched active session from <b>${item.from}</b> (${item.fromWeekly}%) to <b>${item.to}</b> (${item.toWeekly}%).`);
+          } else if (item.type === 'ide_switch_result') {
+            if (item.ok) addLog(`✅ Antigravity is now signed in as <span class="stream-acc">${item.email}</span>.`);
+            else addLog(`⚠️ Antigravity did not switch to ${item.email}: ${item.reason || 'unknown reason'}`, 'err');
             fetchMatrix();
+          } else if (item.type === 'proactive_switch') {
+            const shield = `🛡️ <span style="color:#38bdf8; font-weight:600;">Smart Shield</span>`;
+            const why = item.reason === 'quota_error' ? 'hit a quota error' : `went below ${item.threshold}%`;
+            if (item.state === 'scheduled') {
+              addLog(`${shield}: <b>${item.from}</b> ${why} (${item.fromWeekly}% weekly / ${item.fromBurst}% 5h). Switching to <b>${item.to}</b> as soon as the current task finishes.`);
+            } else if (item.state === 'switched') {
+              addLog(`${shield}: <b>${item.from}</b> ${why}. Antigravity is now using <b>${item.to}</b> (${item.toWeekly}% weekly).`);
+            } else {
+              addLog(`${shield}: switch from <b>${item.from}</b> to <b>${item.to}</b> failed: ${item.error || 'unknown error'}`, 'err');
+            }
+            fetchMatrix();
+          } else if (item.type === 'shield_stranded') {
+            addLog(`🛡️ Smart Shield: <b>${item.email}</b> is below ${item.threshold}% but ${item.reason}.`, 'err');
           }
         } catch (err) {}
       };

@@ -48,3 +48,53 @@ export function shouldAdoptActiveSession(globalStats, servedAccount) {
   if (activeEmail && servedAccount.email && servedAccount.email.toLowerCase() === activeEmail) return false;
   return true;
 }
+
+export function accountHeadroom(accStats = {}) {
+  return {
+    weekly: accStats?.geminiWeekly?.pct ?? accStats?.quotas?.pro ?? 100,
+    burst: accStats?.gemini5h?.pct ?? 100
+  };
+}
+
+/**
+ * Smart Shield decision. Pure: no I/O, easy to test.
+ * Returns { action: 'none' | 'stranded' | 'switch', ... }.
+ */
+export function planShieldSwitch({
+  accounts = [],
+  statsAccounts = {},
+  currentId,
+  threshold = 20,
+  isCoolingDown = () => false,
+  forceLow = false
+} = {}) {
+  const current = accounts.find((a) => a.id === currentId);
+  if (!current) return { action: 'none', reason: 'current account unknown' };
+
+  const cur = accountHeadroom(statsAccounts[current.id]);
+  const low = forceLow || cur.weekly < threshold || cur.burst < threshold;
+  if (!low) {
+    return { action: 'none', reason: 'current account above threshold', current, currentWeekly: cur.weekly, currentBurst: cur.burst };
+  }
+
+  // A replacement must have clearly more room than the threshold, or we would bounce straight back.
+  const minWeekly = Math.max(25, threshold + 5);
+  const minBurst = Math.max(15, threshold + 5);
+  const candidates = [];
+  for (const account of accounts) {
+    if (account.id === current.id) continue;
+    const s = statsAccounts[account.id];
+    if (!s || !s.enabled || s.is403Banned || isCoolingDown(account.id)) continue;
+    const h = accountHeadroom(s);
+    if (h.weekly > minWeekly && h.burst > minBurst) {
+      candidates.push({ account, weekly: h.weekly, burst: h.burst, score: h.weekly * 0.6 + h.burst * 0.4 });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+
+  const base = { current, currentWeekly: cur.weekly, currentBurst: cur.burst, minWeekly, minBurst };
+  if (candidates.length === 0) {
+    return { action: 'stranded', reason: `no other account has more than ${minWeekly}% weekly and ${minBurst}% 5h quota left`, ...base };
+  }
+  return { action: 'switch', target: candidates[0], candidates, ...base };
+}

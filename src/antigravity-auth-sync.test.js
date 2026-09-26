@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { buildJetskiDocument, idTokenEmail, writeJetskiToken, formatRFC3339Micros } from './antigravity-auth-sync.js';
+import {
+  buildJetskiDocument,
+  idTokenEmail,
+  writeJetskiToken,
+  formatRFC3339Micros,
+  preserveConversationLayout,
+  isAntigravitySessionBusy,
+  scheduleLanguageServerSwitch,
+  getPendingSwitch,
+  cancelPendingSwitch
+} from './antigravity-auth-sync.js';
 
 function jwt(payload) {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -59,20 +69,57 @@ test('preserveConversationLayout persists active conversation and pane to app_st
   }));
 
   const testConvId = '12345678-abcd-ef01-2345-6789abcdef01';
-  import('./antigravity-auth-sync.js').then(({ preserveConversationLayout }) => {
-    const success = preserveConversationLayout(testConvId, storageFile);
-    assert.equal(success, true);
+  const success = preserveConversationLayout(testConvId, storageFile);
+  assert.equal(success, true);
 
-    const saved = JSON.parse(fs.readFileSync(storageFile, 'utf8'));
-    const index = JSON.parse(saved['antigravity-multi-conversation-layout-v3-index']);
-    assert.deepEqual(index[0], [testConvId]);
+  const saved = JSON.parse(fs.readFileSync(storageFile, 'utf8'));
+  const index = JSON.parse(saved['antigravity-multi-conversation-layout-v3-index']);
+  assert.deepEqual(index[0], [testConvId]);
 
-    const layout = JSON.parse(saved[`antigravity-multi-conversation-layout-v3-${testConvId}`]);
-    assert.equal(layout.rootNode.cascadeId, testConvId);
-    assert.equal(layout.rootNode.type, 'pane');
-    fs.rmSync(dir, { recursive: true, force: true });
-  });
+  const layout = JSON.parse(saved[`antigravity-multi-conversation-layout-v3-${testConvId}`]);
+  assert.equal(layout.rootNode.cascadeId, testConvId);
+  assert.equal(layout.rootNode.type, 'pane');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
+function fakeGeminiDirWithTranscript() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-gemini-'));
+  const logDir = path.join(dir, 'antigravity', 'brain', 'conv-1', '.system_generated', 'logs');
+  fs.mkdirSync(logDir, { recursive: true });
+  const logFile = path.join(logDir, 'transcript.jsonl');
+  fs.writeFileSync(logFile, '{}\n');
+  return { dir, logFile };
+}
 
+test('isAntigravitySessionBusy waits for a finished answer to settle', () => {
+  const { dir, logFile } = fakeGeminiDirWithTranscript();
+  fs.writeFileSync(logFile, [
+    { step_index: 1, source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE' },
+    { step_index: 2, source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', content: 'All done.' }
+  ].map((step) => JSON.stringify(step)).join('\n') + '\n');
+  const tenSecondsAgo = new Date(Date.now() - 10000);
+  fs.utimesSync(logFile, tenSecondsAgo, tenSecondsAgo);
+  assert.equal(isAntigravitySessionBusy(dir, 8000), false);
+  assert.equal(isAntigravitySessionBusy(dir, 20000), true);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
+test('a switch requested while a task is running stays pending until cancelled or superseded', () => {
+  const { dir } = fakeGeminiDirWithTranscript(); // transcript just written => busy
+  const pending = scheduleLanguageServerSwitch(
+    { email: 'Carol@example.com', refresh_token: 'r', access_token: 'a' },
+    { geminiDir: dir, idleMs: 60000, pollMs: 50 }
+  );
+  assert.equal(pending.email, 'carol@example.com');
+  assert.equal(getPendingSwitch().email, 'carol@example.com');
+
+  scheduleLanguageServerSwitch(
+    { email: 'alice@example.com', refresh_token: 'r', access_token: 'a' },
+    { geminiDir: dir, idleMs: 60000, pollMs: 50 }
+  );
+  assert.equal(getPendingSwitch().email, 'alice@example.com');
+
+  cancelPendingSwitch();
+  assert.equal(getPendingSwitch(), null);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
