@@ -997,9 +997,9 @@
     }
     .heatmap-grid {
       display: grid;
-      grid-template-columns: 56px repeat(24, 1fr);
+      grid-template-columns: 72px repeat(24, 1fr);
       gap: 3px;
-      min-width: 660px;
+      min-width: 720px;
     }
     .heatmap-header-cell {
       font-size: 9px;
@@ -1014,6 +1014,7 @@
       color: var(--text-3);
       display: flex;
       align-items: center;
+      white-space: nowrap;
     }
     .heatmap-cell {
       height: 16px;
@@ -1022,6 +1023,10 @@
       border: 1px solid rgba(255,255,255,0.03);
       cursor: pointer;
       transition: transform 0.15s, border-color 0.15s;
+    }
+    .heatmap-cell.is-now {
+      border: 1px solid var(--blue) !important;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.45);
     }
     .heatmap-cell:hover {
       transform: scale(1.22);
@@ -2940,6 +2945,7 @@
     async function fetchHeatmap() {
       const container = document.getElementById('heatmap-grid-container');
       const pill = document.getElementById('heatmap-summary-pill');
+      const statsLine = document.getElementById('heatmap-stats-line');
       if (!container) return;
 
       try {
@@ -2948,23 +2954,39 @@
         const data = await res.json();
         const days = data.days || [];
         const maxTokens = data.maxTokens || 1;
+        const tz = data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+        const currentHour = typeof data.currentHour === 'number' ? data.currentHour : new Date().getHours();
 
         if (pill) {
-          pill.innerText = `Peak 1h: ${formatNumber(maxTokens)} tokens`;
+          pill.innerText = `Peak 1h: ${formatNumber(maxTokens)} tokens • Local (${tz})`;
+        }
+        if (statsLine) {
+          statsLine.innerHTML = `Active coding hours tracked in SQLite &bull; System Timezone: <strong style="color:var(--text-2);">${tz}</strong>`;
         }
 
         let html = '<div class="heatmap-header-cell"></div>';
         for (let h = 0; h < 24; h++) {
-          const hStr = h % 2 === 0 ? `${h}h` : '';
-          html += `<div class="heatmap-header-cell">${hStr}</div>`;
+          const isCurr = h === currentHour;
+          const hStr = h % 3 === 0 ? `${h}h` : '';
+          const currStyle = isCurr ? 'color: var(--blue); font-weight: 700;' : '';
+          html += `<div class="heatmap-header-cell" style="${currStyle}" title="${h}:00 local hour">${hStr}</div>`;
         }
 
         for (const day of days) {
-          html += `<div class="heatmap-row-label">${day.dayShort || day.dayLabel}</div>`;
+          const isToday = day.isToday;
+          const isYesterday = day.isYesterday;
+          const displayLabel = isToday ? 'Today' : (isYesterday ? 'Yesterday' : `${day.dayShort} ${day.date.slice(5)}`);
+          const labelStyle = isToday ? 'color: var(--green); font-weight: 600;' : (isYesterday ? 'color: var(--text-2); font-weight: 500;' : '');
+          html += `<div class="heatmap-row-label" style="${labelStyle}" title="${day.dayLabel} (${day.date})">${displayLabel}</div>`;
           for (const cell of day.hours) {
-            const timeRange = `${cell.hourLabel}–${String((cell.hour + 1) % 24).padStart(2, '0')}:00`;
-            const tooltip = `${day.dayLabel} at ${timeRange}\n• Tokens: ${cell.tokens.toLocaleString()} (Saved ~$${cell.dollarsSaved})\n• Requests: ${cell.requests}`;
-            html += `<div class="heatmap-cell level-${cell.level}" title="${tooltip}"></div>`;
+            const h12 = cell.hour === 0 ? '12 AM' : (cell.hour === 12 ? '12 PM' : (cell.hour > 12 ? `${cell.hour - 12} PM` : `${cell.hour} AM`));
+            const nextH = (cell.hour + 1) % 24;
+            const nextH12 = nextH === 0 ? '12 AM' : (nextH === 12 ? '12 PM' : (nextH > 12 ? `${nextH - 12} PM` : `${nextH} AM`));
+            const timeRange = `${cell.hourLabel}–${String(nextH).padStart(2, '0')}:00 (${h12} – ${nextH12})`;
+            const currentMarker = cell.isCurrent ? ' [CURRENT HOUR NOW]' : '';
+            const tooltip = `${day.dayLabel} (${day.date})${currentMarker}\n⏰ Time: ${timeRange} ${tz}\n• Tokens: ${cell.tokens.toLocaleString()} (Saved ~$${cell.dollarsSaved})\n• Requests: ${cell.requests}`;
+            const nowClass = cell.isCurrent ? ' is-now' : '';
+            html += `<div class="heatmap-cell level-${cell.level}${nowClass}" title="${tooltip}"></div>`;
           }
         }
 

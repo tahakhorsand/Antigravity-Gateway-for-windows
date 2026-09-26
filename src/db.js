@@ -25,6 +25,13 @@ export function getDatabase() {
   return dbInstance;
 }
 
+export function getLocalDateString(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function initSchema() {
   const db = dbInstance;
   db.exec(`
@@ -72,6 +79,28 @@ function initSchema() {
       value TEXT
     );
   `);
+
+  // Ensure daily_usage is aligned to local calendar dates
+  try {
+    const localToday = getLocalDateString();
+    const hasTodayInLogs = db.prepare(`SELECT 1 FROM request_logs WHERE date(datetime(timestamp / 1000, 'unixepoch', 'localtime')) = ? LIMIT 1`).get(localToday);
+    const hasTodayInDaily = db.prepare(`SELECT 1 FROM daily_usage WHERE date = ? LIMIT 1`).get(localToday);
+    if (hasTodayInLogs && !hasTodayInDaily) {
+      db.exec(`
+        DELETE FROM daily_usage;
+        INSERT INTO daily_usage (date, account_id, total_requests, input_tokens, output_tokens, total_tokens)
+        SELECT 
+          date(datetime(timestamp / 1000, 'unixepoch', 'localtime')) AS date,
+          account_id,
+          COUNT(*) AS total_requests,
+          COALESCE(SUM(input_tokens), 0) AS input_tokens,
+          COALESCE(SUM(output_tokens), 0) AS output_tokens,
+          COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM request_logs
+        GROUP BY date, account_id;
+      `);
+    }
+  } catch (e) {}
 }
 
 export function recordRequestDb({
@@ -91,7 +120,7 @@ export function recordRequestDb({
     const db = getDatabase();
     const now = Date.now();
     const isoString = new Date(now).toISOString();
-    const dateStr = isoString.slice(0, 10); // YYYY-MM-DD
+    const dateStr = getLocalDateString(new Date(now)); // Local calendar date YYYY-MM-DD
     const total = totalTokens || (inputTokens + outputTokens + cachedTokens);
 
     // 1. Insert detailed request log
@@ -232,15 +261,15 @@ export function getDailyAnalyticsDb(days = 7) {
     const db = getDatabase();
     const query = db.prepare(`
       SELECT 
-        date,
-        SUM(total_requests) AS totalRequests,
-        SUM(input_tokens) AS inputTokens,
-        SUM(output_tokens) AS outputTokens,
-        SUM(total_tokens) AS totalTokens
-      FROM daily_usage
+        date(datetime(timestamp / 1000, 'unixepoch', 'localtime')) AS date,
+        COUNT(*) AS totalRequests,
+        COALESCE(SUM(input_tokens), 0) AS inputTokens,
+        COALESCE(SUM(output_tokens), 0) AS outputTokens,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens
+      FROM request_logs
+      WHERE timestamp >= (strftime('%s', 'now') - ((? + 1) * 86400)) * 1000
       GROUP BY date
       ORDER BY date DESC
-      LIMIT ?
     `);
     const rows = query.all(days);
     const byDate = new Map();
@@ -253,13 +282,13 @@ export function getDailyAnalyticsDb(days = 7) {
       });
     }
 
-    // Build continuous array of past N days up to today
+    // Build continuous array of past N days up to today in local calendar dates
     const result = [];
     const now = new Date();
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = getLocalDateString(d);
       const dayData = byDate.get(dateStr) || {
         totalRequests: 0,
         inputTokens: 0,
@@ -327,7 +356,7 @@ export function getHourlyHeatmapDb(days = 7) {
         COALESCE(SUM(input_tokens), 0) AS inputTokens,
         COALESCE(SUM(output_tokens), 0) AS outputTokens
       FROM request_logs
-      WHERE timestamp >= (strftime('%s', 'now') - (? * 86400)) * 1000
+      WHERE timestamp >= (strftime('%s', 'now') - ((? + 1) * 86400)) * 1000
       GROUP BY dayDate, hourNum
       ORDER BY dayDate ASC, hourNum ASC
     `);
@@ -350,11 +379,16 @@ export function getHourlyHeatmapDb(days = 7) {
 
     const grid = [];
     const now = new Date();
+    const currentHour = now.getHours();
+    const todayDateStr = getLocalDateString(now);
+
     for (let d = days - 1; d >= 0; d--) {
       const dayDateObj = new Date(now);
       dayDateObj.setDate(dayDateObj.getDate() - d);
-      const dayDateStr = dayDateObj.toISOString().slice(0, 10);
-      const dayLabel = d === 0 ? 'Today' : (d === 1 ? 'Yesterday' : dayDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
+      const dayDateStr = getLocalDateString(dayDateObj);
+      const isToday = d === 0;
+      const isYesterday = d === 1;
+      const dayLabel = isToday ? 'Today' : (isYesterday ? 'Yesterday' : dayDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
       const dayShort = dayDateObj.toLocaleDateString('en-US', { weekday: 'short' });
 
       const hours = [];
@@ -374,7 +408,8 @@ export function getHourlyHeatmapDb(days = 7) {
           tokens: item.tokens,
           requests: item.requests,
           dollarsSaved: Number(((item.inTok * 0.000003) + (item.outTok * 0.000015)).toFixed(3)),
-          level
+          level,
+          isCurrent: isToday && h === currentHour
         });
       }
 
@@ -382,17 +417,22 @@ export function getHourlyHeatmapDb(days = 7) {
         date: dayDateStr,
         dayLabel,
         dayShort,
+        isToday,
+        isYesterday,
         hours
       });
     }
 
     return {
       days: grid,
-      maxTokens
+      maxTokens,
+      currentHour,
+      todayDateStr,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local'
     };
   } catch (err) {
     console.error('[SQLite] Error calculating hourly heatmap:', err.message);
-    return { days: [], maxTokens: 0 };
+    return { days: [], maxTokens: 0, currentHour: 0, todayDateStr: '', timezone: 'Local' };
   }
 }
 
