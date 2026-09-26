@@ -6,7 +6,8 @@ import {
   getPersistedTotalsDb, 
   migrateExistingJsonStats, 
   getRecentLogsDb, 
-  getDailyAnalyticsDb 
+  getDailyAnalyticsDb,
+  getModelDistributionDb
 } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -465,6 +466,17 @@ export function getAllStats() {
   checkAntigravityLiveSession();
   computeBestAccount();
   updateLoadMetrics();
+
+  // Commercial API cost savings (vs GPT-4o / Claude 3.5 Sonnet: $3/M input, $15/M output)
+  const inputCost = (stats.global.inputTokens || 0) * 0.000003;
+  const outputCost = (stats.global.outputTokens || 0) * 0.000015;
+  const totalSaved = inputCost + outputCost;
+
+  stats.global.dollarsSaved = Number(totalSaved.toFixed(2));
+  stats.global.dollarsSavedFormatted = '$' + totalSaved.toFixed(2);
+  stats.global.dailyAnalytics = getDailyAnalyticsDb(7);
+  stats.global.modelDistribution = getModelDistributionDb();
+
   return stats;
 }
 
@@ -476,4 +488,4 @@ export function setActiveAccount(accountId) {
   }
 }
 
-export { getRecentLogsDb, getDailyAnalyticsDb } from './db.js';
+export { getRecentLogsDb, getDailyAnalyticsDb, getModelDistributionDb } from './db.js';

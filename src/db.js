@@ -227,7 +227,7 @@ export function getRecentLogsDb(limit = 50) {
   }
 }
 
-export function getDailyAnalyticsDb(days = 14) {
+export function getDailyAnalyticsDb(days = 7) {
   try {
     const db = getDatabase();
     const query = db.prepare(`
@@ -242,9 +242,75 @@ export function getDailyAnalyticsDb(days = 14) {
       ORDER BY date DESC
       LIMIT ?
     `);
-    return query.all(days).reverse();
+    const rows = query.all(days);
+    const byDate = new Map();
+    for (const r of rows) {
+      byDate.set(r.date, {
+        totalRequests: Number(r.totalRequests || 0),
+        inputTokens: Number(r.inputTokens || 0),
+        outputTokens: Number(r.outputTokens || 0),
+        totalTokens: Number(r.totalTokens || 0)
+      });
+    }
+
+    // Build continuous array of past N days up to today
+    const result = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayData = byDate.get(dateStr) || {
+        totalRequests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0
+      };
+
+      // Commercial API baseline savings ($3/M input, $15/M output like GPT-4o / Claude 3.5 Sonnet)
+      const dollarsSaved = (dayData.inputTokens * 0.000003) + (dayData.outputTokens * 0.000015);
+
+      result.push({
+        date: dateStr,
+        label: i === 0 ? 'Today' : (i === 1 ? 'Yesterday' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })),
+        dayShort: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        totalRequests: dayData.totalRequests,
+        inputTokens: dayData.inputTokens,
+        outputTokens: dayData.outputTokens,
+        totalTokens: dayData.totalTokens,
+        dollarsSaved: Number(dollarsSaved.toFixed(3))
+      });
+    }
+
+    return result;
   } catch (err) {
     console.error('[SQLite] Error reading daily analytics:', err.message);
+    return [];
+  }
+}
+
+export function getModelDistributionDb() {
+  try {
+    const db = getDatabase();
+    const query = db.prepare(`
+      SELECT 
+        COALESCE(model, 'gemini-2.5-pro') AS model,
+        COUNT(*) AS requestCount,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens
+      FROM request_logs
+      GROUP BY model
+      ORDER BY totalTokens DESC
+    `);
+    const rows = query.all();
+    const totalAllTokens = rows.reduce((sum, r) => sum + Number(r.totalTokens || 0), 0) || 1;
+    return rows.map(r => ({
+      model: r.model,
+      requestCount: Number(r.requestCount || 0),
+      totalTokens: Number(r.totalTokens || 0),
+      percentage: Math.max(1, Math.round((Number(r.totalTokens || 0) / totalAllTokens) * 100))
+    }));
+  } catch (err) {
+    console.error('[SQLite] Error reading model distribution:', err.message);
     return [];
   }
 }
