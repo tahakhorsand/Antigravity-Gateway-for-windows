@@ -1,4 +1,12 @@
-<!DOCTYPE html>
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const targetPath = path.resolve(__dirname, '../src/dashboard.html');
+
+const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1361,13 +1369,13 @@
           <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">OpenAI Compatible Endpoint</div>
           <div style="font-size: 11px; color: var(--text-3); margin-bottom: 12px;">Compatible with Cursor, Cline, Continue, Aider, and standard OpenAI SDKs.</div>
           <div style="background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; font-family: var(--font-mono); font-size: 11px; color: #d4d4d8; position: relative;">
-            <pre><code>curl http://127.0.0.1:8045/v1/chat/completions \
-  -H "Content-Type: application/json" \
+            <pre><code>curl http://127.0.0.1:8045/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
   -d '{
     "model": "gemini-3.8-flash",
     "messages": [{"role": "user", "content": "Hello"}]
   }'</code></pre>
-            <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copySnippet(`curl http://127.0.0.1:8045/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"gemini-3.8-flash","messages":[{"role":"user","content":"Hello"}]}'`, this)">Copy</button>
+            <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copySnippet(\`curl http://127.0.0.1:8045/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"gemini-3.8-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}'\`, this)">Copy</button>
           </div>
         </div>
 
@@ -1375,13 +1383,13 @@
           <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Anthropic Compatible Endpoint</div>
           <div style="font-size: 11px; color: var(--text-3); margin-bottom: 12px;">Direct protocol support for Anthropic Messages API.</div>
           <div style="background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; font-family: var(--font-mono); font-size: 11px; color: #d4d4d8; position: relative;">
-            <pre><code>curl http://127.0.0.1:8045/v1/messages \
-  -H "Content-Type: application/json" \
+            <pre><code>curl http://127.0.0.1:8045/v1/messages \\
+  -H "Content-Type: application/json" \\
   -d '{
     "model": "claude-3-5-sonnet",
     "messages": [{"role": "user", "content": "Hello"}]
   }'</code></pre>
-            <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copySnippet(`curl http://127.0.0.1:8045/v1/messages -H 'Content-Type: application/json' -d '{"model":"claude-3-5-sonnet","messages":[{"role":"user","content":"Hello"}]}'`, this)">Copy</button>
+            <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copySnippet(\`curl http://127.0.0.1:8045/v1/messages -H 'Content-Type: application/json' -d '{\"model\":\"claude-3-5-sonnet\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}'\`, this)">Copy</button>
           </div>
         </div>
       </div>
@@ -1514,7 +1522,7 @@
       document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
 
       const targetPane = document.getElementById(tabId);
-      const targetTabBtn = document.querySelector(`.nav-tab[data-tab="${tabId}"]`);
+      const targetTabBtn = document.querySelector(\`.nav-tab[data-tab="\${tabId}"]\`);
 
       if (targetPane) targetPane.classList.add('active');
       if (targetTabBtn) targetTabBtn.classList.add('active');
@@ -1543,11 +1551,11 @@
       const modal = document.getElementById('inspector-modal');
       const content = document.getElementById('inspector-content');
       const idTag = document.getElementById('inspector-id');
-      if (idTag) idTag.innerText = `REQ #${logId}`;
+      if (idTag) idTag.innerText = \`REQ #\${logId}\`;
       if (content) content.innerText = '// Loading request payload...';
       if (modal) modal.style.display = 'flex';
 
-      fetch(`/api/db/logs?search=${logId}&limit=1`)
+      fetch(\`/api/db/logs?search=\${logId}&limit=1\`)
         .then(r => r.json())
         .then(data => {
           const item = data.logs?.[0];
@@ -1597,9 +1605,9 @@
       const secs = totalSec % 60;
 
       if (hours > 0) {
-        timerEl.innerText = `${hours}h ${mins}m ${secs}s`;
+        timerEl.innerText = \`\${hours}h \${mins}m \${secs}s\`;
       } else {
-        timerEl.innerText = `${mins}m ${secs}s`;
+        timerEl.innerText = \`\${mins}m \${secs}s\`;
       }
     }
     setInterval(updateResetCountdown, 1000);
@@ -1639,7 +1647,7 @@
         const enabled = data.enabled !== false;
         if (toggle) toggle.checked = enabled;
         if (headerPill) {
-          headerPill.innerText = enabled ? `Armed (<${data.weeklyThreshold || 20}%)` : 'Disabled';
+          headerPill.innerText = enabled ? \`Armed (<\${data.weeklyThreshold || 20}%)\` : 'Disabled';
           headerPill.style.color = enabled ? 'var(--text-1)' : 'var(--text-3)';
         }
 
@@ -1651,7 +1659,7 @@
         const primary = document.getElementById('shield-primary');
         if (primary && Array.isArray(data.accounts)) {
           primary.innerHTML = '<option value="">None (spend quota that expires first)</option>' +
-            data.accounts.map(e => `<option value="${e}">${e}</option>`).join('');
+            data.accounts.map(e => \`<option value="\${e}">\${e}</option>\`).join('');
           primary.value = data.primaryEmail || '';
         }
         const auto = document.getElementById('shield-auto-continue');
@@ -1661,7 +1669,7 @@
         if (detected) {
           const fams = data.detectedModels?.families;
           detected.innerText = data.models === 'auto'
-            ? (fams && fams.length ? `(active: ${fams.map(f => f === 'claude' ? 'Claude/GPT' : 'Gemini').join(' + ')})` : 'Watching both until detected')
+            ? (fams && fams.length ? \`(active: \${fams.map(f => f === 'claude' ? 'Claude/GPT' : 'Gemini').join(' + ')})\` : 'Watching both until detected')
             : '';
         }
       } catch (e) {}
@@ -1683,7 +1691,7 @@
           body: JSON.stringify(change)
         });
         const updated = await res.json();
-        addLog(`🛡️ Smart Shield settings updated.`);
+        addLog(\`🛡️ Smart Shield settings updated.\`);
         fetchSmartShieldConfig();
       } catch (e) {
         console.error('Error saving Smart Shield setting:', e);
@@ -1728,7 +1736,7 @@
           account,
           model
         });
-        const res = await fetch(`/api/db/logs?${query.toString()}`);
+        const res = await fetch(\`/api/db/logs?\${query.toString()}\`);
         if (!res.ok) return;
         const data = await res.json();
         const logs = data.logs || [];
@@ -1737,7 +1745,7 @@
         if (info) {
           const start = pag.total === 0 ? 0 : (pag.page - 1) * pag.limit + 1;
           const end = Math.min(pag.page * pag.limit, pag.total);
-          info.innerText = `Showing ${start}–${end} of ${pag.total} requests (Page ${pag.page} of ${pag.totalPages})`;
+          info.innerText = \`Showing \${start}–\${end} of \${pag.total} requests (Page \${pag.page} of \${pag.totalPages})\`;
         }
 
         if (btnPrev) btnPrev.disabled = !pag.hasPrev;
@@ -1752,25 +1760,25 @@
           let statusBadge = '<span class="status-badge active-now">200 OK</span>';
           if (l.status_code === 429) statusBadge = '<span class="status-badge queued">429 Quota</span>';
           else if (l.status_code === 403) statusBadge = '<span class="status-badge restricted">403 Banned</span>';
-          else if (l.status_code >= 400) statusBadge = `<span class="status-badge restricted">${l.status_code} Err</span>`;
+          else if (l.status_code >= 400) statusBadge = \`<span class="status-badge restricted">\${l.status_code} Err</span>\`;
 
           const timeStr = l.created_at ? new Date(l.created_at).toLocaleTimeString() : '';
-          const tokStr = `↑${l.input_tokens || 0} ↓${l.output_tokens || 0}`;
+          const tokStr = \`↑\${l.input_tokens || 0} ↓\${l.output_tokens || 0}\`;
 
-          return `
+          return \`
             <tr>
-              <td>${statusBadge}</td>
-              <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-3);">#${l.request_id || l.id}</td>
-              <td style="font-weight: 500; color: var(--text-1);">${l.account_email || 'anonymous'}</td>
-              <td style="font-family: var(--font-mono); font-size: 11px; color: var(--blue);">${l.model || 'auto'}</td>
-              <td>${l.latency_ms || 0}ms</td>
-              <td>${tokStr}</td>
-              <td style="color: var(--text-4); font-size: 11px;">${timeStr}</td>
+              <td>\${statusBadge}</td>
+              <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-3);">#\${l.request_id || l.id}</td>
+              <td style="font-weight: 500; color: var(--text-1);">\${l.account_email || 'anonymous'}</td>
+              <td style="font-family: var(--font-mono); font-size: 11px; color: var(--blue);">\${l.model || 'auto'}</td>
+              <td>\${l.latency_ms || 0}ms</td>
+              <td>\${tokStr}</td>
+              <td style="color: var(--text-4); font-size: 11px;">\${timeStr}</td>
               <td style="text-align: right;">
-                <button class="btn btn-ghost btn-sm" onclick="openInspector(${l.request_id || l.id})">Inspect</button>
+                <button class="btn btn-ghost btn-sm" onclick="openInspector(\${l.request_id || l.id})">Inspect</button>
               </td>
             </tr>
-          `;
+          \`;
         }).join('');
       } catch (err) {
         console.error('Error fetching SQLite logs:', err);
@@ -1868,12 +1876,12 @@
         if (moneyEl) moneyEl.innerText = data.global?.dollarsSavedFormatted || '$0.00';
 
         const tabSavings = document.getElementById('tab-badge-savings');
-        if (tabSavings) tabSavings.innerText = `${data.global?.dollarsSavedFormatted || '$0.00'} Saved`;
+        if (tabSavings) tabSavings.innerText = \`\${data.global?.dollarsSavedFormatted || '$0.00'} Saved\`;
 
         const chartSaved = document.getElementById('chart-saved-badge');
         const todayStats = (data.global?.dailyAnalytics || [])[(data.global?.dailyAnalytics || []).length - 1];
         if (chartSaved && todayStats) {
-          chartSaved.innerText = `$${(todayStats.dollarsSaved || 0).toFixed(2)} Saved Today`;
+          chartSaved.innerText = \`$\${(todayStats.dollarsSaved || 0).toFixed(2)} Saved Today\`;
         }
 
         // Badges
@@ -1907,26 +1915,26 @@
         const total = day.totalTokens || 0;
         const input = day.inputTokens || 0;
         const output = day.outputTokens || 0;
-        const saved = day.dollarsSaved ? `$${day.dollarsSaved.toFixed(2)}` : '$0.00';
+        const saved = day.dollarsSaved ? \`$\${day.dollarsSaved.toFixed(2)}\` : '$0.00';
 
         const totalHeight = total > 0 ? Math.max(10, Math.round((total / maxTokens) * 105)) : 4;
         const inputPct = total > 0 ? Math.round((input / total) * 100) : 50;
         const outputPct = total > 0 ? (100 - inputPct) : 50;
 
-        return `
-          <div class="chart-bar-wrap" title="${day.label}: ${total.toLocaleString()} tokens (${input} in / ${output} out) &bull; ${saved} saved">
-            <div style="font-size: 9px; font-weight: 500; color: ${total > 0 ? 'var(--text-2)' : 'var(--text-4)'};">
-              ${total > 0 ? formatNumber(total) : '0'}
+        return \`
+          <div class="chart-bar-wrap" title="\${day.label}: \${total.toLocaleString()} tokens (\${input} in / \${output} out) &bull; \${saved} saved">
+            <div style="font-size: 9px; font-weight: 500; color: \${total > 0 ? 'var(--text-2)' : 'var(--text-4)'};">
+              \${total > 0 ? formatNumber(total) : '0'}
             </div>
-            <div class="chart-bar-pillar" style="height: ${totalHeight}px;">
-              <div style="height: ${outputPct}%; background: var(--green); width: 100%;"></div>
-              <div style="height: ${inputPct}%; background: var(--blue); width: 100%;"></div>
+            <div class="chart-bar-pillar" style="height: \${totalHeight}px;">
+              <div style="height: \${outputPct}%; background: var(--green); width: 100%;"></div>
+              <div style="height: \${inputPct}%; background: var(--blue); width: 100%;"></div>
             </div>
-            <div class="chart-label" style="font-weight: ${isToday ? '600' : '400'}; color: ${isToday ? 'var(--blue)' : 'var(--text-4)'};">
-              ${day.dayShort || day.label}
+            <div class="chart-label" style="font-weight: \${isToday ? '600' : '400'}; color: \${isToday ? 'var(--blue)' : 'var(--text-4)'};">
+              \${day.dayShort || day.label}
             </div>
           </div>
-        `;
+        \`;
       }).join('');
     }
 
@@ -1942,13 +1950,13 @@
       }
 
       const colors = ['var(--blue)', 'var(--purple)', 'var(--green)', 'var(--amber)', '#ec4899'];
-      bar.innerHTML = models.map((m, i) => `
-        <div style="width: ${m.percentage}%; background: ${colors[i % colors.length]}; height: 100%;" title="${m.model}: ${m.percentage}% (${formatNumber(m.totalTokens)} tokens)"></div>
-      `).join('');
+      bar.innerHTML = models.map((m, i) => \`
+        <div style="width: \${m.percentage}%; background: \${colors[i % colors.length]}; height: 100%;" title="\${m.model}: \${m.percentage}% (\${formatNumber(m.totalTokens)} tokens)"></div>
+      \`).join('');
 
-      summary.innerHTML = models.map((m, i) => `
-        <span style="color: ${colors[i % colors.length]}; font-weight: 500;">${m.model.replace('gemini-', '')} (${m.percentage}%)</span>
-      `).join(' &bull; ');
+      summary.innerHTML = models.map((m, i) => \`
+        <span style="color: \${colors[i % colors.length]}; font-weight: 500;">\${m.model.replace('gemini-', '')} (\${m.percentage}%)</span>
+      \`).join(' &bull; ');
     }
 
     // Render Accounts Table View
@@ -1981,7 +1989,7 @@
           statusHtml = '<span class="status-badge restricted">403 Restricted</span>';
         } else if (isCooling) {
           const rem = Math.ceil((a.cooldownUntil - Date.now()) / 1000);
-          statusHtml = `<span class="status-badge cooling">Cooling (${rem}s)</span>`;
+          statusHtml = \`<span class="status-badge cooling">Cooling (\${rem}s)</span>\`;
         } else if (isNextRecommended) {
           statusHtml = '<span class="status-badge" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); color: var(--blue);"><i data-lucide="sparkles" style="width:10px;height:10px;"></i> Recommended</span>';
         } else if (isLowest && (gw.pct < 20 || g5.pct < 20)) {
@@ -1992,69 +2000,69 @@
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
         const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
 
-        let actionBtn = `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>`;
+        let actionBtn = \`<button class="btn btn-secondary btn-sm" onclick="setActive('\${a.id}')">Set Active</button>\`;
         if (isActive) {
           actionBtn = '<span style="color: var(--green); font-size: 11px; font-weight: 500;">Active</span>';
         } else if (isQueued) {
           actionBtn = '<span style="color: var(--amber); font-size: 11px;">Queued</span>';
         }
 
-        const hotkey = idx < 9 ? `<kbd>${idx + 1}</kbd>` : '&bull;';
+        const hotkey = idx < 9 ? \`<kbd>\${idx + 1}</kbd>\` : '&bull;';
 
-        return `
-          <tr class="${isActive ? 'is-active' : ''}">
-            <td style="text-align: center;">${hotkey}</td>
-            <td>${statusHtml}</td>
+        return \`
+          <tr class="\${isActive ? 'is-active' : ''}">
+            <td style="text-align: center;">\${hotkey}</td>
+            <td>\${statusHtml}</td>
             <td>
               <div class="acc-cell">
-                <span class="acc-email">${a.email}</span>
-                <span class="acc-name">${a.name || 'Pro Account'} &bull; ${a.subscriptionTier || 'PRO'}</span>
+                <span class="acc-email">\${a.email}</span>
+                <span class="acc-name">\${a.name || 'Pro Account'} &bull; \${a.subscriptionTier || 'PRO'}</span>
               </div>
             </td>
             <td>
               <div class="quota-cell">
                 <div class="quota-meta">
-                  <span class="quota-pct">${gw.pct}%</span>
-                  <span class="quota-reset">Resets in ${gw.resetText || 'Active'}</span>
+                  <span class="quota-pct">\${gw.pct}%</span>
+                  <span class="quota-reset">Resets in \${gw.resetText || 'Active'}</span>
                 </div>
                 <div class="micro-bar">
-                  <div class="micro-fill ${getBarColor(gw.pct)}" style="width: ${gw.pct}%;"></div>
+                  <div class="micro-fill \${getBarColor(gw.pct)}" style="width: \${gw.pct}%;"></div>
                 </div>
               </div>
             </td>
             <td>
               <div class="quota-cell">
                 <div class="quota-meta">
-                  <span class="quota-pct">${g5.pct}%</span>
-                  <span class="quota-reset">Resets in ${g5.resetText || 'Active'}</span>
+                  <span class="quota-pct">\${g5.pct}%</span>
+                  <span class="quota-reset">Resets in \${g5.resetText || 'Active'}</span>
                 </div>
                 <div class="micro-bar">
-                  <div class="micro-fill ${getBarColor(g5.pct)}" style="width: ${g5.pct}%;"></div>
+                  <div class="micro-fill \${getBarColor(g5.pct)}" style="width: \${g5.pct}%;"></div>
                 </div>
               </div>
             </td>
             <td>
               <div class="quota-cell">
                 <div class="quota-meta">
-                  <span class="quota-pct">${cw.pct}%</span>
+                  <span class="quota-pct">\${cw.pct}%</span>
                   <span class="quota-reset">Claude / 3P</span>
                 </div>
                 <div class="micro-bar">
-                  <div class="micro-fill ${getBarColor(cw.pct)}" style="width: ${cw.pct}%;"></div>
+                  <div class="micro-fill \${getBarColor(cw.pct)}" style="width: \${cw.pct}%;"></div>
                 </div>
               </div>
             </td>
             <td>
               <div style="display: flex; flex-direction: column; font-size: 11px;">
-                <span>${(a.totalRequests || 0).toLocaleString()} reqs</span>
-                <span style="color: var(--text-4);">${formatNumber(a.totalTokens || 0)} tokens</span>
+                <span>\${(a.totalRequests || 0).toLocaleString()} reqs</span>
+                <span style="color: var(--text-4);">\${formatNumber(a.totalTokens || 0)} tokens</span>
               </div>
             </td>
             <td style="text-align: right;">
-              ${actionBtn}
+              \${actionBtn}
             </td>
           </tr>
-        `;
+        \`;
       }).join('');
     }
 
@@ -2090,18 +2098,18 @@
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
         const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
 
-        const hotkey = idx < 9 ? `<kbd>${idx + 1}</kbd>` : '';
+        const hotkey = idx < 9 ? \`<kbd>\${idx + 1}</kbd>\` : '';
 
-        return `
-          <div class="acc-card ${isActive ? 'is-active' : ''}">
+        return \`
+          <div class="acc-card \${isActive ? 'is-active' : ''}">
             <div class="acc-card-top">
               <div class="acc-cell">
-                <span class="acc-email">${a.email}</span>
-                <span class="acc-name">${a.name || 'Pro Account'} &bull; ${a.subscriptionTier || 'PRO'}</span>
+                <span class="acc-email">\${a.email}</span>
+                <span class="acc-name">\${a.name || 'Pro Account'} &bull; \${a.subscriptionTier || 'PRO'}</span>
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
-                ${hotkey}
-                ${statusHtml}
+                \${hotkey}
+                \${statusHtml}
               </div>
             </div>
 
@@ -2109,40 +2117,40 @@
               <div class="quota-cell">
                 <div class="quota-meta">
                   <span style="color:var(--text-3); font-size:11px;">Gemini Weekly</span>
-                  <span class="quota-pct">${gw.pct}%</span>
+                  <span class="quota-pct">\${gw.pct}%</span>
                 </div>
                 <div class="micro-bar">
-                  <div class="micro-fill ${getBarColor(gw.pct)}" style="width: ${gw.pct}%;"></div>
+                  <div class="micro-fill \${getBarColor(gw.pct)}" style="width: \${gw.pct}%;"></div>
                 </div>
               </div>
 
               <div class="quota-cell">
                 <div class="quota-meta">
                   <span style="color:var(--text-3); font-size:11px;">5-Hour Burst</span>
-                  <span class="quota-pct">${g5.pct}%</span>
+                  <span class="quota-pct">\${g5.pct}%</span>
                 </div>
                 <div class="micro-bar">
-                  <div class="micro-fill ${getBarColor(g5.pct)}" style="width: ${g5.pct}%;"></div>
+                  <div class="micro-fill \${getBarColor(g5.pct)}" style="width: \${g5.pct}%;"></div>
                 </div>
               </div>
 
               <div class="quota-cell">
                 <div class="quota-meta">
                   <span style="color:var(--text-3); font-size:11px;">Claude / 3P</span>
-                  <span class="quota-pct">${cw.pct}%</span>
+                  <span class="quota-pct">\${cw.pct}%</span>
                 </div>
                 <div class="micro-bar">
-                  <div class="micro-fill ${getBarColor(cw.pct)}" style="width: ${cw.pct}%;"></div>
+                  <div class="micro-fill \${getBarColor(cw.pct)}" style="width: \${cw.pct}%;"></div>
                 </div>
               </div>
             </div>
 
             <div class="acc-card-footer">
-              <span>${(a.totalRequests || 0).toLocaleString()} reqs &bull; ${formatNumber(a.totalTokens || 0)} tokens</span>
-              ${!isActive ? `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>` : '<span style="color:var(--green); font-weight:500;">Active Now</span>'}
+              <span>\${(a.totalRequests || 0).toLocaleString()} reqs &bull; \${formatNumber(a.totalTokens || 0)} tokens</span>
+              \${!isActive ? \`<button class="btn btn-secondary btn-sm" onclick="setActive('\${a.id}')">Set Active</button>\` : '<span style="color:var(--green); font-weight:500;">Active Now</span>'}
             </div>
           </div>
-        `;
+        \`;
       }).join('');
     }
 
@@ -2153,7 +2161,7 @@
       const time = new Date().toLocaleTimeString();
       const div = document.createElement('div');
       div.className = 'stream-line';
-      div.innerHTML = `<span class="stream-ts">[${time}]</span> <span>${msg}</span>`;
+      div.innerHTML = \`<span class="stream-ts">[\${time}]</span> <span>\${msg}</span>\`;
       box.appendChild(div);
       box.scrollTop = box.scrollHeight;
     }
@@ -2186,19 +2194,19 @@
 
     async function setActive(id) {
       try {
-        const res = await fetch(`/api/set-active-account?id=${id}`, { method: 'POST' });
+        const res = await fetch(\`/api/set-active-account?id=\${id}\`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         const ide = data.ide || {};
         const who = data.email || ide.email || 'selected account';
 
         if (!res.ok || data.ok === false) {
-          addLog(`⚠️ Could not switch to ${who}: ${data.error || 'unknown error'}`);
+          addLog(\`⚠️ Could not switch to \${who}: \${data.error || 'unknown error'}\`);
         } else if (ide.restarted || (ide.ok && !ide.deferred && !ide.note)) {
-          addLog(`✅ Switched active account to ${who}.`);
+          addLog(\`✅ Switched active account to \${who}.\`);
         } else if (ide.deferred) {
-          addLog(`⏳ Switch queued for ${who}. Will apply once active task finishes.`);
+          addLog(\`⏳ Switch queued for \${who}. Will apply once active task finishes.\`);
         } else {
-          addLog(`🔄 Active account set to ${who}.`);
+          addLog(\`🔄 Active account set to \${who}.\`);
         }
         await fetchMatrix();
       } catch (e) {
@@ -2214,17 +2222,17 @@
     async function addAccount() {
       try {
         const tab = window.open('about:blank', '_blank');
-        const res = await fetch(`/api/accounts/login${tab ? '' : '?open=1'}`, { method: 'POST' });
+        const res = await fetch(\`/api/accounts/login\${tab ? '' : '?open=1'}\`, { method: 'POST' });
         const data = await res.json();
         if (!data.ok) {
           if (tab) tab.close();
-          addLog(`⚠️ Cannot start Google sign-in: ${data.error}`);
+          addLog(\`⚠️ Cannot start Google sign-in: \${data.error}\`);
           return;
         }
         if (tab) tab.location.href = data.url;
         addLog('👉 Sign in with your Google account in the newly opened tab.');
       } catch (e) {
-        addLog(`⚠️ Sign-in error: ${e.message}`);
+        addLog(\`⚠️ Sign-in error: \${e.message}\`);
       }
     }
 
@@ -2258,20 +2266,20 @@
         const data = await res.json();
         if (res.ok) {
           const content = data.choices?.[0]?.message?.content || JSON.stringify(data);
-          statusEl.innerText = `&bull; ${res.status} OK`;
+          statusEl.innerText = \`&bull; \${res.status} OK\`;
           statusEl.style.color = 'var(--green)';
-          metaEl.innerText = `Latency: ${elapsed}ms &bull; Tokens: ${data.usage?.total_tokens || 0}`;
-          textEl.innerText = `"${content.trim()}"`;
+          metaEl.innerText = \`Latency: \${elapsed}ms &bull; Tokens: \${data.usage?.total_tokens || 0}\`;
+          textEl.innerText = \`"\${content.trim()}"\`;
         } else {
-          statusEl.innerText = `&bull; ${res.status} Error`;
+          statusEl.innerText = \`&bull; \${res.status} Error\`;
           statusEl.style.color = 'var(--red)';
-          metaEl.innerText = `Latency: ${elapsed}ms`;
+          metaEl.innerText = \`Latency: \${elapsed}ms\`;
           textEl.innerText = data.error?.message || JSON.stringify(data);
         }
       } catch (err) {
         statusEl.innerText = '&bull; Connection Error';
         statusEl.style.color = 'var(--red)';
-        metaEl.innerText = `Failed after ${Date.now() - start}ms`;
+        metaEl.innerText = \`Failed after \${Date.now() - start}ms\`;
         textEl.innerText = err.message;
       } finally {
         if (btn) btn.disabled = false;
@@ -2288,24 +2296,24 @@
           const item = JSON.parse(e.data);
           if (item.type === 'account_active') {
             activeRunningId = item.accountId;
-            addLog(`⚡ ${item.email} is processing request...`);
+            addLog(\`⚡ \${item.email} is processing request...\`);
             fetchMatrix();
           } else if (item.type === 'account_idle') {
             activeRunningId = null;
-            const tok = item.tokens ? ` (+${item.tokens.total || 0} tokens)` : '';
-            addLog(`✅ ${item.email} completed prompt in ${item.duration}ms${tok}`);
+            const tok = item.tokens ? \` (+\${item.tokens.total || 0} tokens)\` : '';
+            addLog(\`✅ \${item.email} completed prompt in \${item.duration}ms\${tok}\`);
             if (document.getElementById('pane-logs')?.classList.contains('active')) {
               fetchDbLogs();
             }
             fetchMatrix();
           } else if (item.type === 'account_switch') {
-            addLog(`🔄 Session switched to ${item.email}`);
+            addLog(\`🔄 Session switched to \${item.email}\`);
             fetchMatrix();
           } else if (item.type === 'proactive_switch') {
-            addLog(`🛡️ Proactive switch from ${item.from} to ${item.to}`);
+            addLog(\`🛡️ Proactive switch from \${item.from} to \${item.to}\`);
             fetchMatrix();
           } else if (item.type === 'account_added') {
-            addLog(`✅ Account added: ${item.email}`);
+            addLog(\`✅ Account added: \${item.email}\`);
             fetchMatrix();
           }
         } catch (err) {}
@@ -2367,3 +2375,7 @@
   </script>
 </body>
 </html>
+`;
+
+fs.writeFileSync(targetPath, htmlContent, 'utf8');
+console.log('✅ Successfully compiled modern Vercel/Cloudflare Console redesign to:', targetPath);
