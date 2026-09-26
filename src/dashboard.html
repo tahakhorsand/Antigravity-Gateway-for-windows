@@ -833,6 +833,29 @@
         </div>
       </div>
 
+      <!-- Smart Quota Shield Banner -->
+      <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #34d399;">
+            <i data-lucide="shield" style="width: 17px; height: 17px;"></i>
+          </div>
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span>Smart Quota Shield</span>
+              <span class="badge badge-success" id="smart-shield-badge" style="font-size: 10px;">Auto Protection Active</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 1px;">
+              Proactively rotates active session before weekly or 5h burst quota drops below 20%.
+            </div>
+          </div>
+        </div>
+
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+          <span style="font-size: 11px; font-weight: 500; color: #34d399;" id="smart-shield-label">Auto-Switch: ON</span>
+          <input type="checkbox" id="smart-shield-toggle" checked onchange="toggleSmartShield(this.checked)" style="width: 16px; height: 16px; accent-color: #10b981; cursor: pointer;">
+        </label>
+      </div>
+
       <!-- Account Matrix Section -->
       <div class="section-title">
         <span>Account Matrix (<span id="acc-count">0</span>)</span>
@@ -971,6 +994,32 @@
         </button>
       </div>
 
+      <!-- Search & Filter Controls -->
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px;">
+        <div style="flex: 1; min-width: 180px; position: relative; display: flex; align-items: center;">
+          <i data-lucide="search" style="width: 13px; height: 13px; position: absolute; left: 10px; color: var(--muted-foreground);"></i>
+          <input type="text" id="log-search-input" placeholder="Search email, model, endpoint, or #req..." oninput="debounceFilterLogs()" style="width: 100%; background: #090d16; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); padding: 6px 10px 6px 30px; font-size: 11px; color: #fff; outline: none;">
+        </div>
+
+        <select id="log-model-filter" onchange="fetchDbLogs()" style="background: #090d16; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); padding: 6px 10px; font-size: 11px; color: #fff; outline: none; cursor: pointer;">
+          <option value="">All Models</option>
+          <option value="3.8-flash">Gemini 3.8 Flash</option>
+          <option value="3.7-flash">Gemini 3.7 Flash</option>
+          <option value="2.5-flash">Gemini 2.5 Flash</option>
+          <option value="2.5-pro">Gemini 2.5 Pro</option>
+          <option value="claude">Claude Sonnet</option>
+        </select>
+
+        <select id="log-account-filter" onchange="fetchDbLogs()" style="background: #090d16; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); padding: 6px 10px; font-size: 11px; color: #fff; outline: none; cursor: pointer;">
+          <option value="">All Accounts</option>
+        </select>
+
+        <button class="btn btn-secondary btn-sm" onclick="clearLogFilters()" title="Reset Filters">
+          <i data-lucide="filter-x" style="width: 12px; height: 12px;"></i>
+          <span>Clear</span>
+        </button>
+      </div>
+
       <div class="db-logs-table-wrapper">
         <table class="db-logs-table">
           <thead>
@@ -1060,6 +1109,70 @@
     </div>
   </div>
 
+  <!-- Request Detail Inspector Modal -->
+  <div id="inspector-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #0d121f; border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius); width: 100%; max-width: 540px; box-shadow: 0 25px 50px rgba(0,0,0,0.85); overflow: hidden; animation: fadeInTab 0.15s ease;">
+      <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="file-text" style="width: 15px; height: 15px; color: #38bdf8;"></i>
+          <span style="font-weight: 700; font-size: 13px; color: #fff;" id="insp-title">Request Inspection</span>
+        </div>
+        <button onclick="closeInspector()" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Close">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; font-size: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground);">Account Dispatched</div>
+            <div style="font-weight: 600; color: #fff; margin-top: 3px; word-break: break-all;" id="insp-account">--</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground);">Model Identified</div>
+            <div style="font-weight: 600; color: #38bdf8; margin-top: 3px;" id="insp-model">--</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground);">HTTP Status</div>
+            <div style="font-weight: 700; margin-top: 3px;" id="insp-status">200 OK</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground);">Latency</div>
+            <div style="font-weight: 700; color: #fbbf24; margin-top: 3px;" id="insp-latency">-- ms</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground);">Commercial Value</div>
+            <div style="font-weight: 700; color: #34d399; margin-top: 3px;" id="insp-saved">$0.00</div>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px;">
+          <div style="font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 8px;">Token Ingestion & Generation Breakdown</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-bottom: 5px;">
+            <span style="color: var(--muted-foreground);">Prompt Context (Input):</span>
+            <span style="color: #38bdf8; font-weight: 600;" id="insp-input">0 tokens</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-bottom: 5px;">
+            <span style="color: var(--muted-foreground);">Generated Output (Completion):</span>
+            <span style="color: #10b981; font-weight: 600;" id="insp-output">0 tokens</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
+            <span style="color: #fff; font-weight: 600;">Total Tokens Processed:</span>
+            <span style="color: #fff; font-weight: 700;" id="insp-total">0 tokens</span>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between;">
+          <span id="insp-timestamp">--</span>
+          <span style="color: #38bdf8; font-family: ui-monospace, monospace;" id="insp-endpoint">/v1/chat/completions</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     let activeRunningId = null;
     let bestAccountId = null;
@@ -1085,25 +1198,59 @@
       }
     }
 
+    let logsCache = new Map();
+    let filterDebounceTimer = null;
+
+    function debounceFilterLogs() {
+      clearTimeout(filterDebounceTimer);
+      filterDebounceTimer = setTimeout(() => {
+        fetchDbLogs();
+      }, 250);
+    }
+
+    function clearLogFilters() {
+      const searchInput = document.getElementById('log-search-input');
+      const modelSelect = document.getElementById('log-model-filter');
+      const accSelect = document.getElementById('log-account-filter');
+      if (searchInput) searchInput.value = '';
+      if (modelSelect) modelSelect.value = '';
+      if (accSelect) accSelect.value = '';
+      fetchDbLogs();
+    }
+
     async function fetchDbLogs() {
       const tbody = document.getElementById('db-logs-tbody');
       if (!tbody) return;
+
+      const search = (document.getElementById('log-search-input')?.value || '').trim();
+      const model = document.getElementById('log-model-filter')?.value || '';
+      const account = document.getElementById('log-account-filter')?.value || '';
+
+      const params = new URLSearchParams({ limit: '50' });
+      if (search) params.set('search', search);
+      if (model) params.set('model', model);
+      if (account) params.set('account', account);
+
       try {
-        const res = await fetch('/api/db/logs?limit=30');
+        const res = await fetch(`/api/db/logs?${params.toString()}`);
         if (!res.ok) return;
         const logs = await res.json();
+        logsCache.clear();
+
         if (!logs || logs.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted-foreground); padding: 24px;">No requests recorded in SQLite database yet.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted-foreground); padding: 24px;">No matching request logs found.</td></tr>`;
           return;
         }
+
         tbody.innerHTML = logs.map(l => {
+          logsCache.set(l.id, l);
           const timeStr = l.created_at ? new Date(l.created_at).toLocaleTimeString() : (l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : '--');
           const isOk = l.status_code >= 200 && l.status_code < 400;
           const statusBadge = isOk 
             ? `<span class="badge badge-success" style="font-size: 10px;">${l.status_code} OK</span>`
             : `<span class="badge badge-destructive" style="font-size: 10px;">${l.status_code} ERR</span>`;
           return `
-            <tr>
+            <tr onclick="openInspector(${l.id})" style="cursor: pointer;" title="Click to inspect request #${l.request_id || l.id}">
               <td style="font-family: ui-monospace, monospace; color: var(--muted-foreground);">#${l.request_id || l.id}</td>
               <td style="color: var(--muted-foreground);">${timeStr}</td>
               <td style="font-weight: 500; color: #fff;">${l.account_email}</td>
@@ -1117,6 +1264,86 @@
       } catch (e) {
         console.error('Error fetching DB logs:', e);
       }
+    }
+
+    function openInspector(logId) {
+      const log = logsCache.get(logId);
+      if (!log) return;
+
+      const modal = document.getElementById('inspector-modal');
+      document.getElementById('insp-title').innerText = `Request Inspection #${log.request_id || log.id}`;
+      document.getElementById('insp-account').innerText = log.account_email;
+      document.getElementById('insp-model').innerText = formatModelDisplayName(log.model);
+      
+      const isOk = log.status_code >= 200 && log.status_code < 400;
+      const statusEl = document.getElementById('insp-status');
+      statusEl.innerText = `${log.status_code} ${isOk ? 'OK' : 'Error'}`;
+      statusEl.style.color = isOk ? '#34d399' : '#f87171';
+
+      document.getElementById('insp-latency').innerText = `${log.latency_ms} ms`;
+
+      // Cost saving calculation
+      const inCost = (log.input_tokens || 0) * 0.000003;
+      const outCost = (log.output_tokens || 0) * 0.000015;
+      const totalSaved = inCost + outCost;
+      document.getElementById('insp-saved').innerText = `$${totalSaved.toFixed(4)}`;
+
+      document.getElementById('insp-input').innerText = `${formatNumber(log.input_tokens || 0)} tokens`;
+      document.getElementById('insp-output').innerText = `${formatNumber(log.output_tokens || 0)} tokens`;
+      document.getElementById('insp-total').innerText = `${formatNumber(log.total_tokens || 0)} tokens`;
+
+      document.getElementById('insp-timestamp').innerText = log.created_at ? new Date(log.created_at).toLocaleString() : '--';
+      document.getElementById('insp-endpoint').innerText = log.endpoint || '/v1/chat/completions';
+
+      modal.style.display = 'flex';
+      if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+    }
+
+    function closeInspector() {
+      const modal = document.getElementById('inspector-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function toggleSmartShield(enabled) {
+      const label = document.getElementById('smart-shield-label');
+      const badge = document.getElementById('smart-shield-badge');
+      if (label) label.innerText = enabled ? 'Auto-Switch: ON' : 'Auto-Switch: OFF';
+      if (label) label.style.color = enabled ? '#34d399' : 'var(--muted-foreground)';
+      if (badge) {
+        badge.className = enabled ? 'badge badge-success' : 'badge';
+        badge.innerText = enabled ? 'Auto Protection Active' : 'Shield Standby';
+      }
+
+      try {
+        await fetch('/api/config/smart-shield', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+      } catch (e) {
+        console.error('Error toggling smart shield:', e);
+      }
+    }
+
+    async function fetchSmartShieldConfig() {
+      try {
+        const res = await fetch('/api/config/smart-shield');
+        if (!res.ok) return;
+        const data = await res.json();
+        const toggle = document.getElementById('smart-shield-toggle');
+        const label = document.getElementById('smart-shield-label');
+        const badge = document.getElementById('smart-shield-badge');
+        const enabled = data.enabled !== false;
+        if (toggle) toggle.checked = enabled;
+        if (label) {
+          label.innerText = enabled ? 'Auto-Switch: ON' : 'Auto-Switch: OFF';
+          label.style.color = enabled ? '#34d399' : 'var(--muted-foreground)';
+        }
+        if (badge) {
+          badge.className = enabled ? 'badge badge-success' : 'badge';
+          badge.innerText = enabled ? 'Auto Protection Active' : 'Shield Standby';
+        }
+      } catch (e) {}
     }
 
     function getBarColor(pct) {
@@ -1164,6 +1391,20 @@
         const accounts = Object.values(data.accounts || {});
         document.getElementById('acc-count').innerText = accounts.length;
         document.getElementById('header-acc-count').innerText = `${accounts.length} Accounts Pooled`;
+
+        // Dynamically populate account filter options if not already populated
+        const accSelect = document.getElementById('log-account-filter');
+        if (accSelect && accSelect.options.length <= 1 && accounts.length > 0) {
+          const currentVal = accSelect.value;
+          accSelect.innerHTML = '<option value="">All Accounts</option>';
+          accounts.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.email;
+            opt.innerText = a.name ? `${a.name} (${a.email})` : a.email;
+            accSelect.appendChild(opt);
+          });
+          accSelect.value = currentVal;
+        }
 
         const tabAccBadge = document.getElementById('tab-accounts-badge');
         if (tabAccBadge) tabAccBadge.innerText = accounts.length;
@@ -1581,10 +1822,24 @@
           } else if (item.type === 'account_switch') {
             addLog(`🔄 Active Antigravity session switched to <span class="stream-acc">${item.email}</span>`);
             fetchMatrix();
+          } else if (item.type === 'proactive_switch') {
+            addLog(`🛡️ <span style="color:#38bdf8; font-weight:600;">Smart Shield</span>: Proactively switched active session from <b>${item.from}</b> (${item.fromWeekly}%) to <b>${item.to}</b> (${item.toWeekly}%).`);
+            fetchMatrix();
           }
         } catch (err) {}
       };
     } catch (e) {}
+
+    // Modal dismissal via ESC key and clicking overlay background
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeInspector();
+    });
+    document.getElementById('inspector-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'inspector-modal') closeInspector();
+    });
+
+    // Initialize Smart Quota Shield settings
+    fetchSmartShieldConfig();
 
     // Restore saved tab or default to accounts
     const savedTab = localStorage.getItem('harness_active_tab');

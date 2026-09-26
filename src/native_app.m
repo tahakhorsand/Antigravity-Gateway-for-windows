@@ -54,78 +54,85 @@
     [self.statusMenu addItem:header];
 
     // Status / Active Account
-    NSString *activeId = stats[@"activeAccountId"];
-    NSArray *accounts = stats[@"accounts"] ? [stats[@"accounts"] allValues] : @[];
+    NSString *activeId = stats[@"global"][@"activeSessionAccountId"];
+    if (!activeId) activeId = stats[@"global"][@"bestAccountId"];
+    if (!activeId) activeId = stats[@"activeAccountId"];
+
+    NSString *activeEmail = stats[@"global"][@"activeSessionEmail"];
     NSDictionary *activeAcc = nil;
     if (activeId && stats[@"accounts"]) {
         activeAcc = stats[@"accounts"][activeId];
     }
 
-    NSString *activeLabel = activeAcc ? [NSString stringWithFormat:@"● Active: %@", activeAcc[@"email"]] : @"● Status: Ready (Universal Proxy)";
+    NSString *activeLabel = (activeAcc && activeAcc[@"email"]) 
+        ? [NSString stringWithFormat:@"● Active: %@", activeAcc[@"email"]] 
+        : (activeEmail ? [NSString stringWithFormat:@"● Active: %@", activeEmail] : @"● Status: Ready (Universal Proxy)");
+    
     NSMenuItem *activeItem = [[NSMenuItem alloc] initWithTitle:activeLabel
                                                         action:nil
                                                  keyEquivalent:@""];
     activeItem.enabled = NO;
     [self.statusMenu addItem:activeItem];
 
-    // If quota details exist for active account
-    if (activeAcc && activeAcc[@"quotas"]) {
-        NSDictionary *q = activeAcc[@"quotas"];
-        NSNumber *pro = q[@"gemini_pro"];
-        NSNumber *flash = q[@"gemini_flash"];
-        if (pro || flash) {
-            NSString *qText = [NSString stringWithFormat:@"   Pro: %@%% | Flash: %@%% remaining", 
-                               pro ? pro : @100, flash ? flash : @100];
-            NSMenuItem *qItem = [[NSMenuItem alloc] initWithTitle:qText action:nil keyEquivalent:@""];
-            qItem.enabled = NO;
-            [self.statusMenu addItem:qItem];
-        }
-    }
-    // Live Token Usage in Menu Bar
+    // Live Metrics in Menu Bar
     if (stats[@"global"]) {
         NSNumber *totalTok = stats[@"global"][@"totalTokens"];
-        NSNumber *tpm = stats[@"global"][@"currentTpm"];
+        NSString *dollarsSaved = stats[@"global"][@"dollarsSavedFormatted"] ?: @"$0.00";
         if (totalTok) {
-            NSString *tokLabel = [NSString stringWithFormat:@"   Tokens: %@ (TPM: %@)", totalTok, tpm ? tpm : @0];
+            NSString *tokLabel = [NSString stringWithFormat:@"   Tokens: %@ • %@ Saved", totalTok, dollarsSaved];
             NSMenuItem *tokItem = [[NSMenuItem alloc] initWithTitle:tokLabel action:nil keyEquivalent:@""];
             tokItem.enabled = NO;
             [self.statusMenu addItem:tokItem];
+        }
+
+        // Update menu bar button label with money saved
+        if (self.statusItem.button && dollarsSaved.length > 0 && ![dollarsSaved isEqualToString:@"$0.00"]) {
+            self.statusItem.button.title = [NSString stringWithFormat:@"⚡ AGY (%@)", dollarsSaved];
+        } else if (self.statusItem.button) {
+            self.statusItem.button.title = @"⚡ AGY";
         }
     }
 
     [self.statusMenu addItem:[NSMenuItem separatorItem]];
 
-    // Submenu: Switch Active Account
-    NSMenuItem *switchItem = [[NSMenuItem alloc] initWithTitle:@"Switch Active Account"
-                                                        action:nil
-                                                 keyEquivalent:@""];
-    NSMenu *switchSubmenu = [[NSMenu alloc] initWithTitle:@"Accounts"];
+    // Direct 1-Click Switch Account Section
+    NSMenuItem *switchHeader = [[NSMenuItem alloc] initWithTitle:@"SWITCH ACCOUNT (1-Click Switch):"
+                                                          action:nil
+                                                   keyEquivalent:@""];
+    switchHeader.enabled = NO;
+    [self.statusMenu addItem:switchHeader];
     
     if (stats[@"accounts"] && [stats[@"accounts"] count] > 0) {
         for (NSString *accId in stats[@"accounts"]) {
             NSDictionary *acc = stats[@"accounts"][accId];
             NSString *email = acc[@"email"] ?: accId;
-            NSString *name = acc[@"name"] ?: @"";
-            NSString *itemTitle = name.length > 0 ? [NSString stringWithFormat:@"%@ (%@)", name, email] : email;
+            NSNumber *weeklyPct = acc[@"geminiWeekly"][@"pct"] ?: @100;
+            NSNumber *burstPct = acc[@"gemini5h"][@"pct"] ?: @100;
+
+            BOOL isCurrent = [accId isEqualToString:activeId] || 
+                             (activeEmail && [[email lowercaseString] isEqualToString:[activeEmail lowercaseString]]);
+
+            NSString *prefix = isCurrent ? @"✓ " : @"   ";
+            NSString *itemTitle = [NSString stringWithFormat:@"%@%@ — Wk: %@%% • 5h: %@%%", 
+                                   prefix, email, weeklyPct, burstPct];
 
             NSMenuItem *accMenuItem = [[NSMenuItem alloc] initWithTitle:itemTitle
                                                                  action:@selector(onSelectAccount:)
                                                           keyEquivalent:@""];
             accMenuItem.target = self;
             accMenuItem.representedObject = accId;
-            if ([accId isEqualToString:activeId]) {
+            if (isCurrent) {
                 accMenuItem.state = NSControlStateValueOn;
             }
-            [switchSubmenu addItem:accMenuItem];
+            [self.statusMenu addItem:accMenuItem];
         }
     } else {
-        NSMenuItem *noneItem = [[NSMenuItem alloc] initWithTitle:@"No Accounts Found" action:nil keyEquivalent:@""];
+        NSMenuItem *noneItem = [[NSMenuItem alloc] initWithTitle:@"   No Accounts Found" action:nil keyEquivalent:@""];
         noneItem.enabled = NO;
-        [switchSubmenu addItem:noneItem];
+        [self.statusMenu addItem:noneItem];
     }
-    
-    [switchItem setSubmenu:switchSubmenu];
-    [self.statusMenu addItem:switchItem];
+
+    [self.statusMenu addItem:[NSMenuItem separatorItem]];
 
     // Sync Quotas Item
     NSMenuItem *syncItem = [[NSMenuItem alloc] initWithTitle:@"🔄 Sync Live Quotas Now"

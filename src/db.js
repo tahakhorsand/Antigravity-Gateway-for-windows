@@ -352,3 +352,55 @@ export function migrateExistingJsonStats(existingStats) {
     console.error('[SQLite] Migration error:', err.message);
   }
 }
+
+export function getMetadataDb(key, defaultValue = null) {
+  try {
+    const db = getDatabase();
+    const row = db.prepare('SELECT value FROM system_metadata WHERE key = ?').get(key);
+    return row ? JSON.parse(row.value) : defaultValue;
+  } catch (err) {
+    return defaultValue;
+  }
+}
+
+export function setMetadataDb(key, value) {
+  try {
+    const db = getDatabase();
+    const strVal = JSON.stringify(value);
+    db.prepare(`
+      INSERT INTO system_metadata (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(key, strVal);
+  } catch (err) {
+    console.error('[SQLite] Error setting metadata:', err.message);
+  }
+}
+
+export function queryLogsDb({ limit = 50, account = '', model = '', search = '' } = {}) {
+  try {
+    const db = getDatabase();
+    let sql = 'SELECT * FROM request_logs WHERE 1=1';
+    const params = [];
+
+    if (account) {
+      sql += ' AND account_email LIKE ?';
+      params.push(`%${account}%`);
+    }
+    if (model) {
+      sql += ' AND model LIKE ?';
+      params.push(`%${model}%`);
+    }
+    if (search) {
+      sql += ' AND (account_email LIKE ? OR model LIKE ? OR endpoint LIKE ? OR CAST(request_id AS TEXT) LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    sql += ' ORDER BY id DESC LIMIT ?';
+    params.push(limit);
+
+    return db.prepare(sql).all(...params);
+  } catch (err) {
+    console.error('[SQLite] Error querying logs:', err.message);
+    return [];
+  }
+}

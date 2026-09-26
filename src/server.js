@@ -19,6 +19,7 @@ import {
   getRecentLogsDb,
   getDailyAnalyticsDb
 } from './stats.js';
+import { getMetadataDb, setMetadataDb, queryLogsDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
 import crypto from 'crypto';
 import { 
@@ -76,6 +77,68 @@ export async function syncAllQuotas() {
   isSyncingQuotas = false;
   broadcastEvent({ type: 'quotas_synced', timestamp: Date.now() });
   console.log(`${colors.green}[QuotaSync] ✅ Live Google quotas and reset timers updated successfully.${colors.reset}`);
+  
+  // Proactive Smart Quota Shield check
+  checkAndApplySmartShield();
+}
+
+export function sendMacNotification(title, message, sound = 'Subtle') {
+  try {
+    const cleanTitle = (title || 'Antigravity Gateway').replace(/"/g, '\\"');
+    const cleanMsg = (message || '').replace(/"/g, '\\"');
+    const script = `display notification "${cleanMsg}" with title "${cleanTitle}" sound name "${sound}"`;
+    exec(`osascript -e '${script}'`, () => {});
+  } catch (e) {}
+}
+
+export function checkAndApplySmartShield() {
+  const isEnabled = getMetadataDb('smart_shield_enabled', true);
+  if (!isEnabled) return;
+
+  const stats = getAllStats();
+  const activeSessionId = stats.global?.activeSessionAccountId;
+  const activeSessionEmail = stats.global?.activeSessionEmail;
+  if (!activeSessionId && !activeSessionEmail) return;
+
+  const accounts = getAccounts();
+  const currentAcc = accounts.find(a => a.id === activeSessionId || (activeSessionEmail && a.email.toLowerCase() === activeSessionEmail.toLowerCase()));
+  if (!currentAcc) return;
+
+  const currentStats = stats.accounts?.[currentAcc.id];
+  if (!currentStats) return;
+
+  const weeklyPct = currentStats.geminiWeekly?.pct ?? 100;
+  const burstPct = currentStats.gemini5h?.pct ?? 100;
+
+  // If weekly or burst quota drops below 20%
+  if (weeklyPct < 20 || burstPct < 20) {
+    const bestId = stats.global?.bestAccountId;
+    if (bestId && bestId !== currentAcc.id) {
+      const targetAcc = accounts.find(a => a.id === bestId);
+      const targetStats = stats.accounts?.[bestId];
+      const targetWeekly = targetStats?.geminiWeekly?.pct ?? 0;
+
+      // Only switch if the target account has healthy headroom (> 40%)
+      if (targetAcc && targetWeekly > 40) {
+        console.log(`${colors.cyan}[SmartShield] 🛡️ Proactive Switch: ${currentAcc.email} (${weeklyPct}% weekly, ${burstPct}% 5h) ➜ ${targetAcc.email} (${targetWeekly}% headroom)${colors.reset}`);
+        switchAntigravityActiveAccount(bestId, targetAcc);
+        setActiveAccount(bestId);
+
+        broadcastEvent({
+          type: 'proactive_switch',
+          from: currentAcc.email,
+          to: targetAcc.email,
+          fromWeekly: weeklyPct,
+          toWeekly: targetWeekly
+        });
+
+        sendMacNotification(
+          'Antigravity Smart Shield 🛡️',
+          `Proactive switch: ${currentAcc.email} (${weeklyPct}%) ➜ ${targetAcc.email} (${targetWeekly}%). Session kept uninterrupted!`
+        );
+      }
+    }
+  }
 }
 
 // Colors for terminal logs
@@ -261,6 +324,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
         console.warn(`${colors.yellow}[Req #${reqId}] ⚠️ Account ${account.email} hit 429! Failover to next account...${colors.reset}`);
         markCooldown(account.id, 60);
         recordFailover(account.id, 60);
+        sendMacNotification('Antigravity Quota Failover ⚠️', `Account ${account.email} hit 429. Instant failover to next account!`);
         broadcastEvent({ type: 'quota_hit', accountId: account.id, email: account.email });
         continue;
       }
@@ -477,13 +541,38 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify(statsData, null, 2));
   }
 
-  // SQLite Persistent Request Logs
+  // SQLite Persistent Request Logs with Search & Filter
   if (urlPath.startsWith('/api/db/logs')) {
     const query = new URL(req.url, 'http://localhost').searchParams;
     const limit = parseInt(query.get('limit') || '50', 10);
-    const logs = getRecentLogsDb(limit);
+    const account = query.get('account') || '';
+    const model = query.get('model') || '';
+    const search = query.get('search') || '';
+    const logs = queryLogsDb({ limit, account, model, search });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(logs, null, 2));
+  }
+
+  // Smart Quota Shield Config Endpoint
+  if (urlPath === '/api/config/smart-shield') {
+    if (req.method === 'POST') {
+      let bodyStr = '';
+      for await (const chunk of req) bodyStr += chunk;
+      try {
+        const bodyJson = JSON.parse(bodyStr);
+        const enabled = !!bodyJson.enabled;
+        setMetadataDb('smart_shield_enabled', enabled);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: true, enabled }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+    } else {
+      const enabled = getMetadataDb('smart_shield_enabled', true);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ enabled }));
+    }
   }
 
   // SQLite Daily Usage Analytics
@@ -650,6 +739,7 @@ async function handleProxyRequest(req, res) {
         console.log(
           `${colors.yellow}[${new Date().toLocaleTimeString()}] [Req #${reqId}] ⚠️ Account "${account.email}" hit 429 quota limit! Auto-switching to next account...${colors.reset}`
         );
+        sendMacNotification('Antigravity Quota Failover ⚠️', `Account "${account.email}" hit 429 quota. Auto-switched to next account.`);
         broadcastEvent({ 
           type: 'quota_hit', 
           accountId: account.id, 
@@ -761,4 +851,9 @@ ${colors.bold}${colors.cyan}─────────────────�
   setInterval(() => {
     syncAllQuotas().catch(console.error);
   }, 180000);
+
+  // Periodic proactive Smart Quota Shield check every 30 seconds
+  setInterval(() => {
+    checkAndApplySmartShield();
+  }, 30000);
 });
