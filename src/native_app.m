@@ -81,6 +81,17 @@
             [self.statusMenu addItem:qItem];
         }
     }
+    // Live Token Usage in Menu Bar
+    if (stats[@"global"]) {
+        NSNumber *totalTok = stats[@"global"][@"totalTokens"];
+        NSNumber *tpm = stats[@"global"][@"currentTpm"];
+        if (totalTok) {
+            NSString *tokLabel = [NSString stringWithFormat:@"   Tokens: %@ (TPM: %@)", totalTok, tpm ? tpm : @0];
+            NSMenuItem *tokItem = [[NSMenuItem alloc] initWithTitle:tokLabel action:nil keyEquivalent:@""];
+            tokItem.enabled = NO;
+            [self.statusMenu addItem:tokItem];
+        }
+    }
 
     [self.statusMenu addItem:[NSMenuItem separatorItem]];
 

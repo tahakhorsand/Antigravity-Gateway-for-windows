@@ -257,7 +257,13 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           type: 'account_idle',
           accountId: account.id,
           email: account.email,
-          duration
+          duration,
+          tokens: {
+            input: promptTokens,
+            output: completionTokens,
+            cached: 0,
+            total: totalTokens
+          }
         });
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -368,7 +374,13 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           type: 'account_idle',
           accountId: account.id,
           email: account.email,
-          duration
+          duration,
+          tokens: {
+            input: 20,
+            output: totalOutTokens,
+            cached: 0,
+            total: 20 + totalOutTokens
+          }
         });
 
         return res.end();

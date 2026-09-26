@@ -505,6 +505,59 @@
     .stream-err {
       color: #f87171;
     }
+
+    /* Real-Time Token Telemetry Strip */
+    .token-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .token-tile {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 13px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: all 0.2s ease;
+    }
+
+    .token-tile:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .token-tile-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .token-tile-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .token-tile-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      font-feature-settings: "tnum";
+      letter-spacing: -0.5px;
+      margin-top: 1px;
+    }
+
+    .token-tile-sub {
+      font-size: 11px;
+      color: var(--muted-foreground);
+    }
   </style>
 </head>
 <body>
@@ -545,6 +598,47 @@
           <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
           <span>Launch Antigravity</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Real-Time Token Telemetry Strip -->
+    <div class="token-strip">
+      <div class="token-tile">
+        <div class="token-tile-top">
+          <span class="token-tile-label"><i data-lucide="layers" style="width: 13px; height: 13px; color: #a855f7;"></i> Total Tokens</span>
+          <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; font-size: 10px;">Global</span>
+        </div>
+        <div class="token-tile-val" id="stat-total-tokens">0</div>
+        <div class="token-tile-sub">Input + Output + Cached</div>
+      </div>
+
+      <div class="token-tile">
+        <div class="token-tile-top">
+          <span class="token-tile-label"><i data-lucide="arrow-up-right" style="width: 13px; height: 13px; color: #38bdf8;"></i> Prompt / Input</span>
+          <span class="badge" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 10px;">Context</span>
+        </div>
+        <div class="token-tile-val" id="stat-input-tokens" style="color: #38bdf8;">0</div>
+        <div class="token-tile-sub">User messages & system instructions</div>
+      </div>
+
+      <div class="token-tile">
+        <div class="token-tile-top">
+          <span class="token-tile-label"><i data-lucide="arrow-down-left" style="width: 13px; height: 13px; color: #34d399;"></i> Generated Output</span>
+          <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #34d399; font-size: 10px;">Completion</span>
+        </div>
+        <div class="token-tile-val" id="stat-output-tokens" style="color: #34d399;">0</div>
+        <div class="token-tile-sub">LLM response tokens generated</div>
+      </div>
+
+      <div class="token-tile">
+        <div class="token-tile-top">
+          <span class="token-tile-label"><i data-lucide="activity" style="width: 13px; height: 13px; color: #fbbf24;"></i> Live Speedometer</span>
+          <span class="badge" id="rate-badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; font-size: 10px;">Live Rate</span>
+        </div>
+        <div class="token-tile-val" id="stat-speedometer" style="font-size: 19px; color: #fbbf24;">
+          <span id="stat-tpm">0</span> <span style="font-size: 12px; font-weight: 500; color: var(--muted-foreground);">TPM</span>
+        </div>
+        <div class="token-tile-sub" id="stat-rpm-sub">0 req/min • 0 in-flight</div>
       </div>
     </div>
 
@@ -719,9 +813,14 @@
           btnElement.innerHTML = originalHtml;
           if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
         }, 1800);
-      }).catch(err => {
-        console.error('Clipboard copy failed:', err);
       });
+    }
+
+    function formatNumber(num) {
+      if (num === null || num === undefined) return '0';
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+      return num.toLocaleString();
     }
 
     async function fetchMatrix() {
@@ -735,6 +834,38 @@
         const accounts = Object.values(data.accounts || {});
         document.getElementById('acc-count').innerText = accounts.length;
         document.getElementById('header-acc-count').innerText = `${accounts.length} Accounts Pooled`;
+
+        // Update Real-Time Token Telemetry Strip
+        const totalTokens = data.global?.totalTokens || 0;
+        const inputTokens = data.global?.inputTokens || 0;
+        const outputTokens = data.global?.outputTokens || 0;
+        const tpm = data.global?.currentTpm || 0;
+        const rpm = data.global?.currentRpm || 0;
+        const inFlight = data.global?.inFlightRequests || (data.global?.isSessionGenerating ? 1 : 0);
+
+        const elTotal = document.getElementById('stat-total-tokens');
+        const elInput = document.getElementById('stat-input-tokens');
+        const elOutput = document.getElementById('stat-output-tokens');
+        const elTpm = document.getElementById('stat-tpm');
+        const elRpmSub = document.getElementById('stat-rpm-sub');
+        const rateBadge = document.getElementById('rate-badge');
+
+        if (elTotal) elTotal.innerText = formatNumber(totalTokens);
+        if (elInput) elInput.innerText = formatNumber(inputTokens);
+        if (elOutput) elOutput.innerText = formatNumber(outputTokens);
+        if (elTpm) elTpm.innerText = formatNumber(tpm);
+        if (elRpmSub) elRpmSub.innerText = `${rpm} req/min • ${inFlight} in-flight`;
+
+        if (rateBadge) {
+          if (inFlight > 0) {
+            rateBadge.className = 'badge badge-active';
+            rateBadge.innerHTML = '<i data-lucide="zap" style="width:10px;height:10px;"></i> Active';
+          } else {
+            rateBadge.className = 'badge';
+            rateBadge.style = 'background: rgba(251, 191, 36, 0.1); color: #fbbf24; font-size: 10px;';
+            rateBadge.innerText = 'Live Rate';
+          }
+        }
 
         // 1. Render Active Antigravity Session Panel
         const activeSessionEmail = data.global?.activeSessionEmail;
@@ -922,8 +1053,11 @@
 
             <!-- Footer Stats & Actions -->
             <div class="card-footer-metrics">
-              <span>Reqs: <b style="color: var(--foreground);">${a.totalRequests || 0}</b> • <span style="color:#a1a1aa;">${formatRelativeTime(a.lastSynced)}</span></span>
-              <span>Avg: <b style="color: #fbbf24;">${a.avgLatency || 175}ms</b></span>
+              <div>
+                <span>Reqs: <b style="color: var(--foreground);">${a.totalRequests || 0}</b></span>
+                <span style="margin: 0 4px; color: var(--muted-foreground);">•</span>
+                <span>Tokens: <b style="color: #38bdf8;">${formatNumber(a.totalTokens || 0)}</b> <span style="font-size: 10px; color: var(--muted-foreground);">(↑${formatNumber(a.inputTokens || 0)} ↓${formatNumber(a.outputTokens || 0)})</span></span>
+              </div>
               ${actionBtnHtml}
             </div>
           </div>
@@ -1007,7 +1141,9 @@
             fetchMatrix();
           } else if (item.type === 'account_idle') {
             activeRunningId = null;
-            addLog(`✅ <span class="stream-acc">${item.email}</span> completed prompt (${item.duration}ms)`);
+            const tok = item.tokens;
+            const tokText = tok ? ` • <b>+${tok.total || 0} tokens</b> (${tok.input || 0} in / ${tok.output || 0} out)` : '';
+            addLog(`✅ <span class="stream-acc">${item.email}</span> completed prompt (${item.duration}ms)${tokText}`);
             fetchMatrix();
           } else if (item.type === 'account_banned') {
             addLog(`🚫 <span class="stream-err">${item.email}</span> received 403 Forbidden! Isolated from pool.`, 'err');
