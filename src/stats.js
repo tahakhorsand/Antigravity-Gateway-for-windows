@@ -1,6 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { 
+  recordRequestDb, 
+  getPersistedTotalsDb, 
+  migrateExistingJsonStats, 
+  getRecentLogsDb, 
+  getDailyAnalyticsDb 
+} from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +49,35 @@ export function loadStats() {
       console.error('Failed to load stats.json');
     }
   }
+
+  // 1. One-time migration to SQLite if database is fresh
+  migrateExistingJsonStats(stats);
+
+  // 2. Hydrate persistent usage and token counters from SQLite
+  const dbTotals = getPersistedTotalsDb();
+  if (dbTotals) {
+    if (dbTotals.global.totalTokens > 0 || dbTotals.global.totalRequests > 0) {
+      stats.global.totalRequests = dbTotals.global.totalRequests;
+      stats.global.inputTokens = dbTotals.global.inputTokens;
+      stats.global.outputTokens = dbTotals.global.outputTokens;
+      stats.global.cachedTokens = dbTotals.global.cachedTokens;
+      stats.global.totalTokens = dbTotals.global.totalTokens;
+    }
+
+    for (const id in dbTotals.accounts) {
+      const dbAcc = dbTotals.accounts[id];
+      if (stats.accounts[id]) {
+        stats.accounts[id].totalRequests = dbAcc.totalRequests;
+        stats.accounts[id].inputTokens = dbAcc.inputTokens;
+        stats.accounts[id].outputTokens = dbAcc.outputTokens;
+        stats.accounts[id].cachedTokens = dbAcc.cachedTokens;
+        stats.accounts[id].totalTokens = dbAcc.totalTokens;
+        if (dbAcc.avgLatency > 0) stats.accounts[id].avgLatency = dbAcc.avgLatency;
+        if (dbAcc.lastUsed > 0) stats.accounts[id].lastUsed = dbAcc.lastUsed;
+      }
+    }
+  }
+
   computeBestAccount();
   return stats;
 }
@@ -189,7 +225,7 @@ export function recordRequestStart(accountId) {
   updateLoadMetrics();
 }
 
-export function recordRequestSuccess(accountId, latencyMs, tokens = {}, model = 'gemini-2.5-pro') {
+export function recordRequestSuccess(accountId, latencyMs, tokens = {}, model = 'gemini-2.5-pro', extra = {}) {
   loadStats();
   stats.global.inFlightRequests = Math.max(0, stats.global.inFlightRequests - 1);
   if (stats.global.inFlightRequests === 0) {
@@ -222,6 +258,21 @@ export function recordRequestSuccess(accountId, latencyMs, tokens = {}, model = 
     acc.latencies.push(latencyMs);
     if (acc.latencies.length > 20) acc.latencies.shift();
     acc.avgLatency = Math.round(acc.latencies.reduce((a, b) => a + b, 0) / acc.latencies.length);
+
+    // Persist to SQLite database
+    recordRequestDb({
+      requestId: extra.requestId || null,
+      accountId: acc.id,
+      accountEmail: acc.email,
+      model,
+      endpoint: extra.endpoint || '/v1/chat/completions',
+      statusCode: extra.statusCode || 200,
+      latencyMs,
+      inputTokens: input,
+      outputTokens: output,
+      cachedTokens: cached,
+      totalTokens: total
+    });
   }
 
   computeBestAccount();
@@ -424,3 +475,5 @@ export function setActiveAccount(accountId) {
     saveStats();
   }
 }
+
+export { getRecentLogsDb, getDailyAnalyticsDb } from './db.js';

@@ -15,7 +15,9 @@ import {
   recordFailover, 
   record403Banned,
   setActiveAccount,
-  getAllStats 
+  getAllStats,
+  getRecentLogsDb,
+  getDailyAnalyticsDb
 } from './stats.js';
 import { fetchLiveAccountQuota } from './quota.js';
 import crypto from 'crypto';
@@ -251,7 +253,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           output: completionTokens,
           cached: 0,
           total: totalTokens
-        }, targetModel);
+        }, targetModel, { requestId: reqId, endpoint: urlPath, statusCode: 200 });
 
         broadcastEvent({
           type: 'account_idle',
@@ -368,7 +370,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           output: totalOutTokens,
           cached: 0,
           total: 20 + totalOutTokens
-        }, targetModel);
+        }, targetModel, { requestId: reqId, endpoint: urlPath, statusCode: 200 });
 
         broadcastEvent({
           type: 'account_idle',
@@ -428,6 +430,24 @@ async function handleProxyRequest(req, res) {
     const statsData = getAllStats();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(statsData, null, 2));
+  }
+
+  // SQLite Persistent Request Logs
+  if (urlPath.startsWith('/api/db/logs')) {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const limit = parseInt(query.get('limit') || '50', 10);
+    const logs = getRecentLogsDb(limit);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(logs, null, 2));
+  }
+
+  // SQLite Daily Usage Analytics
+  if (urlPath.startsWith('/api/db/daily')) {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const days = parseInt(query.get('days') || '14', 10);
+    const daily = getDailyAnalyticsDb(days);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(daily, null, 2));
   }
 
   // 1-Click Set Active Account Endpoint
@@ -634,7 +654,11 @@ async function handleProxyRequest(req, res) {
       if (urlPath.includes('flash')) modelUsed = 'gemini-2.5-flash';
       if (urlPath.includes('image')) modelUsed = 'imagen-3';
 
-      recordRequestSuccess(account.id, duration, tokenUsage, modelUsed);
+      recordRequestSuccess(account.id, duration, tokenUsage, modelUsed, {
+        requestId: reqId,
+        endpoint: urlPath,
+        statusCode: upstreamRes.status
+      });
 
       broadcastEvent({ 
         type: 'account_idle',

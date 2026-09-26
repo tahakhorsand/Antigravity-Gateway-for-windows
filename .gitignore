@@ -3,4 +3,8 @@ accounts.json
 .DS_Store
 *.log
 stats.json
+data/
+*.db
+*.db-wal
+*.db-shm
 /tmp/
