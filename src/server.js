@@ -1240,6 +1240,177 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify({ ok: true, accountId, email: removed.email }));
   }
 
+  // Fast 1-Account Quota Sync
+  if (urlPath.startsWith('/api/accounts/sync') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const accountId = query.get('id');
+    const accounts = getAccounts();
+    const targetAcc = accounts.find(a => a.id === accountId);
+    if (!targetAcc) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Account not found' }));
+    }
+    try {
+      const live = await fetchLiveAccountQuota(targetAcc);
+      updateAccountLiveQuota(accountId, live);
+      broadcastEvent({
+        type: 'quota_recovered',
+        accountId,
+        email: targetAcc.email,
+        window: 'Manual Refresh',
+        oldPct: 0,
+        newPct: live.geminiWeekly?.pct ?? 100,
+        timestamp: Date.now()
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, accountId, email: targetAcc.email, quota: live }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+  }
+
+  // Account Token & Health Check
+  if (urlPath.startsWith('/api/accounts/health') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const accountId = query.get('id');
+    const accounts = getAccounts();
+    const targetAcc = accounts.find(a => a.id === accountId);
+    if (!targetAcc) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Account not found' }));
+    }
+    const t0 = Date.now();
+    try {
+      const token = await getValidAccessToken(targetAcc);
+      const latencyMs = Date.now() - t0;
+      const stats = getAllStats();
+      const s = stats.accounts?.[accountId];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({
+        ok: true,
+        latencyMs,
+        email: targetAcc.email,
+        name: targetAcc.name,
+        expiresAt: targetAcc.expiry_timestamp,
+        hasRefreshToken: !!targetAcc.refresh_token,
+        isBanned: s ? !!s.is403Banned : false,
+        isCooling: isCoolingDown(accountId),
+        tokenPreview: token ? `${token.slice(0, 8)}...${token.slice(-6)}` : null
+      }));
+    } catch (err) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({
+        ok: false,
+        latencyMs: Date.now() - t0,
+        email: targetAcc.email,
+        error: err.message
+      }));
+    }
+  }
+
+  // Bulk Account Operations (Pause, Resume, Sync)
+  if (urlPath.startsWith('/api/accounts/bulk') && req.method === 'POST') {
+    let bodyStr = '';
+    for await (const chunk of req) bodyStr += chunk;
+    let body = {};
+    try { body = JSON.parse(bodyStr || '{}'); } catch {}
+    const { action, ids } = body;
+    if (!action || !Array.isArray(ids) || ids.length === 0) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Invalid action or account IDs' }));
+    }
+    const accounts = getAccounts();
+    let affected = 0;
+    if (action === 'pause' || action === 'resume') {
+      const enable = action === 'resume';
+      for (const id of ids) {
+        const acc = accounts.find(a => a.id === id);
+        if (acc) {
+          acc.enabled = enable;
+          updateAccountEnabledState(id, enable);
+          affected++;
+        }
+      }
+      saveAccounts(accounts);
+    } else if (action === 'sync') {
+      for (const id of ids) {
+        const acc = accounts.find(a => a.id === id);
+        if (acc) {
+          try {
+            const live = await fetchLiveAccountQuota(acc);
+            updateAccountLiveQuota(id, live);
+            affected++;
+          } catch {}
+        }
+      }
+    }
+    broadcastEvent({ type: 'account_updated' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, action, affected }));
+  }
+
+  // Smart Shield Sandbox Failover Simulator (Dry run - zero side effects on IDE)
+  if (urlPath.startsWith('/api/shield/simulate') && req.method === 'POST') {
+    let bodyStr = '';
+    for await (const chunk of req) bodyStr += chunk;
+    let body = {};
+    try { body = JSON.parse(bodyStr || '{}'); } catch {}
+
+    const accounts = getAccounts();
+    const stats = getAllStats();
+    const settings = shieldSettings();
+    const currentAcc = accounts.find(a => a.id === body.accountId || (body.email && a.email?.toLowerCase() === body.email.toLowerCase())) || accounts[0];
+
+    if (!currentAcc) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'No accounts in pool' }));
+    }
+
+    const families = familiesToWatch(settings);
+    const plan = planShieldSwitch({
+      accounts,
+      statsAccounts: stats.accounts || {},
+      currentId: currentAcc.id,
+      weeklyThreshold: body.weeklyThreshold ?? settings.weeklyThreshold,
+      burstThreshold: body.burstThreshold ?? settings.burstThreshold,
+      families,
+      isCoolingDown,
+      forceLow: true,
+      primaryId: settings.primaryEmail ? accounts.find(a => a.email?.toLowerCase() === settings.primaryEmail)?.id : null
+    });
+
+    const targetAccount = plan.target?.account ? {
+      id: plan.target.account.id,
+      email: plan.target.account.email,
+      name: plan.target.account.name,
+      weekly: plan.target.weekly,
+      burst: plan.target.burst
+    } : null;
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      ok: true,
+      simulation: {
+        sourceAccount: { id: currentAcc.id, email: currentAcc.email },
+        action: plan.action,
+        reason: plan.reason,
+        target: targetAccount,
+        candidatesCount: (plan.candidates || []).length,
+        candidates: (plan.candidates || []).map(c => ({
+          id: c.account.id,
+          email: c.account.email,
+          weekly: c.weekly,
+          burst: c.burst,
+          score: Math.round(c.score || 0)
+        })),
+        explanation: targetAccount 
+          ? `Failover engine selected ${targetAccount.email} with ${targetAccount.weekly}% weekly headroom and ${targetAccount.burst}% 5-hour burst runway.`
+          : 'No eligible failover account found in pool (all candidates cooling, paused, or low).'
+      }
+    }, null, 2));
+  }
+
   // Diagnostics: save Antigravity's web UI files and its window-state keys into tmp/antigravity-ui/
   if (urlPath.startsWith('/api/debug/antigravity-ui') && req.method === 'POST') {
     const result = await dumpAntigravityUi();
