@@ -560,15 +560,23 @@
     }
 
     /* Modern Navigation Tabs Menu */
-    .nav-tabs {
+    .nav-tabs-header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px;
       background: rgba(255, 255, 255, 0.025);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      margin-bottom: 2px;
       overflow-x: auto;
       scrollbar-width: none;
     }
@@ -576,11 +584,33 @@
       display: none;
     }
 
+    .nav-tabs-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--muted-foreground);
+      padding: 5px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+    }
+
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .meta-divider {
+      color: rgba(255, 255, 255, 0.15);
+    }
+
     .nav-tab {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 14px;
+      padding: 7px 13px;
       font-size: 12px;
       font-weight: 500;
       color: var(--muted-foreground);
@@ -604,6 +634,77 @@
       border-color: rgba(255, 255, 255, 0.12);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
       font-weight: 600;
+    }
+
+    /* Integration Cards & Universal API Hub */
+    .integration-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .integration-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .integration-card:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .code-pill {
+      background: #080c14;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .code-pill code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .code-pill code::-webkit-scrollbar {
+      display: none;
+    }
+
+    .btn-copy {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--muted-foreground);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .btn-copy:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
     }
 
     .tab-badge {
@@ -751,31 +852,39 @@
       </div>
     </div>
 
-    <!-- Modern Navigation Menu Bar -->
-    <nav class="nav-tabs" role="tablist">
-      <button class="nav-tab active" data-tab="pane-accounts" onclick="switchTab('pane-accounts')">
-        <i data-lucide="users" style="width: 14px; height: 14px;"></i>
-        <span>Accounts & Quotas</span>
-        <span class="tab-badge" id="tab-accounts-badge">4</span>
-      </button>
+    <!-- Modern Navigation Menu Bar with Telemetry -->
+    <div class="nav-tabs-header">
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="pane-accounts" onclick="switchTab('pane-accounts')">
+          <i data-lucide="users" style="width: 14px; height: 14px;"></i>
+          <span>Accounts & Quotas</span>
+          <span class="tab-badge" id="tab-accounts-badge">4</span>
+        </button>
 
-      <button class="nav-tab" data-tab="pane-analytics" onclick="switchTab('pane-analytics')">
-        <i data-lucide="bar-chart-3" style="width: 14px; height: 14px;"></i>
-        <span>Token Analytics & Savings</span>
-        <span class="tab-badge-accent" id="tab-savings-badge">$0.00 Saved</span>
-      </button>
+        <button class="nav-tab" data-tab="pane-analytics" onclick="switchTab('pane-analytics')">
+          <i data-lucide="bar-chart-3" style="width: 14px; height: 14px;"></i>
+          <span>Token Analytics & Savings</span>
+          <span class="tab-badge-accent" id="tab-savings-badge">$0.00 Saved</span>
+        </button>
 
-      <button class="nav-tab" data-tab="pane-logs" onclick="switchTab('pane-logs')">
-        <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
-        <span>Live Stream & SQLite Logs</span>
-        <span class="pulse-dot"></span>
-      </button>
+        <button class="nav-tab" data-tab="pane-logs" onclick="switchTab('pane-logs')">
+          <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
+          <span>Live Stream & SQLite Logs</span>
+          <span class="pulse-dot"></span>
+        </button>
 
-      <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
-        <i data-lucide="cpu" style="width: 14px; height: 14px;"></i>
-        <span>Universal API & Integrations</span>
-      </button>
-    </nav>
+        <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
+          <i data-lucide="cpu" style="width: 14px; height: 14px;"></i>
+          <span>Universal API & Integrations</span>
+        </button>
+      </nav>
+
+      <div class="nav-tabs-meta">
+        <span class="meta-item"><i data-lucide="shield-check" style="width: 12px; height: 12px; color: #10b981;"></i> Shield Armed</span>
+        <span class="meta-divider">•</span>
+        <span class="meta-item"><i data-lucide="activity" style="width: 12px; height: 12px; color: #38bdf8;"></i> 127.0.0.1:8045</span>
+      </div>
+    </div>
 
     <!-- Tab Pane 1: Accounts & Headroom -->
     <div class="tab-pane active" id="pane-accounts">
@@ -1044,65 +1153,164 @@
       </div>
     </div>
 
-    <!-- Tab Pane 4: Universal API & Integrations -->
+    <!-- Tab Pane 4: Universal AI Client & Multi-Tool Adapter -->
     <div class="tab-pane" id="pane-api">
       <div class="section-title">
         <span>Universal AI Client & Multi-Tool Adapter</span>
-        <span style="font-size: 11px; color: #38bdf8;">● Multi-Tool Adapter Active</span>
+        <span style="font-size: 11px; color: #10b981; display: inline-flex; align-items: center; gap: 5px;">
+          <i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> All Adapters Ready
+        </span>
       </div>
 
-      <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-          <!-- Cursor / OpenAI Protocol -->
-          <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+      <!-- 3 Integration Cards Grid (No redundant outer box) -->
+      <div class="integration-grid">
+        <!-- Card 1: Cursor / OpenAI Protocol -->
+        <div class="integration-card">
+          <div>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="terminal" style="width: 14px; height: 14px; color: #10b981;"></i>
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 7px;">
+                <i data-lucide="terminal" style="width: 15px; height: 15px; color: #10b981;"></i>
                 Cursor / OpenAI Protocol
               </span>
               <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">SSE Stream</span>
             </div>
-            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Base URL for Cursor, Roo Code, Cline or Continue.dev:</p>
-            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, monospace; font-size: 12px; color: #38bdf8; display: flex; align-items: center; justify-content: space-between;">
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 10px;">Base URL for Cursor, Roo Code, Cline or Continue.dev:</p>
+            <div class="code-pill">
               <code>http://127.0.0.1:8045/v1</code>
-              <button onclick="copySnippet('http://127.0.0.1:8045/v1', this)" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Copy">
-                <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
+              <button class="btn-copy" onclick="copySnippet('http://127.0.0.1:8045/v1', this)" title="Copy OpenAI Base URL">
+                <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
               </button>
             </div>
           </div>
+          <div style="font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+            <span>Endpoint: <b>/v1/chat/completions</b></span>
+            <span style="color: #10b981;">Ready</span>
+          </div>
+        </div>
 
-          <!-- Claude Code / Anthropic Protocol -->
-          <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+        <!-- Card 2: Claude Code / Anthropic Protocol -->
+        <div class="integration-card">
+          <div>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="cpu" style="width: 14px; height: 14px; color: #a855f7;"></i>
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 7px;">
+                <i data-lucide="cpu" style="width: 15px; height: 15px; color: #a855f7;"></i>
                 Claude Code / Anthropic
               </span>
               <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.2);">V1 Messages</span>
             </div>
-            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Run in shell or add to ~/.zshrc for unlimited Claude Code:</p>
-            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, monospace; font-size: 12px; color: #c084fc; display: flex; align-items: center; justify-content: space-between;">
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 10px;">Export in shell or ~/.zshrc for unlimited Claude Code:</p>
+            <div class="code-pill">
               <code>export ANTHROPIC_BASE_URL="http://127.0.0.1:8045"</code>
-              <button onclick="copySnippet('export ANTHROPIC_BASE_URL=\&quot;http://127.0.0.1:8045\&quot;', this)" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Copy">
-                <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
+              <button class="btn-copy" onclick="copySnippet('export ANTHROPIC_BASE_URL=\&quot;http://127.0.0.1:8045\&quot;', this)" title="Copy Shell Command">
+                <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
               </button>
             </div>
           </div>
+          <div style="font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+            <span>Endpoint: <b>/v1/messages</b></span>
+            <span style="color: #a855f7;">Ready</span>
+          </div>
+        </div>
 
-          <!-- macOS System Tray Extra -->
-          <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+        <!-- Card 3: macOS Menu Bar Extra -->
+        <div class="integration-card">
+          <div>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="zap" style="width: 14px; height: 14px; color: #fbbf24;"></i>
-                macOS System Tray Extra
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 7px;">
+                <i data-lucide="zap" style="width: 15px; height: 15px; color: #fbbf24;"></i>
+                macOS Menu Bar Quick Switcher
               </span>
               <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2);">Menu Bar</span>
             </div>
-            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Access real-time quotas & 1-click active switch directly from top bar:</p>
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #e4e4e7;">
-              <span style="padding: 3px 8px; background: rgba(255,255,255,0.06); border-radius: 4px; font-weight: 600; color: #fbbf24;">⚡ AGY</span>
-              <span>Always running in top system menu bar</span>
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 10px;">Fast macOS tray helper for live quotas & 1-click switch:</p>
+            <div class="code-pill">
+              <code>open "/Applications/Antigravity Harness.app"</code>
+              <button class="btn-copy" onclick="copySnippet('open \&quot;/Applications/Antigravity Harness.app\&quot;', this)" title="Copy Launch Command">
+                <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+              </button>
             </div>
+          </div>
+          <div style="font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+            <span>Status: <b style="color: #fbbf24;">⚡ AGY Active in Status Bar</b></span>
+            <span style="color: #10b981;">Installed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Developer Hub: Quick Test Console & SDK Integration Snippets -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-top: 2px;">
+        <!-- Left: Quick Test Playground -->
+        <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 7px;">
+                <i data-lucide="play-circle" style="width: 15px; height: 15px; color: #38bdf8;"></i>
+                Live Proxy Test Playground
+              </span>
+              <button class="btn btn-default btn-sm" id="btn-run-test" onclick="runProxyTest()">
+                <i data-lucide="zap" style="width: 12px; height: 12px;"></i>
+                <span id="btn-test-text">Send Test Ping</span>
+              </button>
+            </div>
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 12px;">Verify proxy latency and end-to-end token dispatch from this browser:</p>
+            
+            <div style="background: #080c14; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 10px 12px; position: relative;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground); font-weight: 600;">cURL Command</span>
+                <button class="btn-copy" onclick="copySnippet('curl http://127.0.0.1:8045/v1/chat/completions -H \&quot;Content-Type: application/json\&quot; -d \'{\&quot;model\&quot;: \&quot;gemini-3.8-flash\&quot;, \&quot;messages\&quot;: [{\&quot;role\&quot;: \&quot;user\&quot;, \&quot;content\&quot;: \&quot;Say hello!\&quot;}]}\'', this)" title="Copy cURL">
+                  <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+                </button>
+              </div>
+              <pre style="margin: 0; font-family: ui-monospace, monospace; font-size: 11px; color: #38bdf8; overflow-x: auto; white-space: pre-wrap; word-break: break-all;">curl http://127.0.0.1:8045/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gemini-3.8-flash", "messages": [{"role": "user", "content": "Say hello!"}]}'</pre>
+            </div>
+          </div>
+
+          <div id="test-result-box" style="display: none; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; padding: 10px 12px; font-size: 11px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-weight: 600; color: #34d399;" id="test-result-status">● 200 OK</span>
+              <span style="color: var(--muted-foreground);" id="test-result-meta">Latency: 280ms • Output: 8 tokens</span>
+            </div>
+            <div style="color: #e4e4e7; font-family: ui-monospace, monospace; word-break: break-all;" id="test-result-text">Response text...</div>
+          </div>
+        </div>
+
+        <!-- Right: SDK Config Snippets -->
+        <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 7px;">
+                <i data-lucide="code-2" style="width: 15px; height: 15px; color: #ec4899;"></i>
+                Python & Node.js SDK Setup
+              </span>
+              <span class="badge" style="background: rgba(236, 72, 153, 0.1); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.2);">OpenAI Compatible</span>
+            </div>
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 12px;">Plug directly into Python OpenAI client or any AI coding tool:</p>
+
+            <div style="background: #080c14; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 10px 12px; position: relative;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-size: 10px; text-transform: uppercase; color: var(--muted-foreground); font-weight: 600;">Python Client Snippet</span>
+                <button class="btn-copy" onclick="copySnippet('from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\&quot;http://127.0.0.1:8045/v1\&quot;,\n    api_key=\&quot;antigravity\&quot;\n)\n\nresponse = client.chat.completions.create(\n    model=\&quot;gemini-3.8-flash\&quot;,\n    messages=[{\&quot;role\&quot;: \&quot;user\&quot;, \&quot;content\&quot;: \&quot;Hello\&quot;}]\n)\nprint(response.choices[0].message.content)', this)" title="Copy Python Snippet">
+                  <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+                </button>
+              </div>
+              <pre style="margin: 0; font-family: ui-monospace, monospace; font-size: 11px; color: #c084fc; overflow-x: auto; white-space: pre-wrap;">from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:8045/v1",
+    api_key="antigravity"
+)
+response = client.chat.completions.create(
+    model="gemini-3.8-flash",
+    messages=[{"role": "user", "content": "Hello!"}]
+)</pre>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+            <span>Models: <b>gemini-3.8-flash</b>, <b>gemini-2.5-pro</b>, <b>claude-3-5-sonnet</b></span>
+            <span style="color: #38bdf8;">Multi-Model</span>
           </div>
         </div>
       </div>
@@ -1788,6 +1996,59 @@
     function addAccount() {
       fetch('/api/add-account', { method: 'POST' });
       addLog('👉 Opening browser for Google sign-in...');
+    }
+
+    async function runProxyTest() {
+      const btn = document.getElementById('btn-run-test');
+      const btnText = document.getElementById('btn-test-text');
+      const box = document.getElementById('test-result-box');
+      const statusEl = document.getElementById('test-result-status');
+      const metaEl = document.getElementById('test-result-meta');
+      const textEl = document.getElementById('test-result-text');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerText = 'Testing...';
+      if (box) box.style.display = 'block';
+      if (statusEl) {
+        statusEl.innerText = '● Sending request...';
+        statusEl.style.color = '#fbbf24';
+      }
+
+      const startTime = Date.now();
+      try {
+        const res = await fetch('/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash',
+            messages: [{ role: 'user', content: 'Say "Antigravity Gateway is operating normally" in one sentence.' }]
+          })
+        });
+        const elapsed = Date.now() - startTime;
+        const data = await res.json();
+        if (res.ok) {
+          const content = data.choices?.[0]?.message?.content || JSON.stringify(data);
+          const totalTok = data.usage?.total_tokens || 0;
+          statusEl.innerText = `● ${res.status} OK`;
+          statusEl.style.color = '#34d399';
+          metaEl.innerText = `Latency: ${elapsed}ms • Model: ${formatModelDisplayName(data.model)} • Tokens: ${totalTok}`;
+          textEl.innerText = `"${content.trim()}"`;
+        } else {
+          statusEl.innerText = `● ${res.status} Error`;
+          statusEl.style.color = '#f87171';
+          metaEl.innerText = `Latency: ${elapsed}ms`;
+          textEl.innerText = data.error?.message || JSON.stringify(data);
+        }
+      } catch (err) {
+        statusEl.innerText = '● Connection Error';
+        statusEl.style.color = '#f87171';
+        metaEl.innerText = `Failed after ${Date.now() - startTime}ms`;
+        textEl.innerText = err.message;
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'Send Test Ping';
+        fetchMatrix();
+      }
     }
 
     // Real-Time Server-Sent Events (SSE) Listener
