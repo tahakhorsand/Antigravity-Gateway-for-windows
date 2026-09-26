@@ -315,6 +315,87 @@ export function getModelDistributionDb() {
   }
 }
 
+export function getHourlyHeatmapDb(days = 7) {
+  try {
+    const db = getDatabase();
+    const query = db.prepare(`
+      SELECT 
+        date(datetime(timestamp / 1000, 'unixepoch', 'localtime')) AS dayDate,
+        CAST(strftime('%H', datetime(timestamp / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS hourNum,
+        COUNT(*) AS requestCount,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens,
+        COALESCE(SUM(input_tokens), 0) AS inputTokens,
+        COALESCE(SUM(output_tokens), 0) AS outputTokens
+      FROM request_logs
+      WHERE timestamp >= (strftime('%s', 'now') - (? * 86400)) * 1000
+      GROUP BY dayDate, hourNum
+      ORDER BY dayDate ASC, hourNum ASC
+    `);
+
+    const rows = query.all(days);
+    const lookup = new Map();
+    let maxTokens = 100;
+
+    for (const r of rows) {
+      const key = `${r.dayDate}_${r.hourNum}`;
+      const tok = Number(r.totalTokens || 0);
+      if (tok > maxTokens) maxTokens = tok;
+      lookup.set(key, {
+        requests: Number(r.requestCount || 0),
+        tokens: tok,
+        inTok: Number(r.inputTokens || 0),
+        outTok: Number(r.outputTokens || 0)
+      });
+    }
+
+    const grid = [];
+    const now = new Date();
+    for (let d = days - 1; d >= 0; d--) {
+      const dayDateObj = new Date(now);
+      dayDateObj.setDate(dayDateObj.getDate() - d);
+      const dayDateStr = dayDateObj.toISOString().slice(0, 10);
+      const dayLabel = d === 0 ? 'Today' : (d === 1 ? 'Yesterday' : dayDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }));
+      const dayShort = dayDateObj.toLocaleDateString('en-US', { weekday: 'short' });
+
+      const hours = [];
+      for (let h = 0; h < 24; h++) {
+        const item = lookup.get(`${dayDateStr}_${h}`) || { requests: 0, tokens: 0, inTok: 0, outTok: 0 };
+        let level = 0;
+        if (item.tokens > 0) {
+          const ratio = item.tokens / maxTokens;
+          if (ratio > 0.5) level = 4;
+          else if (ratio > 0.25) level = 3;
+          else if (ratio > 0.08) level = 2;
+          else level = 1;
+        }
+        hours.push({
+          hour: h,
+          hourLabel: `${String(h).padStart(2, '0')}:00`,
+          tokens: item.tokens,
+          requests: item.requests,
+          dollarsSaved: Number(((item.inTok * 0.000003) + (item.outTok * 0.000015)).toFixed(3)),
+          level
+        });
+      }
+
+      grid.push({
+        date: dayDateStr,
+        dayLabel,
+        dayShort,
+        hours
+      });
+    }
+
+    return {
+      days: grid,
+      maxTokens
+    };
+  } catch (err) {
+    console.error('[SQLite] Error calculating hourly heatmap:', err.message);
+    return { days: [], maxTokens: 0 };
+  }
+}
+
 export function migrateExistingJsonStats(existingStats) {
   try {
     const db = getDatabase();

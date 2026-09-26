@@ -26,7 +26,7 @@ import {
   updateAccountAlias,
   removeAccountStats
 } from './stats.js';
-import { getMetadataDb, setMetadataDb, queryLogsDb } from './db.js';
+import { getMetadataDb, setMetadataDb, queryLogsDb, getHourlyHeatmapDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
 import { createLoginUrl, completeLogin, loginResultPage } from './account-login.js';
 import crypto from 'crypto';
@@ -95,6 +95,75 @@ export async function syncAllQuotas() {
   
   // Proactive Smart Quota Shield check
   void checkAndApplySmartShield();
+}
+
+const recoveryCooldowns = new Map();
+
+export async function checkAndRecoverQuotas() {
+  if (isSyncingQuotas) return;
+  const stats = getAllStats();
+  const accounts = getAccounts();
+  const now = Date.now();
+
+  for (const acc of accounts) {
+    const s = stats.accounts?.[acc.id];
+    if (!s) continue;
+
+    const buckets = [
+      { name: 'Gemini 5h Burst', data: s.gemini5h },
+      { name: 'Gemini Weekly', data: s.geminiWeekly },
+      { name: 'Claude 5h Burst', data: s.claude5h },
+      { name: 'Claude Weekly', data: s.claudeWeekly }
+    ];
+
+    let shouldRecover = false;
+    let expiredBucketName = '';
+
+    for (const b of buckets) {
+      if (b.data?.resetTime && ((b.data.pct ?? 100) < 95 || s.is403Banned)) {
+        const resetTs = new Date(b.data.resetTime).getTime();
+        if (resetTs <= now) {
+          const cooldownKey = `${acc.id}_${b.name}`;
+          const lastAttempt = recoveryCooldowns.get(cooldownKey) || 0;
+          if (now - lastAttempt > 60000) {
+            shouldRecover = true;
+            expiredBucketName = b.name;
+            recoveryCooldowns.set(cooldownKey, now);
+            break;
+          }
+        }
+      }
+    }
+
+    if (shouldRecover) {
+      console.log(`${colors.cyan}[AutoRecovery] ⏳ Reset window arrived for ${acc.email} (${expiredBucketName}). Fetching fresh quota...${colors.reset}`);
+      try {
+        const live = await fetchLiveAccountQuota(acc);
+        const oldWeekly = s.geminiWeekly?.pct ?? 0;
+        updateAccountLiveQuota(acc.id, live);
+        const newWeekly = live.geminiWeekly?.pct ?? 100;
+
+        console.log(`${colors.green}[AutoRecovery] 🎉 ${acc.email} quota refreshed! (${oldWeekly}% -> ${newWeekly}%)${colors.reset}`);
+
+        broadcastEvent({
+          type: 'quota_recovered',
+          accountId: acc.id,
+          email: acc.email,
+          window: expiredBucketName,
+          oldPct: oldWeekly,
+          newPct: newWeekly,
+          timestamp: Date.now()
+        });
+
+        sendMacNotification(
+          'Antigravity Quota Restored',
+          `${acc.email.split('@')[0]}'s ${expiredBucketName} quota reset to ${newWeekly}% and is back in rotation!`
+        );
+      } catch (err) {
+        console.error(`[AutoRecovery] Failed refreshing ${acc.email}:`, err.message);
+      }
+    }
+  }
 }
 
 export function sendMacNotification(title, message, sound = 'Subtle') {
@@ -1062,6 +1131,15 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify(daily, null, 2));
   }
 
+  // SQLite Hourly Activity Heatmap
+  if (urlPath.startsWith('/api/db/heatmap')) {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const days = parseInt(query.get('days') || '7', 10);
+    const heatmap = getHourlyHeatmapDb(Math.min(14, Math.max(1, days)));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(heatmap, null, 2));
+  }
+
   // 1-Click Set Active Account Endpoint
   if (urlPath.startsWith('/api/set-active-account') && req.method === 'POST') {
     const query = new URL(req.url, 'http://localhost').searchParams;
@@ -1519,6 +1597,11 @@ ${colors.bold}${colors.cyan}─────────────────�
   setInterval(() => {
     syncAllQuotas().catch(console.error);
   }, 180000);
+
+  // Proactive Quota Auto-Recovery Check every 15 seconds
+  setInterval(() => {
+    void checkAndRecoverQuotas();
+  }, 15000);
 
   // Follow the account Antigravity is really signed in as, and learn which models it uses
   void pollIdeAccount();

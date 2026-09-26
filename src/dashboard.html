@@ -963,8 +963,131 @@
       animation: spin 0.8s linear infinite;
     }
 
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
+    /* Hourly Heatmap */
+    .heatmap-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .heatmap-scroll {
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: 56px repeat(24, 1fr);
+      gap: 3px;
+      min-width: 660px;
+    }
+    .heatmap-header-cell {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      color: var(--text-4);
+      text-align: center;
+      padding-bottom: 4px;
+    }
+    .heatmap-row-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-3);
+      display: flex;
+      align-items: center;
+    }
+    .heatmap-cell {
+      height: 16px;
+      border-radius: 2px;
+      background: #121212;
+      border: 1px solid rgba(255,255,255,0.03);
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .heatmap-cell:hover {
+      transform: scale(1.22);
+      z-index: 10;
+      border-color: #ffffff;
+    }
+    .heatmap-cell.level-0 { background: #121212; }
+    .heatmap-cell.level-1 { background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.35); }
+    .heatmap-cell.level-2 { background: rgba(16, 185, 129, 0.50); border-color: rgba(16, 185, 129, 0.65); }
+    .heatmap-cell.level-3 { background: rgba(16, 185, 129, 0.75); border-color: rgba(16, 185, 129, 0.90); }
+    .heatmap-cell.level-4 { background: #10b981; border-color: #34d399; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-4);
+      padding-top: 4px;
+    }
+    .heatmap-legend-scale {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .heatmap-legend-box {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    /* Enterprise Savings Card */
+    .roi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .roi-col {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .roi-val {
+      font-size: 18px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Filter Pills */
+    .filter-pills {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--surface-2);
+      padding: 2px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+    }
+    .filter-pill {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      color: var(--text-3);
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      transition: color 0.15s, background 0.15s;
+    }
+    .filter-pill.active {
+      color: var(--text-1);
+      background: var(--surface-3);
+      font-weight: 500;
+    }
+
+    /* Floating Toast Animation */
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
   </style>
 </head>
@@ -1146,13 +1269,27 @@
         </div>
       </div>
 
-      <div class="view-toolbar">
-        <div class="section-heading">
-          <span>Account Pool</span>
-          <span class="section-sub">&bull; <span id="table-acc-count">0</span> accounts monitored with real-time quota failover</span>
+      <div class="view-toolbar" style="flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div class="section-heading" style="margin-bottom: 0;">
+            <span>Account Pool</span>
+            <span class="section-sub">&bull; <span id="table-acc-count">0</span> accounts</span>
+          </div>
+
+          <div class="filter-pills" id="acc-filter-pills">
+            <button class="filter-pill active" onclick="setAccountStatusFilter('all', this)">All</button>
+            <button class="filter-pill" onclick="setAccountStatusFilter('active', this)">Active</button>
+            <button class="filter-pill" onclick="setAccountStatusFilter('standby', this)">Standby</button>
+            <button class="filter-pill" onclick="setAccountStatusFilter('paused', this)">Paused</button>
+          </div>
         </div>
 
         <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="input-search-wrap" style="width: 190px;">
+            <i data-lucide="search" class="search-icon" style="width: 12px; height: 12px;"></i>
+            <input type="text" class="input-text" id="acc-search-input" placeholder="Search email or alias..." oninput="handleAccountSearch()" style="height: 28px; font-size: 11px; padding-left: 26px;">
+          </div>
+
           <div class="segmented-control">
             <button class="segmented-btn active" id="btn-view-table" onclick="setViewMode('table')" title="Table View (Shortcut: t)">
               <i data-lucide="table" style="width: 12px; height: 12px;"></i>
@@ -1378,6 +1515,76 @@
           </div>
           <div class="micro-bar" id="model-share-bar" style="height: 6px; display: flex;">
             <!-- Injected via JavaScript -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 7-Day Activity Heatmap -->
+      <div class="heatmap-card">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--green);"></i>
+              <span>7-Day Hourly Quota Burn Heatmap</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-3);">Hourly request density &amp; token throughput matrix across all local agents</div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-3);" id="heatmap-summary-pill">Peak: -- tokens</div>
+        </div>
+
+        <div class="heatmap-scroll">
+          <div class="heatmap-grid" id="heatmap-grid-container">
+            <!-- Injected via JavaScript -->
+          </div>
+        </div>
+
+        <div class="heatmap-legend">
+          <span id="heatmap-stats-line">Active coding hours tracked in SQLite</span>
+          <div class="heatmap-legend-scale">
+            <span>Less</span>
+            <div class="heatmap-legend-box" style="background: #121212;"></div>
+            <div class="heatmap-legend-box" style="background: rgba(16, 185, 129, 0.25);"></div>
+            <div class="heatmap-legend-box" style="background: rgba(16, 185, 129, 0.50);"></div>
+            <div class="heatmap-legend-box" style="background: rgba(16, 185, 129, 0.75);"></div>
+            <div class="heatmap-legend-box" style="background: #10b981;"></div>
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enterprise ROI & Cost Savings Intelligence Card -->
+      <div class="card" style="margin-top: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="shield-check" style="width: 14px; height: 14px; color: var(--blue);"></i>
+              <span>Enterprise ROI &amp; Quota Savings Analysis</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-3);">Financial comparison vs commercial API pay-per-token rates (OpenAI / Claude standard list prices)</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="exportRoiReport()">
+            <i data-lucide="download" style="width: 12px; height: 12px;"></i>
+            <span>Export ROI Report</span>
+          </button>
+        </div>
+
+        <div class="roi-grid">
+          <div class="roi-col">
+            <span style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px;">Commercial Value</span>
+            <span class="roi-val" id="roi-commercial-val" style="color: var(--text-2);">$0.00</span>
+            <span style="font-size: 10px; color: var(--text-4);">Standard API meter rate</span>
+          </div>
+
+          <div class="roi-col">
+            <span style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px;">Antigravity Cost</span>
+            <span class="roi-val" style="color: var(--green);">$0.00</span>
+            <span style="font-size: 10px; color: var(--green);">100% Free Quota Pooled</span>
+          </div>
+
+          <div class="roi-col" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.25);">
+            <span style="font-size: 11px; color: var(--green); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Net Dollars Kept</span>
+            <span class="roi-val" id="roi-net-saved" style="color: var(--green);">$0.00</span>
+            <span style="font-size: 10px; color: var(--text-3);">Total savings delivered</span>
           </div>
         </div>
       </div>
@@ -1692,6 +1899,9 @@
     </div>
   </div>
 
+  <!-- Floating Toast Notifications -->
+  <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;"></div>
+
   <!-- Keyboard Shortcuts Modal -->
   <div class="modal-backdrop" id="shortcuts-modal">
     <div class="modal-box" style="max-width: 440px;">
@@ -1783,10 +1993,177 @@
 
       if (tabId === 'pane-logs') {
         fetchDbLogs();
+      } else if (tabId === 'pane-analytics') {
+        fetchHeatmap();
       }
       if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
         try { window.lucide.createIcons(); } catch (e) {}
       }
+    }
+
+    // Micro-Toast Notification System
+    function showToast(msg, type = 'info', duration = 4000) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.style.cssText = `
+        pointer-events: auto;
+        background: #111111;
+        border: 1px solid ${type === 'success' ? 'rgba(16, 185, 129, 0.4)' : (type === 'warn' ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-muted)')};
+        color: var(--text-1);
+        font-size: 12px;
+        padding: 10px 14px;
+        border-radius: var(--radius-md);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: toast-in 0.25s ease-out;
+        transition: opacity 0.25s, transform 0.25s;
+      `;
+      const icon = type === 'success' ? '✨' : (type === 'warn' ? '🛡️' : '🔔');
+      toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 250);
+      }, duration);
+    }
+
+    // Account Filtering & Search
+    let currentAccountFilter = 'all';
+    let currentAccountSearch = '';
+    let lastStatsData = null;
+    let lastIdeStatus = null;
+
+    function setAccountStatusFilter(filter, btn) {
+      currentAccountFilter = filter;
+      document.querySelectorAll('#acc-filter-pills .filter-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      applyAccountFilters();
+    }
+
+    function handleAccountSearch() {
+      const input = document.getElementById('acc-search-input');
+      currentAccountSearch = (input?.value || '').toLowerCase().trim();
+      applyAccountFilters();
+    }
+
+    function applyAccountFilters() {
+      if (!cachedAccountsList) return;
+      let list = [...cachedAccountsList];
+
+      if (currentAccountSearch) {
+        list = list.filter(a => 
+          (a.email && a.email.toLowerCase().includes(currentAccountSearch)) ||
+          (a.alias && a.alias.toLowerCase().includes(currentAccountSearch)) ||
+          (a.name && a.name.toLowerCase().includes(currentAccountSearch))
+        );
+      }
+
+      const activeSessionEmail = (lastIdeStatus?.ideEmail || lastStatsData?.global?.activeSessionEmail || '').toLowerCase();
+      const activeSessionId = lastStatsData?.global?.activeSessionAccountId;
+
+      if (currentAccountFilter === 'active') {
+        list = list.filter(a => a.id === activeSessionId || a.email?.toLowerCase() === activeSessionEmail);
+      } else if (currentAccountFilter === 'standby') {
+        list = list.filter(a => (a.id !== activeSessionId && a.email?.toLowerCase() !== activeSessionEmail) && a.enabled !== false && !a.is403Banned);
+      } else if (currentAccountFilter === 'paused') {
+        list = list.filter(a => a.enabled === false);
+      }
+
+      renderAccountsTable(list, lastStatsData, lastIdeStatus);
+      renderAccountsGrid(list, lastStatsData, lastIdeStatus);
+
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (e) {}
+      }
+    }
+
+    // Activity Heatmap Fetcher & Renderer
+    async function fetchHeatmap() {
+      const container = document.getElementById('heatmap-grid-container');
+      const pill = document.getElementById('heatmap-summary-pill');
+      if (!container) return;
+
+      try {
+        const res = await fetch('/api/db/heatmap?days=7');
+        if (!res.ok) return;
+        const data = await res.json();
+        const days = data.days || [];
+        const maxTokens = data.maxTokens || 1;
+
+        if (pill) {
+          pill.innerText = `Peak 1h: ${formatNumber(maxTokens)} tokens`;
+        }
+
+        let html = '<div class="heatmap-header-cell"></div>';
+        for (let h = 0; h < 24; h++) {
+          const hStr = h % 2 === 0 ? `${h}h` : '';
+          html += `<div class="heatmap-header-cell">${hStr}</div>`;
+        }
+
+        for (const day of days) {
+          html += `<div class="heatmap-row-label">${day.dayShort || day.dayLabel}</div>`;
+          for (const cell of day.hours) {
+            const timeRange = `${cell.hourLabel}–${String((cell.hour + 1) % 24).padStart(2, '0')}:00`;
+            const tooltip = `${day.dayLabel} at ${timeRange}\n• Tokens: ${cell.tokens.toLocaleString()} (Saved ~$${cell.dollarsSaved})\n• Requests: ${cell.requests}`;
+            html += `<div class="heatmap-cell level-${cell.level}" title="${tooltip}"></div>`;
+          }
+        }
+
+        container.innerHTML = html;
+      } catch (err) {
+        console.error('Error fetching heatmap:', err);
+      }
+    }
+
+    // Export ROI Savings Report
+    function exportRoiReport() {
+      const g = lastStatsData?.global || {};
+      const totalTokens = g.totalTokens || 0;
+      const inTok = g.inputTokens || 0;
+      const outTok = g.outputTokens || 0;
+      const moneySaved = g.dollarsSavedFormatted || '$0.00';
+      const models = g.modelDistribution || [];
+      const accounts = cachedAccountsList || [];
+
+      let md = `# Antigravity Gateway • Enterprise ROI & Cost Savings Report\n`;
+      md += `Generated: ${new Date().toLocaleString()} (Host: 127.0.0.1:8045)\n\n`;
+      md += `## 1. Executive Summary\n`;
+      md += `- **Total Tokens Processed**: ${totalTokens.toLocaleString()} tokens\n`;
+      md += `- **Input / Context Tokens**: ${inTok.toLocaleString()} tokens\n`;
+      md += `- **Output Completion Tokens**: ${outTok.toLocaleString()} tokens\n`;
+      md += `- **Equivalent Commercial API Value**: ${moneySaved}\n`;
+      md += `- **Antigravity Harness Cost**: $0.00 (Pooled Google Pro Subscriptions)\n`;
+      md += `- **Net Operational Savings**: ${moneySaved}\n\n`;
+
+      md += `## 2. Pooled Accounts\n`;
+      for (const a of accounts) {
+        const aliasStr = a.alias ? ` (${a.alias})` : '';
+        const status = a.enabled === false ? 'PAUSED' : 'ACTIVE';
+        md += `- **${a.email}**${aliasStr}: ${status} • Weekly Quota: ${a.geminiWeekly?.pct ?? 100}% • Reqs: ${a.totalRequests || 0}\n`;
+      }
+      md += `\n`;
+
+      md += `## 3. Model Distribution\n`;
+      for (const m of models) {
+        md += `- **${m.model}**: ${m.percentage}% (${Number(m.totalTokens || 0).toLocaleString()} tokens)\n`;
+      }
+
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `antigravity_roi_report_${Date.now()}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('📥 Downloaded Enterprise ROI Report (Markdown)', 'success');
+      addLog('📥 Exported Enterprise ROI & Cost Savings Report');
     }
 
     // Modal Handlers
@@ -2175,14 +2552,19 @@
         // Badges
         const tabAccBadge = document.getElementById('tab-badge-accounts');
         if (tabAccBadge) tabAccBadge.innerText = String(accounts.length);
-        const tblCount = document.getElementById('table-acc-count');
-        if (tblCount) tblCount.innerText = String(accounts.length);
+        lastStatsData = data;
+        lastIdeStatus = ideStatus;
+
+        // Update Enterprise ROI Card values
+        const roiComm = document.getElementById('roi-commercial-val');
+        const roiNet = document.getElementById('roi-net-saved');
+        if (roiComm) roiComm.innerText = data.global?.dollarsSavedFormatted || '$0.00';
+        if (roiNet) roiNet.innerText = data.global?.dollarsSavedFormatted || '$0.00';
 
         try { updatePoolRunway(accounts, data); } catch (e) { console.error('Error updating pool runway:', e); }
         try { renderDailyChart(data.global?.dailyAnalytics || []); } catch (e) { console.error('Error rendering daily chart:', e); }
         try { renderModelShare(data.global?.modelDistribution || []); } catch (e) { console.error('Error rendering model share:', e); }
-        try { renderAccountsTable(accounts, data, ideStatus); } catch (e) { console.error('Error rendering accounts table:', e); }
-        try { renderAccountsGrid(accounts, data, ideStatus); } catch (e) { console.error('Error rendering accounts grid:', e); }
+        try { applyAccountFilters(); } catch (e) { console.error('Error applying account filters:', e); }
 
         if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
           try { window.lucide.createIcons(); } catch (e) {}
@@ -3062,17 +3444,27 @@
             if (document.getElementById('pane-logs')?.classList.contains('active')) {
               fetchDbLogs();
             }
+          } else if (item.type === 'quota_recovered') {
+            const shortUser = item.email ? item.email.split('@')[0] : 'Account';
+            addLog(`🎉 ${item.email} ${item.window} quota refreshed to ${item.newPct}%!`);
+            showToast(`✨ ${shortUser}'s ${item.window} reset to ${item.newPct}%! Restored to pool.`, 'success');
+            playNotificationSound('chime');
+            sendDesktopNotification('Antigravity Quota Restored', `${item.email} quota reset to ${item.newPct}% and is back in active rotation.`);
             fetchMatrix();
+            fetchHeatmap();
           } else if (item.type === 'account_switch') {
             addLog(`🔄 Session switched to ${item.email}`);
+            showToast(`🔄 Active session switched to ${item.email}`, 'info');
             sendDesktopNotification('Antigravity Session Switched', `Active session shifted to ${item.email}`);
             fetchMatrix();
           } else if (item.type === 'proactive_switch') {
             addLog(`🛡️ Proactive switch from ${item.from} to ${item.to}`);
+            showToast(`🛡️ Smart Shield rotated: ${item.from.split('@')[0]} ➔ ${item.to.split('@')[0]}`, 'warn');
             sendDesktopNotification('🛡️ Smart Shield Failover', `Proactive failover from ${item.from} to ${item.to} (<20% quota protection)`);
             fetchMatrix();
           } else if (item.type === 'account_added') {
             addLog(`✅ Account added: ${item.email}`);
+            showToast(`✅ Account added: ${item.email}`, 'success');
             fetchMatrix();
           }
         } catch (err) {}
