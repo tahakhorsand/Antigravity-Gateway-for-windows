@@ -1,61 +1,171 @@
-# Antigravity Harness
+<p align="center">
+  <img src="assets/image.png" alt="Antigravity Harness logo" width="220">
+</p>
 
-A local tool for macOS that keeps **Google Antigravity** working across several of your own Google AI Pro accounts. When the account Antigravity is using runs low on quota, the harness switches Antigravity to another account between tasks, brings the window back to the conversation you were in, and (optionally) tells the agent to continue after a hard quota error.
+<h1 align="center">Antigravity Harness</h1>
 
-> Rotating accounts to get around per-account usage limits may be against Google's terms and can get accounts restricted (403). The harness detects restricted accounts and stops using them, but it cannot prevent it.
+<p align="center">
+  Keep <a href="https://antigravity.google">Google Antigravity</a> working across several of your own Google AI Pro accounts —
+  switch accounts <b>before</b> a quota runs out, <b>between</b> tasks, without losing your conversation.
+</p>
+
+<p align="center">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg">
+  <img alt="Node.js 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933.svg">
+  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-lightgrey.svg">
+  <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen.svg">
+</p>
+
+> [!WARNING]
+> **Unofficial project.** Not affiliated with, endorsed by or supported by Google. "Antigravity" and "Gemini" are trademarks of Google LLC.
+> Rotating accounts to get around per-account usage limits may violate Google's terms of service and can get accounts restricted. Use only accounts you own, and use at your own risk.
+
+---
+
+## Why
+
+Antigravity has weekly and 5-hour usage limits per account. When one runs out mid-project you have to log out, log in with another account and find your conversation again. Antigravity Harness does that for you: it watches the quota of every account, and when the one in use runs low it moves Antigravity to the best next account at a moment when no task is running, then reopens the conversation you were in.
+
+## Features
+
+- **Live quota tracking** – Gemini and Claude/GPT limits (weekly and 5-hour) for every account, with reset times.
+- **Knows the real active account** – asks Antigravity which account it is signed into; the dashboard always matches the IDE.
+- **Model aware** – detects whether your conversation uses Gemini or Claude/GPT and watches the right limits.
+- **Smart Shield** – switches when the weekly or 5-hour quota drops below your thresholds; skips the switch when the low limit resets within 15 minutes.
+- **Quota-efficient ordering** – spends the quota that would expire first ("use it or lose it"), or returns to your *main account* once it has recovered.
+- **Never interrupts a task** – waits until the agent's turn is finished, including long-running background commands.
+- **Keeps your conversation open** – after the switch the Antigravity window is moved back to the conversation you were in.
+- **Auto-continue** (optional) – after a hard "quota reached" error it switches and asks the agent to continue.
+- **Dashboard** – quotas, switch log, settings and a manual *Set Active* button at `http://127.0.0.1:8045`.
+- **Zero dependencies** – plain Node.js (built-in `node:sqlite`, `fetch`, `WebSocket`).
 
 ## How it works
 
-1. **Quota tracking** – every account's Gemini and Claude/GPT limits (weekly and 5-hour) are read from Google's Cloud Code endpoints: all accounts every 3 minutes, the active account every 30–60 seconds.
-2. **Model detection** – the harness asks Antigravity which model answered recently and watches that model family's limits.
-3. **Smart Shield** – when the active account drops below your thresholds it picks the next account: your *main account* if set and recovered, otherwise the account whose unused weekly quota expires soonest ("use it or lose it"). It does not switch when the low limit resets within 15 minutes.
-4. **Switching** – the new account's login is written where Antigravity reads it (macOS Keychain + `~/.gemini`), then Antigravity's language server is restarted. This only happens when no agent turn or background command is running (read from `~/.gemini/antigravity/brain/*/transcript.jsonl`).
-5. **Conversation restore** – after the restart Antigravity reloads at a blank conversation; the harness moves the window back to `/c/<conversation>` through the DevTools endpoint Antigravity itself opens.
-6. **Auto-continue** (optional) – after a hard "quota reached" error, the harness switches, reopens the conversation and sends a short message asking the agent to continue. It never overwrites a draft in the message box.
-
-## Setup
-
-```bash
-git clone <repo-url> antigravity-harness && cd antigravity-harness
-cp oauth-client.example.json oauth-client.json   # fill in the OAuth client (kept out of git)
-npm run add-account                              # once per Google account
-pm2 start src/server.js --name antigravity-harness && pm2 save
+```mermaid
+sequenceDiagram
+    participant H as Harness
+    participant G as Google (quota API)
+    participant A as Antigravity
+    loop every 30–60 s
+        H->>G: quota of the active account
+        H->>A: which account / model is in use?
+    end
+    Note over H: below threshold → pick next account
+    H->>A: wait until the agent's turn and background commands are done
+    H->>A: write new login (Keychain + ~/.gemini), restart language server
+    A-->>H: signed in as the new account (window reloads)
+    H->>A: reopen the same conversation
+    opt after a hard quota error (auto-continue)
+        H->>A: send "continue" in the conversation
+    end
 ```
 
-Node 22+ is required (built-in `node:sqlite` and WebSocket). No npm dependencies.
+| Piece | What it does |
+|---|---|
+| Quota | Reads each account's buckets from Google's Cloud Code endpoints (all accounts every 3 min, the active one every 30–60 s). |
+| Activity detection | Reads Antigravity's conversation logs (`~/.gemini/antigravity/brain/*/transcript.jsonl`) to know when a turn has finished and whether background commands are still running. |
+| Switching | Writes the new account's OAuth tokens where Antigravity reads its login, then restarts Antigravity's language server; Antigravity respawns it signed in as the new account. |
+| Conversation restore | Antigravity reloads its window at a blank conversation after the restart; the harness moves it back to `/c/<conversation-id>` through the local DevTools endpoint Antigravity opens itself. |
 
-## Daily use
+## Requirements
 
-- Dashboard: http://127.0.0.1:8045 – account quotas, the account Antigravity is really using, switch log, Smart Shield settings (weekly / 5-hour thresholds, models to watch, main account, auto-continue) and a manual **Set Active** button.
-- After changing the code: `npm run restart` (PM2 brings the new version up).
-- Tests: `npm test`.
+- macOS with the Antigravity desktop app
+- Node.js **22 or newer**
+- Two or more Google accounts with Antigravity access
+- [PM2](https://pm2.keymetrics.io/) (recommended, keeps the harness running)
 
-## Useful endpoints
+## Installation
+
+```bash
+git clone https://github.com/mushfiqnabiaz/Antigravity-Gateway.git antigravity-harness
+cd antigravity-harness
+cp oauth-client.example.json oauth-client.json
+```
+
+Fill in `oauth-client.json` with the OAuth client used to sign in the accounts. Antigravity refreshes the tokens itself after a switch, so they must be issued to an installed-app OAuth client that Antigravity accepts. This file is git-ignored; you can also use the `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` environment variables.
+
+Add each account (a browser window opens for Google sign-in; tokens are stored in the git-ignored `accounts.json`):
+
+```bash
+npm run add-account
+```
+
+Start the harness:
+
+```bash
+pm2 start src/server.js --name antigravity-harness
+pm2 save            # and `pm2 startup` once, to start it after a reboot
+```
+
+Or run it in the foreground with `npm start`. Open **http://127.0.0.1:8045**.
+
+## Settings
+
+All settings live in the dashboard's **Smart Quota Shield** panel (stored in `data/harness.db`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Switch when weekly / 5h below | 20% / 20% | Thresholds for leaving the current account. 15–25% leaves room for the running task to finish. |
+| Watch limits of | Auto | Gemini, Claude/GPT, both, or the models the conversation is actually using. |
+| Main account | none | Account to return to once its quota has recovered. Without one, the quota that expires soonest is used first. |
+| Auto-continue after limit | off | After a hard quota error, switch and send a continue message to the conversation. Never overwrites a draft. |
+| Auto-Switch | on | Turns Smart Shield on or off. Manual *Set Active* always works. |
+
+## HTTP API
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/ide-status` | Account Antigravity is signed into, and any queued switch |
-| `POST /api/set-active-account?id=<id>` | Switch now, or when the current task finishes |
+| `POST /api/set-active-account?id=<id>` | Switch now, or as soon as the current task finishes |
 | `GET/POST /api/config/smart-shield` | Read / change Smart Shield settings |
 | `POST /api/shield/test` | Simulate a quota error on the current account |
 | `POST /api/ide-focus?id=<conversation>` | Open a conversation in the Antigravity window |
-| `/v1/chat/completions`, `/v1/messages` | OpenAI / Anthropic compatible endpoints for other tools (point their base URL at the harness) |
+| `GET /api/stats`, `GET /health` | Quotas, usage and account state |
+| `POST /v1/chat/completions`, `POST /v1/messages` | OpenAI / Anthropic compatible endpoints for other tools |
 
-POST requests from other websites are refused.
+The server only listens on `127.0.0.1`, and POST requests coming from other websites are refused.
 
-## Project structure
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `EADDRINUSE: 127.0.0.1:8045` | Another copy is running (often under PM2). Use `npm run restart`. |
+| Dashboard says "Antigravity not detected" | Make sure Antigravity is open. Switching depends on reading its login. |
+| A switch stays "queued" | A task or background command (build, dev server) is still running. It happens when that finishes, or after 15 minutes without activity. |
+| An account shows *403 Forbidden* | Google restricted the account; the harness stops using it. |
+
+Note: the switch restarts Antigravity's language server, so anything the agent left running in the background (for example a dev server) stops at that moment.
+
+## Development
+
+```bash
+npm test          # node:test, no dependencies
+npm run restart   # reload the running harness after a change
+```
 
 ```
 src/
   server.js                  HTTP server, dashboard API, Smart Shield loop
   account-order.js           account ranking and Smart Shield decisions (pure, tested)
-  antigravity-auth-sync.js   writing Antigravity's login, restart scheduling, activity detection
+  antigravity-auth-sync.js   Antigravity login, restart scheduling, activity detection
   antigravity-window.js      DevTools control of the Antigravity window
-  stats.js / db.js           usage stats (SQLite in data/)
   quota.js                   live quota from Google
+  stats.js, db.js            usage statistics (SQLite)
   translator.js              OpenAI / Anthropic request translation
   dashboard.html             dashboard UI
 scripts/
   restart.sh                 restart under PM2 or standalone
-  build-native-app.sh        native macOS menu bar app
+  build-native-app.sh        optional native macOS app (`npm run build:app`)
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. Please:
+
+- keep it dependency-free,
+- add a test for decision logic (see `src/smart-shield.test.js`),
+- never commit `accounts.json`, `oauth-client.json`, `stats.json` or `data/` — they hold tokens and usage data.
+
+## License
+
+[MIT](LICENSE) © Mushfiqur Rahaman

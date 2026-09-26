@@ -10,3 +10,7 @@ data/
 /tmp/
 tmp/
 oauth-client.json
+
+# local-only files (not part of the open-source project)
+languageServer.js
+scripts/live-switch-test.js
