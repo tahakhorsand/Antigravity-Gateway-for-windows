@@ -579,7 +579,7 @@ export function tailLiveAntigravityTranscripts() {
                 else accObj.gemini5h.pct = 0;
                 console.log(`[LiveWatch] ⚠️ Detected quota limit on active Antigravity session (${activeAcc?.email || activeId})`);
                 if (quotaExhaustionCallback) {
-                  try { quotaExhaustionCallback(activeId, activeAcc); } catch (e) {}
+                  try { quotaExhaustionCallback(activeId, activeAcc, c); } catch (e) {}
                 }
               }
 

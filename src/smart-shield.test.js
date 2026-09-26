@@ -121,3 +121,64 @@ test('background commands from an earlier turn do not block forever', () => {
   assert.equal(transcriptTurnState(steps, 10 * SEC).state, 'idle');
   assert.equal(transcriptTurnState([user, toolCall, bgStart('task-9', 'npm run dev'), answer], 16 * MIN).state, 'idle', 'capped by the stale window');
 });
+
+// ---- quota efficiency ----------------------------------------------------------------
+const NOW = Date.parse('2026-09-27T00:00:00Z');
+const inHours = (h) => new Date(NOW + h * 3600 * 1000).toISOString();
+const q = (weekly, burst, weeklyResetH, burstResetH, extra = {}) => ({
+  enabled: true,
+  geminiWeekly: { pct: weekly, resetTime: weeklyResetH == null ? null : inHours(weeklyResetH) },
+  gemini5h: { pct: burst, resetTime: burstResetH == null ? null : inHours(burstResetH) },
+  ...extra
+});
+
+test('prefers the account whose weekly quota expires soonest (use it or lose it)', () => {
+  const plan = planShieldSwitch({
+    accounts,
+    statsAccounts: { nabiaz: q(5, 50, 100, 2), aqua: q(60, 90, 20, 1), diit: q(100, 90, 160, 1) },
+    currentId: 'nabiaz', threshold: 20, now: NOW
+  });
+  assert.equal(plan.action, 'switch');
+  assert.equal(plan.target.account.id, 'aqua', '60% that expires in 20h beats 100% that lasts a week');
+});
+
+test('does not restart Antigravity when the low 5h window resets within the grace period', () => {
+  const statsAccounts = { nabiaz: q(80, 12, 100, 0.1), aqua: q(90, 90, 50, 1), diit: q(90, 90, 50, 1) };
+  const plan = planShieldSwitch({ accounts, statsAccounts, currentId: 'nabiaz', threshold: 20, now: NOW });
+  assert.equal(plan.action, 'wait');
+  const empty = planShieldSwitch({ accounts, statsAccounts: { ...statsAccounts, nabiaz: q(80, 0, 100, 0.1) }, currentId: 'nabiaz', threshold: 20, now: NOW });
+  assert.equal(empty.action, 'switch', 'an empty window is not worth waiting for');
+  const later = planShieldSwitch({ accounts, statsAccounts: { ...statsAccounts, nabiaz: q(80, 12, 100, 3) }, currentId: 'nabiaz', threshold: 20, now: NOW });
+  assert.equal(later.action, 'switch');
+});
+
+test('separate weekly and 5h thresholds', () => {
+  const statsAccounts = { nabiaz: q(25, 60), aqua: q(90, 90), diit: q(90, 90) };
+  assert.equal(planShieldSwitch({ accounts, statsAccounts, currentId: 'nabiaz', weeklyThreshold: 20, burstThreshold: 20, now: NOW }).action, 'none');
+  assert.equal(planShieldSwitch({ accounts, statsAccounts, currentId: 'nabiaz', weeklyThreshold: 30, burstThreshold: 10, now: NOW }).action, 'switch');
+});
+
+test('returns to the main account once it has recovered, but not before', () => {
+  const recovered = planShieldSwitch({
+    accounts, statsAccounts: { nabiaz: q(90, 95), aqua: q(70, 80), diit: q(95, 95) },
+    currentId: 'aqua', primaryId: 'nabiaz', threshold: 20, now: NOW
+  });
+  assert.equal(recovered.action, 'switch');
+  assert.equal(recovered.reason, 'return_to_main');
+  assert.equal(recovered.target.account.id, 'nabiaz');
+
+  const notYet = planShieldSwitch({
+    accounts, statsAccounts: { nabiaz: q(90, 30), aqua: q(70, 80), diit: q(95, 95) },
+    currentId: 'aqua', primaryId: 'nabiaz', threshold: 20, now: NOW
+  });
+  assert.equal(notYet.action, 'none', 'main account 5h window has not recovered enough');
+});
+
+test('watches Claude limits when Claude is in use', () => {
+  const withClaude = (gw, g5, cw, c5) => ({ enabled: true, geminiWeekly: { pct: gw }, gemini5h: { pct: g5 }, claudeWeekly: { pct: cw }, claude5h: { pct: c5 } });
+  const statsAccounts = { nabiaz: withClaude(90, 90, 40, 5), aqua: withClaude(90, 90, 10, 90), diit: withClaude(60, 60, 80, 80) };
+  assert.equal(planShieldSwitch({ accounts, statsAccounts, currentId: 'nabiaz', threshold: 20, families: ['gemini'], now: NOW }).action, 'none');
+  const plan = planShieldSwitch({ accounts, statsAccounts, currentId: 'nabiaz', threshold: 20, families: ['claude'], now: NOW });
+  assert.equal(plan.action, 'switch');
+  assert.equal(plan.target.account.id, 'diit', 'aqua has Gemini room but its Claude weekly is nearly gone');
+});

@@ -30,7 +30,7 @@ SCRIPT="tell application \"Terminal\"
 
 for i in $(seq 1 $NUM_TERMINALS); do
     SCRIPT="$SCRIPT
-    do script \"export HTTPS_PROXY=http://127.0.0.1:8045 HTTP_PROXY=http://127.0.0.1:8045; clear; echo \\\"===================================================\\\"; echo \\\"  🚀 Terminal $i: Connected to Multi-Account Harness\\\"; echo \\\"===================================================\\\"; echo\""
+    do script \"clear; echo \\\"Terminal $i (Antigravity Harness running on http://127.0.0.1:8045)\\\"; echo\""
 done
 
 SCRIPT="$SCRIPT

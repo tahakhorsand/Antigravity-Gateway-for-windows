@@ -53,7 +53,8 @@ async function requestWithFallback(endpoints, token, body = {}) {
           'Content-Type': 'application/json',
           'User-Agent': USER_AGENT
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000) // a hanging endpoint must not stall Smart Shield
       });
 
       if (res.status === 403) {

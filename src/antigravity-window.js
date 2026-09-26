@@ -89,3 +89,65 @@ export async function openConversationInWindow(cascadeId, { lsPorts = [], mode =
   const pathname = await evaluate(win.wsUrl, expression);
   return { ok: pathname === target, cascadeId, mode, pathname, windowUrl: win.url };
 }
+
+/** Evaluate a script in the Antigravity window (used by diagnostics and auto-continue). */
+export async function evaluateInAppWindow(expression, { lsPorts = [], timeoutMs = 6000 } = {}) {
+  const win = await getAppWindow(lsPorts);
+  if (!win) throw new Error('Antigravity window not found (is Antigravity open?)');
+  return evaluate(win.wsUrl, expression, timeoutMs);
+}
+
+/** Run several DevTools commands over one connection. */
+function cdpSession(wsUrl, run, timeoutMs = 15000) {
+  if (typeof WebSocket === 'undefined') return Promise.reject(new Error('this Node.js version has no built-in WebSocket (needs Node 22+)'));
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    const pending = new Map();
+    let nextId = 1;
+    const finish = (fn, value) => { clearTimeout(timer); try { ws.close(); } catch { /* ignore */ } fn(value); };
+    const timer = setTimeout(() => finish(reject, new Error('DevTools session timed out')), timeoutMs);
+    const send = (method, params = {}) => new Promise((res, rej) => {
+      const id = nextId++;
+      pending.set(id, { res, rej });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+    ws.addEventListener('message', (event) => {
+      let msg;
+      try { msg = JSON.parse(typeof event.data === 'string' ? event.data : event.data.toString()); } catch { return; }
+      const waiter = msg.id && pending.get(msg.id);
+      if (!waiter) return;
+      pending.delete(msg.id);
+      if (msg.error) waiter.rej(new Error(msg.error.message)); else waiter.res(msg.result);
+    });
+    ws.addEventListener('open', () => { run(send).then((v) => finish(resolve, v), (e) => finish(reject, e)); });
+    ws.addEventListener('error', () => finish(reject, new Error('could not connect to Antigravity DevTools')));
+  });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Type a message into the open conversation and press Send, exactly like the user would.
+ * Refuses when the conversation is not open or the message box already holds a draft.
+ */
+export async function sendMessageToConversation(cascadeId, text, { lsPorts = [] } = {}) {
+  if (!CONVERSATION_ID.test(cascadeId || '')) return { ok: false, reason: `not a conversation id: ${cascadeId}` };
+  const win = await getAppWindow(lsPorts);
+  if (!win) return { ok: false, reason: 'Antigravity window not found' };
+  if (win.pathname !== `/c/${cascadeId}`) return { ok: false, reason: 'that conversation is not open in the window' };
+  return cdpSession(win.wsUrl, async (send) => {
+    const value = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }))?.result?.value;
+    const box = `document.querySelector('[aria-label="Message input"][contenteditable="true"]')`;
+    const prep = await value(`(() => { const box = ${box}; if (!box) return 'missing'; if (box.innerText.trim()) return 'draft'; box.focus(); return 'ok'; })()`);
+    if (prep === 'missing') return { ok: false, reason: 'message box not found' };
+    if (prep === 'draft') return { ok: false, reason: 'the message box has a draft; not overwriting it' };
+    await send('Input.insertText', { text });
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await sleep(400);
+      const state = await value(`(() => { const b = document.querySelector('[data-testid="send-button"]'); if (!b) return 'missing'; if (b.disabled) return 'disabled'; b.click(); return 'sent'; })()`);
+      if (state === 'sent') return { ok: true };
+      if (state === 'missing') return { ok: false, reason: 'send button not found' };
+    }
+    return { ok: false, reason: 'send button stayed disabled' };
+  });
+}

@@ -3,7 +3,7 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { CONFIG } from './config.js';
 import { getAccounts, saveAccounts } from './auth.js';
-import { openConversationInWindow, getAppWindow } from './antigravity-window.js';
+import { openConversationInWindow, getAppWindow, sendMessageToConversation } from './antigravity-window.js';
 
 const JETSKI_FILE = 'jetski-standalone-oauth-token';
 const USER_STATUS_PATH = '/exa.language_server_pb.LanguageServerService/GetUserStatus';
@@ -165,6 +165,20 @@ async function postLanguageServer(server, rpcPath, body) {
   return { ok: false, reason: lastError };
 }
 
+/** Call a LanguageServerService RPC on the running Antigravity language server (JSON in/out). */
+export async function callLanguageServer(method, body = {}) {
+  if (!/^[A-Za-z]+$/.test(method)) throw new Error('invalid method name');
+  const server = discoverLanguageServer();
+  if (!server) return { ok: false, reason: 'Antigravity language server is not running' };
+  const result = await postLanguageServer(server, `/exa.language_server_pb.LanguageServerService/${method}`, body);
+  if (!result.ok) return result;
+  try {
+    return { ok: true, data: JSON.parse(result.text) };
+  } catch {
+    return { ok: false, reason: 'language server returned non-JSON' };
+  }
+}
+
 export async function readLanguageServerEmail() {
   const server = discoverLanguageServer();
   if (!server) return '';
@@ -189,11 +203,21 @@ export async function focusAntigravityConversation(cascadeId, options = {}) {
   }
 }
 
+/** Type a message into an open conversation in the Antigravity window. */
+export async function sendAntigravityMessage(cascadeId, text) {
+  try {
+    const server = discoverLanguageServer();
+    return await sendMessageToConversation(cascadeId, text, { lsPorts: server?.ports || [] });
+  } catch (error) {
+    return { ok: false, reason: error.message };
+  }
+}
+
 /**
  * After the language server restarts, Antigravity reloads its window at "/" (a blank new
  * conversation). Wait for that reload to finish, then move the window back to the conversation.
  */
-export function restoreConversationAfterRestart(cascadeId, { timeoutMs = 45000 } = {}) {
+export function restoreConversationAfterRestart(cascadeId, { timeoutMs = 45000, onRestored } = {}) {
   if (!cascadeId) return;
   console.log(`[Antigravity] Will reopen conversation ${cascadeId} once the window has reloaded`);
   const deadline = Date.now() + timeoutMs;
@@ -209,6 +233,7 @@ export function restoreConversationAfterRestart(cascadeId, { timeoutMs = 45000 }
       const onNewServer = win && server.ports.includes(win.lsPort);
       if (onNewServer && win.pathname === `/c/${cascadeId}`) {
         console.log(`[Antigravity] ✅ Conversation ${cascadeId} is open again`);
+        if (onRestored) setTimeout(() => onRestored(cascadeId), 1500);
         return;
       }
       if (onNewServer) {
@@ -217,6 +242,7 @@ export function restoreConversationAfterRestart(cascadeId, { timeoutMs = 45000 }
           const result = await openConversationInWindow(cascadeId, { lsPorts: server.ports });
           if (result.ok) {
             console.log(`[Antigravity] ✅ Reopened conversation ${cascadeId}`);
+            if (onRestored) setTimeout(() => onRestored(cascadeId), 1500);
             return;
           }
         }
@@ -498,7 +524,7 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
   }
 
   // 1. Always identify and preserve the active conversation layout
-  const activeConvId = options.conversationId || getActiveAntigravityConversationId(geminiDir);
+  const activeConvId = options.restoreConversationId || options.conversationId || getActiveAntigravityConversationId(geminiDir);
   if (activeConvId) {
     preserveConversationLayout(activeConvId);
   }
@@ -532,6 +558,8 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
         geminiDir,
         idleMs,
         conversationId: activeConvId,
+        restoreConversationId: options.restoreConversationId,
+        onConversationRestored: options.onConversationRestored,
         onDone: options.onDeferredDone
       });
       return {
@@ -589,7 +617,7 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
     if (email === wanted) {
       if (activeConvId) {
         preserveConversationLayout(activeConvId);
-        restoreConversationAfterRestart(activeConvId);
+        restoreConversationAfterRestart(activeConvId, { onRestored: options.onConversationRestored });
       }
       return { ok: true, email, restarted: true, activeConversationId: activeConvId };
     }
@@ -634,6 +662,8 @@ export function scheduleLanguageServerSwitch(account, options = {}) {
     pollMs = 2000,
     maxWaitMs = 30 * 60 * 1000,
     conversationId,
+    restoreConversationId,
+    onConversationRestored,
     onDone
   } = options;
 
@@ -668,7 +698,9 @@ export function scheduleLanguageServerSwitch(account, options = {}) {
         restartLanguageServer: true,
         force: true,
         // the conversation touched most recently is the one the user was just working in
-        conversationId: getActiveAntigravityConversationId(geminiDir) || conversationId
+        conversationId: getActiveAntigravityConversationId(geminiDir) || conversationId,
+        restoreConversationId,
+        onConversationRestored
       });
     } catch (error) {
       result = { ok: false, email: entry.email, reason: error.message };

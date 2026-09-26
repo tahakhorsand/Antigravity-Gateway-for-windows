@@ -9,3 +9,4 @@ data/
 *.db-shm
 /tmp/
 tmp/
+oauth-client.json

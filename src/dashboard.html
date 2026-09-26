@@ -962,18 +962,39 @@
         </div>
 
         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 14px;">
-          <!-- Threshold Control -->
+          <!-- Thresholds -->
           <div style="display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 6px;">
-            <span style="font-size: 11px; color: var(--muted-foreground);">Rotate at:</span>
-            <select id="smart-shield-threshold" onchange="updateShieldThreshold(this.value)" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #34d399; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;">
-              <option value="10">&lt; 10% (Aggressive)</option>
-              <option value="15">&lt; 15%</option>
-              <option value="20" selected>&lt; 20% (Default)</option>
-              <option value="25">&lt; 25%</option>
-              <option value="30">&lt; 30% (High Safety)</option>
-              <option value="40">&lt; 40% (Ultra Safe)</option>
+            <span style="font-size: 11px; color: var(--muted-foreground);">Switch when weekly</span>
+            <select id="shield-weekly-threshold" onchange="saveShieldSetting({ weeklyThreshold: parseInt(this.value, 10) })" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #34d399; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;"><option value="5">&lt; 5%</option><option value="10">&lt; 10%</option><option value="15">&lt; 15%</option><option value="20" selected>&lt; 20%</option><option value="25">&lt; 25%</option><option value="30">&lt; 30%</option><option value="40">&lt; 40%</option><option value="50">&lt; 50%</option></select>
+            <span style="font-size: 11px; color: var(--muted-foreground);">or 5h</span>
+            <select id="shield-5h-threshold" onchange="saveShieldSetting({ burstThreshold: parseInt(this.value, 10) })" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #34d399; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;"><option value="5">&lt; 5%</option><option value="10">&lt; 10%</option><option value="15">&lt; 15%</option><option value="20" selected>&lt; 20%</option><option value="25">&lt; 25%</option><option value="30">&lt; 30%</option><option value="40">&lt; 40%</option><option value="50">&lt; 50%</option></select>
+          </div>
+
+          <!-- Models to watch -->
+          <div style="display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 6px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">Watch limits of:</span>
+            <select id="shield-models" onchange="saveShieldSetting({ models: this.value })" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #34d399; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;">
+              <option value="auto" selected>Models in use (auto)</option>
+              <option value="gemini">Gemini</option>
+              <option value="claude">Claude / GPT</option>
+              <option value="both">Both</option>
+            </select>
+            <span id="shield-models-detected" style="font-size: 10px; color: var(--muted-foreground);"></span>
+          </div>
+
+          <!-- Main account -->
+          <div style="display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 6px;">
+            <span style="font-size: 11px; color: var(--muted-foreground);">Main account:</span>
+            <select id="shield-primary" onchange="saveShieldSetting({ primaryEmail: this.value })" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #34d399; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 6px; outline: none; cursor: pointer;">
+              <option value="">None (spend quota that expires first)</option>
             </select>
           </div>
+
+          <!-- Auto-continue -->
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;" title="After a hard quota error, switch accounts and send 'continue' to the conversation">
+            <span style="font-size: 11px; color: var(--muted-foreground);">Auto-continue after limit</span>
+            <input type="checkbox" id="shield-auto-continue" onchange="saveShieldSetting({ autoContinue: this.checked })" style="width: 14px; height: 14px; accent-color: #10b981; cursor: pointer;">
+          </label>
 
           <!-- Claude Mode Control -->
           <div style="display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 6px;">
@@ -1717,6 +1738,43 @@ response = client.chat.completions.create(
       }
     }
 
+    async function saveShieldSetting(change) {
+      try {
+        const res = await fetch('/api/config/smart-shield', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(change)
+        });
+        applyShieldConfig(await res.json());
+        addLog(`🛡️ Smart Shield setting saved.`);
+      } catch (e) {
+        console.error('Error saving Smart Shield setting:', e);
+      }
+    }
+
+    function applyShieldConfig(data) {
+      if (!data) return;
+      const set = (id, value) => { const el = document.getElementById(id); if (el && value !== undefined && value !== null) el.value = String(value); };
+      set('shield-weekly-threshold', data.weeklyThreshold);
+      set('shield-5h-threshold', data.burstThreshold);
+      set('shield-models', data.models || 'auto');
+      const primary = document.getElementById('shield-primary');
+      if (primary && Array.isArray(data.accounts)) {
+        primary.innerHTML = '<option value="">None (spend quota that expires first)</option>' +
+          data.accounts.map(e => `<option value="${e}">${e}</option>`).join('');
+        primary.value = data.primaryEmail || '';
+      }
+      const auto = document.getElementById('shield-auto-continue');
+      if (auto) auto.checked = !!data.autoContinue;
+      const detected = document.getElementById('shield-models-detected');
+      if (detected) {
+        const fams = data.detectedModels?.families;
+        detected.innerText = data.models === 'auto'
+          ? (fams && fams.length ? `(now: ${fams.map(f => f === 'claude' ? 'Claude/GPT' : 'Gemini').join(' + ')})` : '(watching both until detected)')
+          : '';
+      }
+    }
+
     async function updateShieldThreshold(threshold) {
       try {
         await fetch('/api/config/smart-shield', {
@@ -1768,6 +1826,7 @@ response = client.chat.completions.create(
         if (claudeSelect && data.claudeMode) {
           claudeSelect.value = data.claudeMode;
         }
+        applyShieldConfig(data);
       } catch (e) {}
     }
 
@@ -2342,7 +2401,7 @@ response = client.chat.completions.create(
             fetchMatrix();
           } else if (item.type === 'proactive_switch') {
             const shield = `🛡️ <span style="color:#38bdf8; font-weight:600;">Smart Shield</span>`;
-            const why = item.reason === 'quota_error' ? 'hit a quota error' : `went below ${item.threshold}%`;
+            const why = item.why || (item.reason === 'quota_error' ? 'hit a quota error' : `went below ${item.threshold}%`);
             if (item.state === 'scheduled') {
               addLog(`${shield}: <b>${item.from}</b> ${why} (${item.fromWeekly}% weekly / ${item.fromBurst}% 5h). Switching to <b>${item.to}</b> as soon as the current task finishes.`);
             } else if (item.state === 'switched') {
@@ -2351,6 +2410,11 @@ response = client.chat.completions.create(
               addLog(`${shield}: switch from <b>${item.from}</b> to <b>${item.to}</b> failed: ${item.error || 'unknown error'}`, 'err');
             }
             fetchMatrix();
+          } else if (item.type === 'auto_continue') {
+            if (item.ok) addLog(`▶️ Smart Shield: told the agent to continue after the switch.`);
+            else addLog(`⚠️ Smart Shield: switched, but could not resume the task (${item.reason}). Type "continue" in Antigravity.`, 'err');
+          } else if (item.type === 'shield_waiting') {
+            addLog(`🛡️ Smart Shield: <b>${item.email}</b> is low, but ${item.reason}. Not switching.`);
           } else if (item.type === 'shield_stranded') {
             addLog(`🛡️ Smart Shield: <b>${item.email}</b> is below ${item.threshold}% but ${item.reason}.`, 'err');
           }

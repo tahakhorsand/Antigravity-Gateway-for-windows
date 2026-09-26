@@ -37,8 +37,8 @@ import {
   CLOUDCODE_GENERATE_ENDPOINTS,
   CLOUDCODE_STREAM_ENDPOINTS
 } from './translator.js';
-import { orderAccountCandidates, shouldAdoptActiveSession, planShieldSwitch, accountHeadroom } from './account-order.js';
-import { readLanguageServerEmail, getPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId } from './antigravity-auth-sync.js';
+import { orderAccountCandidates, shouldAdoptActiveSession, planShieldSwitch, familyBuckets } from './account-order.js';
+import { readLanguageServerEmail, getPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage } from './antigravity-auth-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,8 +62,8 @@ function broadcastEvent(data) {
 
 // Connect Antigravity IDE live transcript tailer to SSE broadcaster and quota exhaustion handler
 setBroadcastCallback(broadcastEvent);
-setQuotaExhaustionCallback(async () => {
-  await checkAndApplySmartShield({ quotaHit: true });
+setQuotaExhaustionCallback(async (_accountId, _account, conversationId) => {
+  await checkAndApplySmartShield({ quotaHit: true, conversationId });
 });
 
 export async function syncAllQuotas() {
@@ -206,13 +206,69 @@ async function resolveIdeAccount(accounts, stats) {
     || null;
 }
 
+/** Smart Shield settings (stored in SQLite system_metadata). */
+function shieldSettings() {
+  const legacy = parseInt(getMetadataDb('smart_shield_threshold', 20), 10) || 20;
+  const num = (key, fallback) => {
+    const v = parseInt(getMetadataDb(key, fallback), 10);
+    return Number.isFinite(v) ? v : fallback;
+  };
+  return {
+    enabled: getMetadataDb('smart_shield_enabled', true) !== false,
+    weeklyThreshold: num('smart_shield_weekly_threshold', legacy),
+    burstThreshold: num('smart_shield_5h_threshold', legacy),
+    resetGraceMinutes: num('smart_shield_reset_grace_min', 15),
+    primaryEmail: (getMetadataDb('smart_shield_primary_email', '') || '').toLowerCase(),
+    models: getMetadataDb('smart_shield_models', 'auto'),
+    autoContinue: getMetadataDb('smart_shield_auto_continue', false) === true
+  };
+}
+
+// Which model families Antigravity has been using lately ('gemini' = Gemini quota,
+// 'claude' = the third-party quota shared by Claude/GPT models).
+const modelState = { families: null, models: [], cascadeId: null, checkedAt: 0 };
+
+async function detectModelFamilies() {
+  try {
+    const cascadeId = getActiveAntigravityConversationId();
+    if (!cascadeId) return modelState;
+    const result = await callLanguageServer('GetCascadeTrajectoryGeneratorMetadata', { cascadeId, generatorMetadataOffset: 0 });
+    if (!result.ok) return modelState;
+    const list = Array.isArray(result.data?.generatorMetadata) ? result.data.generatorMetadata : [];
+    const families = [];
+    const models = [];
+    for (const entry of list.slice(-8).reverse()) { // most recent first
+      // only the model that answered the user; helper models (fast apply, input detection) are always Gemini
+      const text = JSON.stringify(entry);
+      const answered = [...text.matchAll(/"(?:responseModel|modelName)"\s*:\s*"([^"]+)"/g)].map((m) => m[1].toLowerCase());
+      for (const name of answered.filter((n) => /^(claude|gemini|gpt)/.test(n))) {
+        if (!models.includes(name)) models.push(name);
+        const family = name.startsWith('gemini') ? 'gemini' : 'claude';
+        if (!families.includes(family)) families.push(family);
+      }
+    }
+    if (families.length) Object.assign(modelState, { families, models, cascadeId, checkedAt: Date.now() });
+  } catch { /* keep the last known state */ }
+  return modelState;
+}
+
+function familiesToWatch(settings) {
+  if (settings.models === 'gemini') return ['gemini'];
+  if (settings.models === 'claude') return ['claude'];
+  if (settings.models === 'both') return ['gemini', 'claude'];
+  return modelState.families && modelState.families.length ? modelState.families : ['gemini', 'claude'];
+}
+
+let lastWaitNotice = '';
+const AUTO_CONTINUE_MESSAGE = 'The previous attempt stopped at a quota limit and the account has been switched. Continue the task where you left off.';
+
 /**
  * Smart Quota Shield: when the account Antigravity is using drops below the threshold
  * (or hits a quota error), move Antigravity to the healthiest other account.
  * The switch restarts Antigravity's language server, so it is only carried out
  * between agent turns; while a task is running it waits (see scheduleLanguageServerSwitch).
  */
-export async function checkAndApplySmartShield({ quotaHit = false } = {}) {
+export async function checkAndApplySmartShield({ quotaHit = false, conversationId = null, continueMessage = null } = {}) {
   if (shieldRunning) return;
   shieldRunning = true;
   try {
@@ -225,44 +281,82 @@ export async function checkAndApplySmartShield({ quotaHit = false } = {}) {
     if (!currentAcc) return;
     if (quotaHit) markCooldown(currentAcc.id, 15 * 60);
 
-    const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10) || 20;
+    const settings = shieldSettings();
+    const families = familiesToWatch(settings);
+    const primary = settings.primaryEmail ? accounts.find((a) => a.email && a.email.toLowerCase() === settings.primaryEmail) : null;
     const plan = planShieldSwitch({
       accounts,
       statsAccounts: stats.accounts || {},
       currentId: currentAcc.id,
-      threshold,
+      weeklyThreshold: settings.weeklyThreshold,
+      burstThreshold: settings.burstThreshold,
+      families,
+      primaryId: primary ? primary.id : null,
+      resetGraceMs: settings.resetGraceMinutes * 60 * 1000,
       isCoolingDown,
       forceLow: quotaHit
     });
+    const threshold = settings.burstThreshold;
     if (plan.action === 'none') return;
+
+    if (plan.action === 'wait') {
+      const key = `${currentAcc.id}:${plan.resetAt}`;
+      if (key !== lastWaitNotice) {
+        lastWaitNotice = key;
+        console.log(`[SmartShield] ${currentAcc.email} is low (${plan.low.map((l) => `${l.family} ${l.bucket} ${l.pct}%`).join(', ')}) but ${plan.reason}; not switching.`);
+        broadcastEvent({ type: 'shield_waiting', email: currentAcc.email, reason: plan.reason, resetAt: plan.resetAt });
+      }
+      return;
+    }
 
     // A switch is already waiting for Antigravity to go idle: keep it unless its target went bad.
     const pending = getPendingSwitch();
     if (pending && pending.email !== currentAcc.email.toLowerCase()) {
       const pendingAcc = accounts.find((a) => a.email && a.email.toLowerCase() === pending.email);
       const pendingStats = pendingAcc ? stats.accounts?.[pendingAcc.id] : null;
-      const h = accountHeadroom(pendingStats);
-      const stillGood = pendingAcc && pendingStats && !pendingStats.is403Banned && !isCoolingDown(pendingAcc.id)
-        && h.weekly >= threshold && h.burst >= threshold;
+      const stillGood = pendingAcc && pendingStats && pendingStats.enabled && !pendingStats.is403Banned && !isCoolingDown(pendingAcc.id)
+        && families.every((f) => {
+          const b = familyBuckets(pendingStats, f);
+          return b.weekly >= settings.weeklyThreshold && b.burst >= settings.burstThreshold;
+        });
       if (stillGood) return;
     }
 
     if (plan.action === 'stranded') {
       if (Date.now() - lastStrandedNoticeAt > 10 * 60 * 1000) {
         lastStrandedNoticeAt = Date.now();
-        console.warn(`[SmartShield] ⚠️ ${currentAcc.email} is below ${threshold}% (${plan.currentWeekly}% weekly, ${plan.currentBurst}% 5h), but ${plan.reason}.`);
+        console.warn(`[SmartShield] ⚠️ ${currentAcc.email} is low (${plan.low.map((l) => `${l.family} ${l.bucket} ${l.pct}%`).join(', ')}), but ${plan.reason}.`);
         broadcastEvent({ type: 'shield_stranded', email: currentAcc.email, threshold, reason: plan.reason });
-        sendMacNotification('Antigravity Smart Shield ⚠️', `${currentAcc.email} is below ${threshold}% and no other account has enough quota left.`);
+        sendMacNotification('Antigravity Smart Shield ⚠️', `${currentAcc.email} is running low and no other account has enough quota left.`);
       }
       return;
     }
 
     const targetAcc = plan.target.account;
-    const why = quotaHit ? 'quota error in Antigravity' : `below ${threshold}% threshold`;
+    const lowText = (plan.low || []).map((l) => `${l.family} ${l.bucket} ${l.pct}%`).join(', ');
+    const why = plan.reason === 'quota_error' ? 'hit a quota error in Antigravity'
+      : plan.reason === 'return_to_main' ? 'main account has quota again'
+      : `running low (${lowText})`;
     console.log(`${colors.cyan}[SmartShield] 🛡️ ${currentAcc.email} (${plan.currentWeekly}% weekly, ${plan.currentBurst}% 5h, ${why}) ➜ ${targetAcc.email} (${plan.target.weekly}% weekly, ${plan.target.burst}% 5h)${colors.reset}`);
+
+    // After a hard quota error the task has stopped: optionally tell the agent to carry on.
+    const resumeInto = quotaHit && conversationId && (settings.autoContinue || continueMessage) ? conversationId : null;
+    const onConversationRestored = resumeInto
+      ? async (cascadeId) => {
+          const text = continueMessage || AUTO_CONTINUE_MESSAGE;
+          const sent = await sendAntigravityMessage(cascadeId, text);
+          console.log(`[SmartShield] ${sent.ok ? '▶️ Sent' : '⚠️ Could not send'} "${text}" to ${cascadeId}${sent.ok ? '' : `: ${sent.reason}`}`);
+          broadcastEvent({ type: 'auto_continue', cascadeId, ok: !!sent.ok, reason: sent.reason || null });
+          if (!sent.ok) sendMacNotification('Antigravity: continue manually ⚠️', `Switched to ${targetAcc.email}, but could not resume the task: ${sent.reason}`);
+        }
+      : undefined;
 
     const result = await switchAntigravityActiveAccount(targetAcc.id, targetAcc, {
       restartLanguageServer: true,
+      restoreConversationId: resumeInto || undefined,
+      onConversationRestored,
+      // an optional switch back to the main account waits for a longer quiet period
+      idleMs: plan.reason === 'return_to_main' ? 60000 : undefined,
       onDeferredDone: (r) => {
         broadcastEvent({
           type: 'ide_switch_result',
@@ -286,7 +380,8 @@ export async function checkAndApplySmartShield({ quotaHit = false } = {}) {
     broadcastEvent({
       type: 'proactive_switch',
       state,
-      reason: quotaHit ? 'quota_error' : 'threshold',
+      reason: plan.reason,
+      why,
       from: currentAcc.email,
       to: targetAcc.email,
       fromWeekly: plan.currentWeekly,
@@ -298,9 +393,9 @@ export async function checkAndApplySmartShield({ quotaHit = false } = {}) {
     });
 
     if (state === 'scheduled') {
-      sendMacNotification('Antigravity Smart Shield 🛡️', `${currentAcc.email} is ${why}. Will switch to ${targetAcc.email} when the current task finishes.`);
+      sendMacNotification('Antigravity Smart Shield 🛡️', `${currentAcc.email}: ${why}. Will switch to ${targetAcc.email} when the current task finishes.`);
     } else if (state === 'switched') {
-      sendMacNotification('Antigravity switched account ✅', `${currentAcc.email} was ${why}. Now using ${targetAcc.email}.`);
+      sendMacNotification('Antigravity switched account ✅', `${currentAcc.email}: ${why}. Now using ${targetAcc.email}.`);
     } else {
       sendMacNotification('Antigravity switch failed ⚠️', `${targetAcc.email}: ${ide.reason || 'unknown error'}`);
     }
@@ -694,6 +789,130 @@ async function handleProxyRequest(req, res) {
   const startTime = Date.now();
   const urlPath = req.url;
 
+  // The API changes accounts and drives Antigravity: refuse POSTs made by other websites
+  // (a browser always sends Origin on cross-site requests; curl and the native app send none).
+  if (req.method === 'POST' && urlPath.startsWith('/api/')) {
+    const origin = req.headers.origin;
+    const allowed = [`http://127.0.0.1:${CONFIG.PORT}`, `http://localhost:${CONFIG.PORT}`];
+    if (origin && origin !== 'null' && !allowed.includes(origin)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'cross-origin request refused' }));
+    }
+  }
+
+  // Restart the harness (PM2 starts it again with the current code)
+  if (urlPath === '/api/admin/restart' && req.method === 'POST') {
+    if (process.env.pm_id === undefined) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'not running under PM2; restart it with npm run restart' }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, note: 'restarting; PM2 will start the new code in a few seconds' }));
+    console.log(`${colors.yellow}[Admin] Restart requested; exiting so PM2 restarts the harness${colors.reset}`);
+    setTimeout(() => process.exit(0), 300);
+    return;
+  }
+
+  // Diagnostics: structure (no content) of the chat input area in the Antigravity window
+  if (urlPath.startsWith('/api/debug/ui-input') && req.method === 'POST') {
+    const { evaluateInAppWindow } = await import('./antigravity-window.js');
+    const { discoverLanguageServer } = await import('./antigravity-auth-sync.js');
+    const expression = `(() => {
+      const describe = (el) => ({
+        tag: el.tagName.toLowerCase(),
+        id: el.id || null,
+        role: el.getAttribute('role'),
+        aria: el.getAttribute('aria-label'),
+        placeholder: el.getAttribute('placeholder') || el.getAttribute('data-placeholder'),
+        contenteditable: el.getAttribute('contenteditable'),
+        testid: el.getAttribute('data-testid'),
+        classes: (el.className && typeof el.className === 'string') ? el.className.slice(0, 160) : null,
+        visible: !!(el.offsetWidth || el.offsetHeight),
+        disabled: !!el.disabled
+      });
+      const all = [];
+      const walk = (root) => {
+        for (const el of root.querySelectorAll('*')) {
+          all.push(el);
+          if (el.shadowRoot) walk(el.shadowRoot);
+        }
+      };
+      walk(document);
+      const inputs = all.filter((el) => el.matches('textarea, [contenteditable="true"], [contenteditable=""], [role="textbox"], input[type="text"]')).map(describe);
+      const buttons = all.filter((el) => el.matches('button, [role="button"]'))
+        .filter((b) => /send|submit|stop|cancel|run|arrow/i.test((b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '') + ' ' + (b.getAttribute('data-testid') || '') + ' ' + (typeof b.className === 'string' ? b.className : '')))
+        .slice(0, 15).map(describe);
+      return {
+        path: location.pathname, title: document.title, readyState: document.readyState,
+        elements: all.length, iframes: document.querySelectorAll('iframe, webview').length,
+        shadowHosts: all.filter((el) => el.shadowRoot).length,
+        inputs, buttons
+      };
+    })()`;
+    let result;
+    try {
+      result = { ok: true, data: await evaluateInAppWindow(expression, { lsPorts: discoverLanguageServer()?.ports || [] }) };
+    } catch (error) {
+      result = { ok: false, reason: error.message };
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(result, null, 2));
+  }
+
+  // Diagnostics: pages Antigravity exposes on its DevTools endpoint (type + url only)
+  if (urlPath.startsWith('/api/debug/targets') && req.method === 'POST') {
+    const { readDevToolsPort } = await import('./antigravity-window.js');
+    const port = readDevToolsPort();
+    let targets = [];
+    try {
+      targets = port ? (await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(2500) })).json()).map((t) => ({ type: t.type, url: (t.url || '').slice(0, 140), title: (t.title || '').slice(0, 60) })) : [];
+    } catch (error) {
+      targets = [{ error: error.message }];
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ port, targets }, null, 2));
+  }
+
+  // Diagnostics: read-only language server calls; full response saved to tmp/ls-<method>.json
+  if (urlPath.startsWith('/api/debug/ls') && req.method === 'POST') {
+    const READ_ONLY = ['GetCascadeTrajectory', 'GetCascadeTrajectoryGeneratorMetadata', 'GetConversationMetadata', 'GetUserStatus', 'GetCascadeModelConfigs', 'GetCascadeModelConfigData', 'GetUserSettings'];
+    let bodyStr = '';
+    for await (const chunk of req) bodyStr += chunk;
+    let body = {};
+    try { body = JSON.parse(bodyStr || '{}'); } catch { /* empty */ }
+    if (!READ_ONLY.includes(body.method)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: `method must be one of ${READ_ONLY.join(', ')}` }));
+    }
+    const params = { ...(body.params || {}) };
+    if (params.cascadeId === 'active') params.cascadeId = getActiveAntigravityConversationId();
+    const result = await callLanguageServer(body.method, params);
+    const outDir = path.resolve(__dirname, '../tmp');
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, `ls-${body.method}.json`), JSON.stringify(result, null, 2));
+    const shape = (v, depth = 0) => {
+      if (Array.isArray(v)) return depth > 2 ? `[${v.length}]` : [`array(${v.length})`, v.length ? shape(v[v.length - 1], depth + 1) : null];
+      if (v && typeof v === 'object') return depth > 3 ? '{…}' : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shape(x, depth + 1)]));
+      return typeof v;
+    };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: result.ok, reason: result.reason || null, params, shape: result.ok ? shape(result.data) : null }, null, 2));
+  }
+
+  // Diagnostics: which model(s) generated the steps of a conversation
+  if (urlPath.startsWith('/api/debug/ide-model') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const cascadeId = query.get('id') || getActiveAntigravityConversationId();
+    const result = await callLanguageServer('GetCascadeTrajectoryGeneratorMetadata', { cascadeId, generatorMetadataOffset: 0 });
+    const outDir = path.resolve(__dirname, '../tmp');
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, 'ide-model.json'), JSON.stringify(result, null, 2));
+    const text = JSON.stringify(result);
+    const models = [...new Set((text.match(/"[A-Za-z]*[mM]odel[A-Za-z]*"\s*:\s*"[^"]{1,80}"/g) || []))].slice(0, 30);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: result.ok, cascadeId, reason: result.reason || null, bytes: text.length, models }, null, 2));
+  }
+
   // Serve Dashboard HTML
   if (urlPath === '/' || urlPath === '/dashboard') {
     if (fs.existsSync(DASHBOARD_PATH)) {
@@ -748,40 +967,50 @@ async function handleProxyRequest(req, res) {
 
   // Smart Quota Shield Config Endpoint
   if (urlPath === '/api/config/smart-shield') {
+    const pct = (v) => { const n = parseInt(v, 10); return n >= 5 && n <= 60 ? n : null; };
     if (req.method === 'POST') {
       let bodyStr = '';
       for await (const chunk of req) bodyStr += chunk;
-      try {
-        const bodyJson = JSON.parse(bodyStr);
-        if (bodyJson.enabled !== undefined) {
-          setMetadataDb('smart_shield_enabled', !!bodyJson.enabled);
-        }
-        if (bodyJson.threshold !== undefined) {
-          const t = parseInt(bodyJson.threshold, 10);
-          if (t >= 5 && t <= 50) {
-            setMetadataDb('smart_shield_threshold', t);
-          }
-        }
-        if (bodyJson.claudeMode !== undefined) {
-          setMetadataDb('smart_shield_claude_mode', bodyJson.claudeMode);
-        }
-        const enabled = getMetadataDb('smart_shield_enabled', true);
-        const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10);
-        const claudeMode = getMetadataDb('smart_shield_claude_mode', 'native');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ ok: true, enabled, threshold, claudeMode }));
-      } catch (e) {
+      let body;
+      try { body = JSON.parse(bodyStr || '{}'); } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
       }
-    } else {
-      const enabled = getMetadataDb('smart_shield_enabled', true);
-      const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10);
-      const claudeMode = getMetadataDb('smart_shield_claude_mode', 'native');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ enabled, threshold, claudeMode }));
+      if (body.enabled !== undefined) setMetadataDb('smart_shield_enabled', !!body.enabled);
+      if (body.threshold !== undefined && pct(body.threshold)) { // legacy single threshold sets both
+        setMetadataDb('smart_shield_threshold', pct(body.threshold));
+        setMetadataDb('smart_shield_weekly_threshold', pct(body.threshold));
+        setMetadataDb('smart_shield_5h_threshold', pct(body.threshold));
+      }
+      if (body.weeklyThreshold !== undefined && pct(body.weeklyThreshold)) setMetadataDb('smart_shield_weekly_threshold', pct(body.weeklyThreshold));
+      if (body.burstThreshold !== undefined && pct(body.burstThreshold)) setMetadataDb('smart_shield_5h_threshold', pct(body.burstThreshold));
+      if (body.resetGraceMinutes !== undefined) {
+        const m = parseInt(body.resetGraceMinutes, 10);
+        if (m >= 0 && m <= 120) setMetadataDb('smart_shield_reset_grace_min', m);
+      }
+      if (body.primaryEmail !== undefined) {
+        const email = String(body.primaryEmail || '').trim().toLowerCase();
+        if (!email || getAccounts().some((a) => a.email && a.email.toLowerCase() === email)) {
+          setMetadataDb('smart_shield_primary_email', email);
+        }
+      }
+      if (body.models !== undefined && ['auto', 'gemini', 'claude', 'both'].includes(body.models)) setMetadataDb('smart_shield_models', body.models);
+      if (body.autoContinue !== undefined) setMetadataDb('smart_shield_auto_continue', !!body.autoContinue);
+      if (body.claudeMode !== undefined) setMetadataDb('smart_shield_claude_mode', body.claudeMode);
     }
+    const settings = shieldSettings();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      ok: true,
+      ...settings,
+      threshold: settings.burstThreshold,
+      claudeMode: getMetadataDb('smart_shield_claude_mode', 'native'),
+      detectedModels: { families: modelState.families, models: modelState.models, checkedAt: modelState.checkedAt },
+      watching: familiesToWatch(settings),
+      accounts: getAccounts().map((a) => a.email)
+    }));
   }
+
 
   // SQLite Daily Usage Analytics
   if (urlPath.startsWith('/api/db/daily')) {
@@ -851,13 +1080,16 @@ async function handleProxyRequest(req, res) {
   }
 
   // Test hook: behave exactly as if Antigravity just reported a quota error on the current account.
-  if (urlPath === '/api/shield/test' && req.method === 'POST') {
+  if (urlPath.startsWith('/api/shield/test') && req.method === 'POST') {
     if (!getMetadataDb('smart_shield_enabled', true)) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ ok: false, error: 'Smart Shield is turned off in the dashboard' }));
     }
-    console.log(`${colors.yellow}[SmartShield] 🧪 Test triggered: simulating a quota error on the current account${colors.reset}`);
-    await checkAndApplySmartShield({ quotaHit: true });
+    const testQuery = new URL(req.url, 'http://localhost').searchParams;
+    const testConversation = testQuery.get('conversation') || null;
+    const testMessage = testQuery.get('message') || null;
+    console.log(`${colors.yellow}[SmartShield] 🧪 Test triggered: simulating a quota error on the current account${testConversation ? ` (resume message into ${testConversation})` : ''}${colors.reset}`);
+    await checkAndApplySmartShield({ quotaHit: true, conversationId: testConversation, continueMessage: testMessage });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       ok: true,
@@ -918,7 +1150,8 @@ async function handleProxyRequest(req, res) {
 
   // API Action: Launch Desktop App
   if (urlPath === '/api/launch-desktop' && req.method === 'POST') {
-    exec('HTTPS_PROXY="http://127.0.0.1:8045" HTTP_PROXY="http://127.0.0.1:8045" open -a "Antigravity"');
+    // Antigravity talks to Google directly; account switching works through its login, not a proxy.
+    exec('open -a "Antigravity"');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true }));
   }
@@ -1152,17 +1385,25 @@ ${colors.bold}${colors.cyan}─────────────────�
     syncAllQuotas().catch(console.error);
   }, 180000);
 
-  // Follow the account Antigravity is really signed in as
+  // Follow the account Antigravity is really signed in as, and learn which models it uses
   void pollIdeAccount();
+  setTimeout(() => { void detectModelFamilies(); }, 3000);
   setInterval(() => { void pollIdeAccount(); }, 4000);
 
-  // Refresh the quota of the account Antigravity is using every 60 seconds
-  setInterval(() => {
-    syncActiveAccountQuota().then(() => checkAndApplySmartShield()).catch(console.error);
-  }, 60000);
-
-  // Periodic proactive Smart Quota Shield check every 30 seconds
-  setInterval(() => {
-    checkAndApplySmartShield();
+  // Every 30s: refresh the active account's quota (every 30s while a task runs, every 60s otherwise),
+  // learn which models are in use, then let Smart Shield decide.
+  let lastActiveSync = 0;
+  setInterval(async () => {
+    try {
+      const busy = isAntigravitySessionBusy();
+      if (busy || Date.now() - lastActiveSync >= 60000) {
+        lastActiveSync = Date.now();
+        await syncActiveAccountQuota();
+      }
+      await detectModelFamilies();
+      await checkAndApplySmartShield();
+    } catch (error) {
+      console.error(`[SmartShield] periodic check failed: ${error.message}`);
+    }
   }, 30000);
 });

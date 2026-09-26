@@ -1,112 +1,61 @@
-# Antigravity Multi-Account Harness & Quota Shield 🚀
+# Antigravity Harness
 
-A private, zero-dependency local proxy, load balancer, and multi-account harness built for **Google Antigravity**.
+A local tool for macOS that keeps **Google Antigravity** working across several of your own Google AI Pro accounts. When the account Antigravity is using runs low on quota, the harness switches Antigravity to another account between tasks, brings the window back to the conversation you were in, and (optionally) tells the agent to continue after a hard quota error.
 
-It pools multiple Google AI Pro accounts together, automatically load-balances requests, and **silently catches HTTP 429 quota exhaustion errors** so Antigravity Desktop never hangs or gets stuck in the middle of a coding task.
+> Rotating accounts to get around per-account usage limits may be against Google's terms and can get accounts restricted (403). The harness detects restricted accounts and stops using them, but it cannot prevent it.
 
----
+## How it works
 
-## 🌟 Why This Exists
+1. **Quota tracking** – every account's Gemini and Claude/GPT limits (weekly and 5-hour) are read from Google's Cloud Code endpoints: all accounts every 3 minutes, the active account every 30–60 seconds.
+2. **Model detection** – the harness asks Antigravity which model answered recently and watches that model family's limits.
+3. **Smart Shield** – when the active account drops below your thresholds it picks the next account: your *main account* if set and recovered, otherwise the account whose unused weekly quota expires soonest ("use it or lose it"). It does not switch when the low limit resets within 15 minutes.
+4. **Switching** – the new account's login is written where Antigravity reads it (macOS Keychain + `~/.gemini`), then Antigravity's language server is restarted. This only happens when no agent turn or background command is running (read from `~/.gemini/antigravity/brain/*/transcript.jsonl`).
+5. **Conversation restore** – after the restart Antigravity reloads at a blank conversation; the harness moves the window back to `/c/<conversation>` through the DevTools endpoint Antigravity itself opens.
+6. **Auto-continue** (optional) – after a hard "quota reached" error, the harness switches, reopens the conversation and sends a short message asking the agent to continue. It never overwrites a draft in the message box.
 
-* **Zero Freezing Mid-Code**: When an account runs out of its hourly/daily Pro quota, this proxy catches the `429` error in <50ms and silently replays the in-flight prompt to the next available account.
-* **$4\times$ Parallel Bandwidth**: Run 4 terminal coding tasks simultaneously across 4 accounts without bottlenecking any single account's RPM/TPM limit.
-* **100% Private & Open**: Zero closed-source binaries, zero third-party telemetry, zero sponsor tracking. All OAuth tokens stay encrypted on your local Mac.
-* **Zero External Dependencies**: Built with native Node.js (18+). No `npm install` bloat or heavy frameworks.
-
----
-
-## 🚀 Quickstart for Teammates
-
-### 1. Clone the Repository
-```bash
-git clone <your-repo-url> antigravity-harness
-cd antigravity-harness
-```
-
-### 2. Add Your Google Pro Accounts
-Run the interactive OAuth login helper for each account you want to add:
-```bash
-npm run add-account
-```
-* A browser window will open asking you to sign in with your Google account.
-* After authorizing, the account will be securely saved into your local `accounts.json` (which is git-ignored and never committed).
-* Repeat for each Google Pro account you own (e.g. 2, 3, or 4 accounts).
-
----
-
-## 🖥️ Using with Antigravity Desktop
-
-### Option 1: 1-Click macOS Desktop App (Recommended)
-Build the native **Antigravity Harness** app for your `/Applications` folder:
-```bash
-npm run build:app
-```
-1. Open your Mac's `/Applications` folder.
-2. Drag **`Antigravity Harness.app`** to your **Dock**.
-3. Click it anytime you want to code!
-   * It displays a native notification: `Antigravity Harness Active 🚀`.
-   * It starts the harness in the background if it's not already running.
-   * It launches Antigravity connected to all your pooled accounts.
-
-### Option 2: Running from Terminal
-Start the proxy server in a terminal:
-```bash
-npm start
-```
-Then launch Antigravity with the proxy attached:
-```bash
-HTTPS_PROXY="http://127.0.0.1:8045" HTTP_PROXY="http://127.0.0.1:8045" open -a "Antigravity"
-```
-
----
-
-## ⚡ 4-Terminal Parallel Coding Harness
-
-To run 4 independent coding tasks in parallel (e.g., refactoring backend, building frontend, running test suites, writing docs):
+## Setup
 
 ```bash
-npm run terminals
+git clone <repo-url> antigravity-harness && cd antigravity-harness
+cp oauth-client.example.json oauth-client.json   # fill in the OAuth client (kept out of git)
+npm run add-account                              # once per Google account
+pm2 start src/server.js --name antigravity-harness && pm2 save
 ```
 
-This automatically opens **4 separate macOS Terminal windows**, each connected to your 4-account harness.
+Node 22+ is required (built-in `node:sqlite` and WebSocket). No npm dependencies.
 
----
+## Daily use
 
-## 📁 Project Structure
+- Dashboard: http://127.0.0.1:8045 – account quotas, the account Antigravity is really using, switch log, Smart Shield settings (weekly / 5-hour thresholds, models to watch, main account, auto-continue) and a manual **Set Active** button.
+- After changing the code: `npm run restart` (PM2 brings the new version up).
+- Tests: `npm test`.
+
+## Useful endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/ide-status` | Account Antigravity is signed into, and any queued switch |
+| `POST /api/set-active-account?id=<id>` | Switch now, or when the current task finishes |
+| `GET/POST /api/config/smart-shield` | Read / change Smart Shield settings |
+| `POST /api/shield/test` | Simulate a quota error on the current account |
+| `POST /api/ide-focus?id=<conversation>` | Open a conversation in the Antigravity window |
+| `/v1/chat/completions`, `/v1/messages` | OpenAI / Anthropic compatible endpoints for other tools (point their base URL at the harness) |
+
+POST requests from other websites are refused.
+
+## Project structure
 
 ```
-antigravity-harness/
-├── src/
-│   ├── config.js          # Google OAuth client & endpoint settings
-│   ├── auth.js            # Token lifecycle & automatic OAuth refresher
-│   ├── server.js          # High-performance proxy with 429 auto-failover
-│   └── add-account.js     # Browser OAuth login helper for teammates
-├── scripts/
-│   ├── build-mac-app.sh   # Builds the native macOS launcher app
-│   └── start-4-terminals.sh # Opens 4 parallel terminal windows
-├── accounts.example.json  # Template accounts configuration
-├── package.json           # Scripts and project metadata
-└── .gitignore             # Protects private tokens from Git
-```
-
----
-
-## 🔍 Health Check & Monitoring
-
-You can check the health and cooldown state of your accounts at any time:
-```bash
-curl http://127.0.0.1:8045/health
-```
-
-Output:
-```json
-{
-  "status": "ok",
-  "service": "antigravity-harness",
-  "total_accounts": 4,
-  "accounts": [
-    { "email": "dev1@gmail.com", "name": "Dev One", "cooling_down": false },
-    { "email": "dev2@gmail.com", "name": "Dev Two", "cooling_down": false }
-  ]
-}
+src/
+  server.js                  HTTP server, dashboard API, Smart Shield loop
+  account-order.js           account ranking and Smart Shield decisions (pure, tested)
+  antigravity-auth-sync.js   writing Antigravity's login, restart scheduling, activity detection
+  antigravity-window.js      DevTools control of the Antigravity window
+  stats.js / db.js           usage stats (SQLite in data/)
+  quota.js                   live quota from Google
+  translator.js              OpenAI / Anthropic request translation
+  dashboard.html             dashboard UI
+scripts/
+  restart.sh                 restart under PM2 or standalone
+  build-native-app.sh        native macOS menu bar app
 ```

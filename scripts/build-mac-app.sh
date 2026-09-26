@@ -42,7 +42,7 @@ on run
 
     display notification "Connected to Multi-Account Balance Harness (Port 8045)" with title "Antigravity Harness Active 🚀" subtitle "Pooled accounts & instant 429 failover active"
 
-    do shell script "HTTPS_PROXY='http://127.0.0.1:8045' HTTP_PROXY='http://127.0.0.1:8045' open -a 'Antigravity'"
+    do shell script "open -a 'Antigravity'"
 end run
 EOF
 
