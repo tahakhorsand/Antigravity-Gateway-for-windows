@@ -487,6 +487,42 @@
       border: 1px solid var(--border-muted);
     }
 
+    .btn-danger {
+      background: var(--red-subtle);
+      border-color: var(--red-border);
+      color: var(--red);
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.2);
+    }
+    .badge-alias {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--blue);
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 4px;
+      padding: 1px 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .acc-paused {
+      opacity: 0.55;
+    }
+    .btn-link {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+
     /* High-Density Data Table (Vercel Style) */
     .table-container {
       background: var(--surface-1);
@@ -1001,6 +1037,11 @@
           <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
         </button>
 
+        <button class="btn btn-ghost btn-sm" id="btn-toggle-notifications" onclick="toggleNotifications()" title="Desktop &amp; Browser Push Notifications">
+          <i data-lucide="bell" id="bell-icon" style="width: 13px; height: 13px;"></i>
+          <span id="notif-label">Notify: Off</span>
+        </button>
+
         <button class="btn btn-ghost btn-icon" onclick="openShortcutsModal()" title="Keyboard Shortcuts (Shortcut: ?)">
           <kbd>?</kbd>
         </button>
@@ -1033,6 +1074,11 @@
           <span class="pulse-dot"></span>
         </button>
 
+        <button class="nav-tab" data-tab="pane-playground" onclick="switchTab('pane-playground')">
+          <i data-lucide="play-circle" style="width: 13px; height: 13px;"></i>
+          <span>Playground</span>
+        </button>
+
         <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
           <i data-lucide="code-2" style="width: 13px; height: 13px;"></i>
           <span>Universal API</span>
@@ -1046,6 +1092,60 @@
 
     <!-- PANE 1: Accounts -->
     <div class="tab-pane active" id="pane-accounts">
+      <!-- Pool Runway & Headroom Intelligence Hero Card -->
+      <div class="card" style="margin-bottom: 20px; padding: 18px 22px; border-color: var(--border-subtle); background: linear-gradient(180deg, #111111 0%, #0a0a0a 100%);">
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 24px; align-items: center;">
+          <!-- 1. Aggregate Pool Health -->
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); font-weight: 600;">
+                <i data-lucide="activity" style="width: 12px; height: 12px; display: inline-block; vertical-align: -2px; color: var(--green);"></i>
+                Pool Aggregate Headroom
+              </span>
+              <strong id="hero-pool-pct" style="font-size: 14px; font-variant-numeric: tabular-nums; color: var(--green);">--%</strong>
+            </div>
+            <div class="micro-bar" style="height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden;">
+              <div id="hero-pool-bar" class="micro-fill fill-green" style="width: 75%; height: 100%; transition: width 0.4s ease;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-4); margin-top: 5px;">
+              <span id="hero-pool-token-est">~18.5M tokens available</span>
+              <span id="hero-active-accounts-count">4/4 accounts active</span>
+            </div>
+          </div>
+
+          <!-- 2. Consumption Burn Rate -->
+          <div style="border-left: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); padding: 0 20px;">
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); font-weight: 600; margin-bottom: 4px;">
+              <i data-lucide="zap" style="width: 12px; height: 12px; display: inline-block; vertical-align: -2px; color: var(--amber);"></i>
+              Velocity &amp; Burn Rate
+            </div>
+            <div style="font-size: 16px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums;" id="hero-burn-rate">
+              -- tokens/hr
+            </div>
+            <div style="font-size: 11px; color: var(--text-3); margin-top: 2px;" id="hero-today-burned">
+              Today: -- tokens burned
+            </div>
+          </div>
+
+          <!-- 3. Runway Forecast & Failover Target -->
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); font-weight: 600;">
+                <i data-lucide="clock" style="width: 12px; height: 12px; display: inline-block; vertical-align: -2px; color: var(--blue);"></i>
+                Active Session Runway
+              </span>
+              <span class="badge-tag" id="hero-runway-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--green); border-color: rgba(16, 185, 129, 0.2);">Healthy</span>
+            </div>
+            <div style="font-size: 16px; font-weight: 600; color: var(--text-1);" id="hero-runway-hours">
+              Calculating runway...
+            </div>
+            <div style="font-size: 11px; color: var(--text-3); margin-top: 2px;" id="hero-runway-target">
+              Next failover: Calculating...
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="view-toolbar">
         <div class="section-heading">
           <span>Account Pool</span>
@@ -1073,12 +1173,12 @@
             <tr>
               <th style="width: 44px; text-align: center;">KEY</th>
               <th style="width: 110px;">STATUS</th>
-              <th>ACCOUNT</th>
+              <th>ACCOUNT &amp; ALIAS</th>
               <th style="min-width: 160px;">GEMINI PRO (WEEKLY)</th>
               <th style="min-width: 160px;">5H BURST HEADROOM</th>
               <th style="min-width: 160px;">CLAUDE / 3P QUOTA</th>
-              <th style="width: 140px;">USAGE STATS</th>
-              <th style="width: 100px; text-align: right;">ACTION</th>
+              <th style="width: 130px;">USAGE STATS</th>
+              <th style="width: 120px; text-align: right;">ACTION</th>
             </tr>
           </thead>
           <tbody id="accounts-table-body">
@@ -1194,6 +1294,18 @@
               <span class="settings-desc">Send 'continue' automatically after hard quota</span>
             </div>
             <input type="checkbox" id="shield-auto-continue" onchange="saveShieldSetting({ autoContinue: this.checked })" style="width: 16px; height: 16px; accent-color: var(--green); cursor: pointer;">
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-info">
+              <span class="settings-label">Claude / 3P Routing Strategy</span>
+              <span class="settings-desc">Smart preservation &amp; failover for Anthropic models</span>
+            </div>
+            <select class="select-control" id="shield-claude-mode" onchange="saveShieldSetting({ claudeMode: this.value })">
+              <option value="native" selected>Native Standard</option>
+              <option value="shield">Aggressive Failover (Shield &lt;25%)</option>
+              <option value="preserve">Quota Saver (Fallback to Gemini Pro)</option>
+            </select>
           </div>
         </div>
       </div>
@@ -1320,6 +1432,14 @@
             <option value="100">100 / page</option>
           </select>
 
+          <button class="btn btn-secondary btn-sm" onclick="exportLogs('csv')" title="Download request logs as CSV">
+            <i data-lucide="download" style="width: 12px; height: 12px;"></i>
+            <span>Export CSV</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="exportLogs('json')" title="Download request logs as JSON">
+            <i data-lucide="file-json" style="width: 12px; height: 12px;"></i>
+            <span>Export JSON</span>
+          </button>
           <button class="btn btn-secondary btn-icon" onclick="fetchDbLogs()" title="Refresh Logs">
             <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
           </button>
@@ -1352,6 +1472,83 @@
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-secondary btn-sm" id="btn-log-prev" onclick="goToLogPage(currentLogPage - 1)" disabled>Previous</button>
           <button class="btn btn-secondary btn-sm" id="btn-log-next" onclick="goToLogPage(currentLogPage + 1)" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANE: Interactive Model Playground -->
+    <div class="tab-pane" id="pane-playground">
+      <div class="section-heading">
+        <span>Interactive Model Playground</span>
+        <span class="section-sub">&bull; Test queries directly against the load balancer and inspect live token deduction</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; margin-top: 16px;">
+        <!-- Left: Prompt Editor & Controls -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-2);">Model</label>
+            <select class="select-control" id="play-model" style="width: 220px;">
+              <option value="gemini-3.8-flash" selected>gemini-3.8-flash (Fast &bull; Recommended)</option>
+              <option value="gemini-2.5-pro">gemini-2.5-pro (Reasoning / Agent)</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6 (Anthropic)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size: 11px; font-weight: 500; color: var(--text-3); margin-bottom: 6px; display: block;">Quick Presets</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <button class="btn btn-secondary btn-sm" onclick="setPlayPrompt('Refactor this JavaScript function for optimal performance and memory safety.')">⚡ Refactor</button>
+              <button class="btn btn-secondary btn-sm" onclick="setPlayPrompt('Write comprehensive unit tests with edge cases in Node.js.')">🧪 Unit Tests</button>
+              <button class="btn btn-secondary btn-sm" onclick="setPlayPrompt('Analyze current pool quota metrics and explain optimal failover strategy.')">📊 Quota Strategy</button>
+            </div>
+          </div>
+
+          <div style="flex: 1; display: flex; flex-direction: column;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px;">Prompt</label>
+            <textarea id="play-prompt" rows="8" class="textarea-control" style="width: 100%; font-family: var(--font-sans); font-size: 12px; resize: vertical; min-height: 140px; background: #060606; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px; color: var(--text-1);" placeholder="Type a prompt to test your multi-account pool... (Press ⌘+Enter to submit)">Explain how multi-account load balancing prevents 429 quota errors in 3 concise bullet points.</textarea>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 8px;">
+            <span style="font-size: 11px; color: var(--text-4);"><kbd>⌘</kbd> + <kbd>Enter</kbd> to run</span>
+            <button class="btn btn-primary" id="btn-play-run" onclick="runPlayground()">
+              <i data-lucide="play" style="width: 12px; height: 12px;"></i>
+              <span>Send Request</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Response & Live Telemetry Inspector -->
+        <div class="card" style="display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
+            <div style="font-size: 13px; font-weight: 600;">Response Telemetry</div>
+            <div id="play-meta-pills" style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge-tag" id="play-tag-status">Ready</span>
+            </div>
+          </div>
+
+          <!-- Telemetry Badges Bar -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px;">
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Served By</div>
+              <div id="play-res-account" style="font-size: 11px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+            </div>
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Latency</div>
+              <div id="play-res-latency" style="font-size: 11px; font-weight: 500; color: var(--text-1); font-variant-numeric: tabular-nums;">-- ms</div>
+            </div>
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Tokens</div>
+              <div id="play-res-tokens" style="font-size: 11px; font-weight: 500; color: var(--text-1); font-variant-numeric: tabular-nums;">-- / --</div>
+            </div>
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Cost Saved</div>
+              <div id="play-res-saved" style="font-size: 11px; font-weight: 500; color: var(--green); font-variant-numeric: tabular-nums;">$0.00</div>
+            </div>
+          </div>
+
+          <!-- Output Box -->
+          <div style="flex: 1; min-height: 220px; max-height: 380px; overflow-y: auto; background: #060606; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 14px; font-size: 12px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; word-break: break-word;" id="play-response-body">Click "Send Request" to test model generation and load balancing through the gateway.</div>
         </div>
       </div>
     </div>
@@ -1436,6 +1633,61 @@
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" id="btn-copy-inspector" onclick="copyInspectorData()">Copy JSON</button>
         <button class="btn btn-secondary btn-sm" onclick="closeInspector()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Alias / Nickname Modal -->
+  <div class="modal-backdrop" id="alias-modal">
+    <div class="modal-box" style="max-width: 420px;">
+      <div class="modal-header">
+        <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="tag" style="width: 14px; height: 14px; color: var(--blue);"></i>
+          <span>Account Alias / Nickname</span>
+        </div>
+        <button class="btn btn-ghost btn-icon-sm" onclick="closeAliasModal()">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 12px; color: var(--text-3);" id="alias-modal-email">Setting alias for account</div>
+        <input type="hidden" id="alias-modal-id">
+        <div>
+          <label style="font-size: 11px; font-weight: 500; color: var(--text-2); margin-bottom: 6px; display: block;">Nickname (e.g. Work, Agent-1, Backup)</label>
+          <input type="text" id="alias-modal-input" class="search-input" style="width: 100%; border-radius: var(--radius-sm);" placeholder="Enter custom alias..." maxlength="24">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeAliasModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveAlias()">Save Alias</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete / Unlink Account Confirmation Modal -->
+  <div class="modal-backdrop" id="delete-modal">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header">
+        <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--red);">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+          <span>Unlink &amp; Remove Account</span>
+        </div>
+        <button class="btn btn-ghost btn-icon-sm" onclick="closeDeleteModal()">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+        <input type="hidden" id="delete-modal-id">
+        <div style="font-size: 12px; line-height: 1.5; color: var(--text-2);">
+          Are you sure you want to remove <strong id="delete-modal-email" style="color: var(--text-1);"></strong> from your Antigravity pool?
+        </div>
+        <div style="font-size: 11px; color: var(--text-4); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-sm); padding: 8px 10px;">
+          This will unlink the OAuth token and remove it from active load balancing rotation. You can re-authenticate anytime via "Add Account".
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteAccount()">Yes, Remove Account</button>
       </div>
     </div>
   </div>
@@ -1665,6 +1917,7 @@
         set('shield-weekly-threshold', data.weeklyThreshold);
         set('shield-5h-threshold', data.burstThreshold);
         set('shield-models', data.models || 'auto');
+        set('shield-claude-mode', data.claudeMode || 'native');
         
         const primary = document.getElementById('shield-primary');
         if (primary && Array.isArray(data.accounts)) {
@@ -1925,6 +2178,7 @@
         const tblCount = document.getElementById('table-acc-count');
         if (tblCount) tblCount.innerText = String(accounts.length);
 
+        try { updatePoolRunway(accounts, data); } catch (e) { console.error('Error updating pool runway:', e); }
         try { renderDailyChart(data.global?.dailyAnalytics || []); } catch (e) { console.error('Error rendering daily chart:', e); }
         try { renderModelShare(data.global?.modelDistribution || []); } catch (e) { console.error('Error rendering model share:', e); }
         try { renderAccountsTable(accounts, data, ideStatus); } catch (e) { console.error('Error rendering accounts table:', e); }
@@ -1994,6 +2248,105 @@
       `).join(' &bull; ');
     }
 
+    // Pool Runway & Aggregate Intelligence Calculator
+    function updatePoolRunway(accounts, data) {
+      if (!accounts || accounts.length === 0) return;
+
+      const activeAccounts = accounts.filter(a => a.enabled !== false && !a.is403Banned);
+      const avgWeekly = activeAccounts.length > 0
+        ? Math.round(activeAccounts.reduce((sum, a) => sum + (a.geminiWeekly?.pct ?? 100), 0) / activeAccounts.length)
+        : 0;
+
+      // 1. Aggregate headroom
+      const poolPctEl = document.getElementById('hero-pool-pct');
+      const poolBarEl = document.getElementById('hero-pool-bar');
+      const poolTokensEl = document.getElementById('hero-pool-token-est');
+      const activeCountEl = document.getElementById('hero-active-accounts-count');
+
+      if (poolPctEl) {
+        poolPctEl.innerText = `${avgWeekly}%`;
+        poolPctEl.style.color = avgWeekly > 50 ? 'var(--green)' : (avgWeekly > 20 ? 'var(--amber)' : 'var(--red)');
+      }
+      if (poolBarEl) {
+        poolBarEl.style.width = `${avgWeekly}%`;
+        poolBarEl.className = `micro-fill ${getBarColor(avgWeekly)}`;
+      }
+
+      const totalPoolTokensEst = Math.round(activeAccounts.reduce((sum, a) => sum + (((a.geminiWeekly?.pct ?? 100) / 100) * 5000000), 0));
+      if (poolTokensEl) {
+        poolTokensEl.innerText = `~${(totalPoolTokensEst / 1000000).toFixed(1)}M tokens available`;
+      }
+      if (activeCountEl) {
+        activeCountEl.innerText = `${activeAccounts.length}/${accounts.length} accounts active`;
+      }
+
+      // 2. Velocity & Hourly Burn Rate
+      const dailyList = data?.global?.dailyAnalytics || [];
+      const todayStats = dailyList[dailyList.length - 1];
+      const todayTokens = todayStats?.totalTokens || 0;
+      const now = new Date();
+      const hoursElapsed = Math.max(0.5, now.getHours() + (now.getMinutes() / 60));
+      const hourlyBurn = Math.round(todayTokens / hoursElapsed);
+
+      const burnRateEl = document.getElementById('hero-burn-rate');
+      const todayBurnedEl = document.getElementById('hero-today-burned');
+      if (burnRateEl) {
+        burnRateEl.innerText = hourlyBurn > 0 ? `${formatNumber(hourlyBurn)} tokens/hr` : 'Idle (0 tokens/hr)';
+      }
+      if (todayBurnedEl) {
+        todayBurnedEl.innerText = `Today: ${formatNumber(todayTokens)} tokens consumed`;
+      }
+
+      // 3. Active Session Runway Forecast
+      const activeSessionEmail = (data?.global?.activeSessionEmail || accounts[0]?.email || '').toLowerCase();
+      const activeAcc = accounts.find(a => a.email && a.email.toLowerCase() === activeSessionEmail) || accounts[0];
+      const active5hPct = activeAcc?.gemini5h?.pct ?? 100;
+      const burstTokensRemain = (active5hPct / 100) * 1000000;
+
+      const runwayHrsEl = document.getElementById('hero-runway-hours');
+      const runwayBadgeEl = document.getElementById('hero-runway-badge');
+      const runwayTargetEl = document.getElementById('hero-runway-target');
+
+      if (runwayHrsEl) {
+        if (hourlyBurn <= 0) {
+          runwayHrsEl.innerText = '> 24 hours (Infinite Buffer)';
+        } else {
+          const hoursRem = (burstTokensRemain / hourlyBurn).toFixed(1);
+          runwayHrsEl.innerText = hoursRem > 24 ? '> 24 hours (Infinite Buffer)' : `${hoursRem} hours remaining`;
+        }
+      }
+
+      if (runwayBadgeEl) {
+        if (active5hPct > 50) {
+          runwayBadgeEl.innerText = 'Healthy';
+          runwayBadgeEl.style.background = 'rgba(16, 185, 129, 0.1)';
+          runwayBadgeEl.style.color = 'var(--green)';
+          runwayBadgeEl.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+        } else if (active5hPct > 20) {
+          runwayBadgeEl.innerText = 'Moderate';
+          runwayBadgeEl.style.background = 'rgba(245, 158, 11, 0.1)';
+          runwayBadgeEl.style.color = 'var(--amber)';
+          runwayBadgeEl.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+        } else {
+          runwayBadgeEl.innerText = 'Critical';
+          runwayBadgeEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          runwayBadgeEl.style.color = 'var(--red)';
+          runwayBadgeEl.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+        }
+      }
+
+      if (runwayTargetEl) {
+        const nextAcc = accounts.find(a => a !== activeAcc && a.enabled !== false && !a.is403Banned);
+        if (nextAcc) {
+          const gwPct = nextAcc.geminiWeekly?.pct ?? 100;
+          const shortName = nextAcc.alias || nextAcc.email.split('@')[0];
+          runwayTargetEl.innerText = `Next failover: ${shortName} (${gwPct}% quota)`;
+        } else {
+          runwayTargetEl.innerText = 'Next failover: None available';
+        }
+      }
+    }
+
     // Render Accounts Table View
     function renderAccountsTable(accounts, data, ideStatus) {
       const tbody = document.getElementById('accounts-table-body');
@@ -2014,16 +2367,19 @@
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
         const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
 
-        const isQueued = !!pendingEmail && a.email.toLowerCase() === pendingEmail;
+        const isQueued = !pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
         const isServing = a.id === activeRunningId;
         const isActive = a.id === activeSessionId || a.email.toLowerCase() === activeSessionEmail;
-        const isNextRecommended = !isActive && idx === 1 && !isBanned;
-        const isLowest = !isActive && idx === accounts.length - 1 && accounts.length > 2;
+        const isPaused = a.enabled === false;
+        const isNextRecommended = !isActive && idx === 1 && !isBanned && !isPaused;
+        const isLowest = !isActive && idx === accounts.length - 1 && accounts.length > 2 && !isPaused;
 
         let statusHtml = '<span class="status-badge standby">Standby</span>';
-        if (isServing || (isActive && isGenerating)) {
+        if (isPaused) {
+          statusHtml = '<span class="status-badge" style="background: rgba(161, 161, 170, 0.1); border-color: rgba(161, 161, 170, 0.2); color: var(--text-3);"><i data-lucide="pause-circle" style="width:10px;height:10px;display:inline-block;vertical-align:-1px;"></i> Paused</span>';
+        } else if (isServing || (isActive && isGenerating)) {
           statusHtml = '<span class="status-badge generating"><span class="pulse-dot" style="background:var(--blue)"></span> Generating</span>';
         } else if (isActive) {
           statusHtml = '<span class="status-badge active-now"><span class="pulse-dot"></span> Active Now</span>';
@@ -2040,22 +2396,28 @@
           statusHtml = '<span class="status-badge" style="background: var(--red-subtle); border-color: var(--red-border); color: var(--red);">Lowest Quota</span>';
         }
 
-        let actionBtn = `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>`;
+        let mainAction = `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>`;
         if (isActive) {
-          actionBtn = '<span style="color: var(--green); font-size: 11px; font-weight: 500;">Active</span>';
+          mainAction = '<span style="color: var(--green); font-size: 11px; font-weight: 500;">Active</span>';
         } else if (isQueued) {
-          actionBtn = '<span style="color: var(--amber); font-size: 11px;">Queued</span>';
+          mainAction = '<span style="color: var(--amber); font-size: 11px;">Queued</span>';
         }
 
+        const aliasTag = a.alias ? `<span class="badge-alias">${a.alias}</span>` : '';
+        const escapedAlias = (a.alias || '').replace(/'/g, "\\'");
+        const escapedEmail = (a.email || '').replace(/'/g, "\\'");
         const hotkey = idx < 9 ? `<kbd>${idx + 1}</kbd>` : '&bull;';
 
         return `
-          <tr class="${isActive ? 'is-active' : ''}">
+          <tr class="${isActive ? 'is-active' : ''} ${isPaused ? 'acc-paused' : ''}">
             <td style="text-align: center;">${hotkey}</td>
             <td>${statusHtml}</td>
             <td>
               <div class="acc-cell">
-                <span class="acc-email">${a.email}</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="acc-email">${a.email}</span>
+                  ${aliasTag}
+                </div>
                 <span class="acc-name">${a.name || 'Pro Account'} &bull; ${a.subscriptionTier || 'PRO'}</span>
               </div>
             </td>
@@ -2099,7 +2461,18 @@
               </div>
             </td>
             <td style="text-align: right;">
-              ${actionBtn}
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                ${mainAction}
+                <button class="btn btn-ghost btn-icon-sm" onclick="toggleAccount('${a.id}')" title="${isPaused ? 'Enable account' : 'Pause account'}">
+                  <i data-lucide="${isPaused ? 'play' : 'pause'}" style="width: 12px; height: 12px; color: ${isPaused ? 'var(--green)' : 'var(--amber)'};"></i>
+                </button>
+                <button class="btn btn-ghost btn-icon-sm" onclick="openAliasModal('${a.id}', '${escapedAlias}', '${escapedEmail}')" title="Set nickname/alias">
+                  <i data-lucide="tag" style="width: 12px; height: 12px; color: var(--text-3);"></i>
+                </button>
+                <button class="btn btn-ghost btn-icon-sm" onclick="deleteAccount('${a.id}', '${escapedEmail}')" title="Unlink account">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px; color: var(--red);"></i>
+                </button>
+              </div>
             </td>
           </tr>
         `;
@@ -2126,16 +2499,19 @@
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
         const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
 
-        const isQueued = !!pendingEmail && a.email.toLowerCase() === pendingEmail;
+        const isQueued = !pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
         const isServing = a.id === activeRunningId;
         const isActive = a.id === activeSessionId || a.email.toLowerCase() === activeSessionEmail;
-        const isNextRecommended = !isActive && idx === 1 && !isBanned;
-        const isLowest = !isActive && idx === accounts.length - 1 && accounts.length > 2;
+        const isPaused = a.enabled === false;
+        const isNextRecommended = !isActive && idx === 1 && !isBanned && !isPaused;
+        const isLowest = !isActive && idx === accounts.length - 1 && accounts.length > 2 && !isPaused;
 
         let statusHtml = '<span class="status-badge standby">Standby</span>';
-        if (isServing || (isActive && isGenerating)) {
+        if (isPaused) {
+          statusHtml = '<span class="status-badge" style="background: rgba(161, 161, 170, 0.1); border-color: rgba(161, 161, 170, 0.2); color: var(--text-3);"><i data-lucide="pause-circle" style="width:10px;height:10px;display:inline-block;vertical-align:-1px;"></i> Paused</span>';
+        } else if (isServing || (isActive && isGenerating)) {
           statusHtml = '<span class="status-badge generating"><span class="pulse-dot" style="background:var(--blue)"></span> Generating</span>';
         } else if (isActive) {
           statusHtml = '<span class="status-badge active-now"><span class="pulse-dot"></span> Active Now</span>';
@@ -2152,13 +2528,19 @@
           statusHtml = '<span class="status-badge" style="background: var(--red-subtle); border-color: var(--red-border); color: var(--red);">Lowest Quota</span>';
         }
 
+        const aliasTag = a.alias ? `<span class="badge-alias">${a.alias}</span>` : '';
+        const escapedAlias = (a.alias || '').replace(/'/g, "\\'");
+        const escapedEmail = (a.email || '').replace(/'/g, "\\'");
         const hotkey = idx < 9 ? `<kbd>${idx + 1}</kbd>` : '';
 
         return `
-          <div class="acc-card ${isActive ? 'is-active' : ''}">
+          <div class="acc-card ${isActive ? 'is-active' : ''} ${isPaused ? 'acc-paused' : ''}">
             <div class="acc-card-top">
               <div class="acc-cell">
-                <span class="acc-email">${a.email}</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="acc-email">${a.email}</span>
+                  ${aliasTag}
+                </div>
                 <span class="acc-name">${a.name || 'Pro Account'} &bull; ${a.subscriptionTier || 'PRO'}</span>
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
@@ -2201,7 +2583,18 @@
 
             <div class="acc-card-footer">
               <span>${(a.totalRequests || 0).toLocaleString()} reqs &bull; ${formatNumber(a.totalTokens || 0)} tokens</span>
-              ${!isActive ? `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>` : '<span style="color:var(--green); font-weight:500;">Active Now</span>'}
+              <div style="display: flex; align-items: center; gap: 4px;">
+                ${!isActive ? `<button class="btn btn-secondary btn-sm" onclick="setActive('${a.id}')">Set Active</button>` : '<span style="color:var(--green); font-weight:500; font-size:11px;">Active</span>'}
+                <button class="btn btn-ghost btn-icon-sm" onclick="toggleAccount('${a.id}')" title="${isPaused ? 'Enable account' : 'Pause account'}">
+                  <i data-lucide="${isPaused ? 'play' : 'pause'}" style="width: 12px; height: 12px; color: ${isPaused ? 'var(--green)' : 'var(--amber)'};"></i>
+                </button>
+                <button class="btn btn-ghost btn-icon-sm" onclick="openAliasModal('${a.id}', '${escapedAlias}', '${escapedEmail}')" title="Set nickname/alias">
+                  <i data-lucide="tag" style="width: 12px; height: 12px; color: var(--text-3);"></i>
+                </button>
+                <button class="btn btn-ghost btn-icon-sm" onclick="deleteAccount('${a.id}', '${escapedEmail}')" title="Unlink account">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px; color: var(--red);"></i>
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -2342,6 +2735,268 @@
       }
     }
 
+    // Account Ergonomics: Toggle, Alias, and Delete
+    async function toggleAccount(id) {
+      try {
+        const res = await fetch('/api/accounts/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          addLog(`⚡ Account ${data.account.email} is now ${data.account.enabled ? 'ENABLED' : 'PAUSED'}.`);
+          await fetchMatrix();
+        } else {
+          addLog(`⚠️ Failed to toggle account: ${data.error}`);
+        }
+      } catch (err) {
+        addLog(`⚠️ Toggle error: ${err.message}`);
+      }
+    }
+
+    function openAliasModal(id, currentAlias, email) {
+      const modal = document.getElementById('alias-modal');
+      const idInput = document.getElementById('alias-modal-id');
+      const aliasInput = document.getElementById('alias-modal-input');
+      const emailLabel = document.getElementById('alias-modal-email');
+      if (idInput) idInput.value = id;
+      if (aliasInput) aliasInput.value = currentAlias || '';
+      if (emailLabel) emailLabel.innerText = `Setting alias for ${email}`;
+      if (modal) modal.style.display = 'flex';
+      if (aliasInput) setTimeout(() => aliasInput.focus(), 50);
+    }
+
+    function closeAliasModal() {
+      const modal = document.getElementById('alias-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function saveAlias() {
+      const id = document.getElementById('alias-modal-id')?.value;
+      const alias = document.getElementById('alias-modal-input')?.value?.trim();
+      if (!id) return;
+      try {
+        const res = await fetch('/api/accounts/alias', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, alias })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          addLog(`🏷️ Saved alias for ${data.account.email}: "${alias || 'None'}"`);
+          closeAliasModal();
+          await fetchMatrix();
+        } else {
+          addLog(`⚠️ Failed to save alias: ${data.error}`);
+        }
+      } catch (err) {
+        addLog(`⚠️ Error saving alias: ${err.message}`);
+      }
+    }
+
+    function deleteAccount(id, email) {
+      const modal = document.getElementById('delete-modal');
+      const idInput = document.getElementById('delete-modal-id');
+      const emailLabel = document.getElementById('delete-modal-email');
+      if (idInput) idInput.value = id;
+      if (emailLabel) emailLabel.innerText = email;
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+      const modal = document.getElementById('delete-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmDeleteAccount() {
+      const id = document.getElementById('delete-modal-id')?.value;
+      if (!id) return;
+      try {
+        const res = await fetch('/api/accounts/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          addLog(`🗑️ Removed ${data.email || 'account'} from pool.`);
+          closeDeleteModal();
+          await fetchMatrix();
+        } else {
+          addLog(`⚠️ Could not remove account: ${data.error}`);
+        }
+      } catch (err) {
+        addLog(`⚠️ Remove error: ${err.message}`);
+      }
+    }
+
+    // Export Logs
+    function exportLogs(format) {
+      const a = document.createElement('a');
+      a.href = `/api/db/logs/export?format=${format}`;
+      a.download = `antigravity_requests_${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      addLog(`📥 Exported SQLite logs as ${format.toUpperCase()}`);
+    }
+
+    // Desktop / Browser Notifications
+    let notificationsEnabled = localStorage.getItem('harness_notifications') === 'true';
+
+    function updateNotificationButton() {
+      const btn = document.getElementById('btn-notifications');
+      if (!btn) return;
+      if (notificationsEnabled) {
+        btn.innerHTML = '<i data-lucide="bell" style="width:12px;height:12px;color:var(--green);display:inline-block;vertical-align:-1px;"></i> Notify: On';
+        btn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      } else {
+        btn.innerHTML = '<i data-lucide="bell-off" style="width:12px;height:12px;color:var(--text-4);display:inline-block;vertical-align:-1px;"></i> Notify: Off';
+        btn.style.borderColor = 'var(--border-subtle)';
+      }
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (e) {}
+      }
+    }
+
+    async function toggleNotifications() {
+      if (!notificationsEnabled) {
+        if ('Notification' in window) {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            notificationsEnabled = true;
+            localStorage.setItem('harness_notifications', 'true');
+            addLog('🔔 Desktop notifications enabled for Smart Shield & rotation events.');
+            sendDesktopNotification('Antigravity Alerts Armed', 'You will receive desktop push alerts when quotas rotate.');
+          } else {
+            alert('Notifications were blocked in browser settings. Please permit notifications for this origin.');
+            notificationsEnabled = false;
+            localStorage.setItem('harness_notifications', 'false');
+          }
+        } else {
+          alert('Desktop notifications are not supported in this browser.');
+        }
+      } else {
+        notificationsEnabled = false;
+        localStorage.setItem('harness_notifications', 'false');
+        addLog('🔕 Desktop notifications disabled.');
+      }
+      updateNotificationButton();
+    }
+
+    function sendDesktopNotification(title, body) {
+      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(title, { body, icon: '/favicon.ico' });
+        } catch (e) {}
+      }
+    }
+
+    // Interactive Model Playground
+    function setPlayPrompt(text) {
+      const promptEl = document.getElementById('play-prompt');
+      if (promptEl) {
+        promptEl.value = text;
+        promptEl.focus();
+      }
+    }
+
+    async function runPlayground() {
+      const model = document.getElementById('play-model')?.value || 'gemini-3.8-flash';
+      const prompt = document.getElementById('play-prompt')?.value?.trim();
+      const btn = document.getElementById('btn-play-run');
+      const tagStatus = document.getElementById('play-tag-status');
+      const outBody = document.getElementById('play-response-body');
+      const resAccount = document.getElementById('play-res-account');
+      const resLatency = document.getElementById('play-res-latency');
+      const resTokens = document.getElementById('play-res-tokens');
+      const resSaved = document.getElementById('play-res-saved');
+
+      if (!prompt) {
+        alert('Please enter a prompt to send.');
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+      if (tagStatus) {
+        tagStatus.innerText = 'Running...';
+        tagStatus.style.color = 'var(--blue)';
+      }
+      if (outBody) {
+        outBody.innerText = 'Generating response via Antigravity Gateway...';
+        outBody.style.color = 'var(--text-3)';
+      }
+      if (resAccount) resAccount.innerText = 'Routing...';
+      if (resLatency) resLatency.innerText = '-- ms';
+      if (resTokens) resTokens.innerText = '-- / --';
+      if (resSaved) resSaved.innerText = '$0.00';
+
+      const start = Date.now();
+      try {
+        const res = await fetch('/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        const elapsed = Date.now() - start;
+        const data = await res.json();
+
+        if (res.ok) {
+          const content = data.choices?.[0]?.message?.content || JSON.stringify(data, null, 2);
+          const inTok = data.usage?.prompt_tokens || 0;
+          const outTok = data.usage?.completion_tokens || 0;
+          const costSaved = ((inTok * 0.00000125) + (outTok * 0.000005)).toFixed(4);
+
+          if (tagStatus) {
+            tagStatus.innerText = '200 OK';
+            tagStatus.style.color = 'var(--green)';
+          }
+          if (outBody) {
+            outBody.innerText = content.trim();
+            outBody.style.color = 'var(--text-1)';
+          }
+          if (resAccount) {
+            resAccount.innerText = data.served_by || 'Auto-Routed';
+            resAccount.title = data.served_by || 'Auto-Routed';
+          }
+          if (resLatency) resLatency.innerText = `${elapsed}ms`;
+          if (resTokens) resTokens.innerText = `↑${inTok} ↓${outTok}`;
+          if (resSaved) resSaved.innerText = `+$${costSaved}`;
+
+          addLog(`🧪 Playground: ${model} generated ${outTok} tokens (${elapsed}ms)`);
+        } else {
+          if (tagStatus) {
+            tagStatus.innerText = `${res.status} Error`;
+            tagStatus.style.color = 'var(--red)';
+          }
+          if (outBody) {
+            outBody.innerText = data.error?.message || JSON.stringify(data, null, 2);
+            outBody.style.color = 'var(--red)';
+          }
+          if (resLatency) resLatency.innerText = `${elapsed}ms`;
+          addLog(`⚠️ Playground error: ${data.error?.message || res.status}`);
+        }
+      } catch (err) {
+        if (tagStatus) {
+          tagStatus.innerText = 'Failed';
+          tagStatus.style.color = 'var(--red)';
+        }
+        if (outBody) {
+          outBody.innerText = `Network or gateway failure: ${err.message}`;
+          outBody.style.color = 'var(--red)';
+        }
+        if (resLatency) resLatency.innerText = `${Date.now() - start}ms`;
+      } finally {
+        if (btn) btn.disabled = false;
+        fetchMatrix();
+      }
+    }
+
     // Server-Sent Events (SSE) Listener
     try {
       const sse = new EventSource('/api/events');
@@ -2362,9 +3017,11 @@
             fetchMatrix();
           } else if (item.type === 'account_switch') {
             addLog(`🔄 Session switched to ${item.email}`);
+            sendDesktopNotification('Antigravity Session Switched', `Active session shifted to ${item.email}`);
             fetchMatrix();
           } else if (item.type === 'proactive_switch') {
             addLog(`🛡️ Proactive switch from ${item.from} to ${item.to}`);
+            sendDesktopNotification('🛡️ Smart Shield Failover', `Proactive failover from ${item.from} to ${item.to} (<20% quota protection)`);
             fetchMatrix();
           } else if (item.type === 'account_added') {
             addLog(`✅ Account added: ${item.email}`);
@@ -2383,6 +3040,8 @@
       if (e.key === 'Escape') {
         closeInspector();
         closeShortcutsModal();
+        closeAliasModal();
+        closeDeleteModal();
         return;
       }
 
@@ -2414,8 +3073,23 @@
     document.getElementById('shortcuts-modal')?.addEventListener('click', (e) => {
       if (e.target.id === 'shortcuts-modal') closeShortcutsModal();
     });
+    document.getElementById('alias-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'alias-modal') closeAliasModal();
+    });
+    document.getElementById('delete-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'delete-modal') closeDeleteModal();
+    });
+
+    // Playground Cmd+Enter Shortcut
+    document.getElementById('play-prompt')?.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runPlayground();
+      }
+    });
 
     // Init
+    updateNotificationButton();
     setViewMode(currentViewMode);
     fetchSmartShieldConfig();
     const savedTab = localStorage.getItem('harness_active_tab');
