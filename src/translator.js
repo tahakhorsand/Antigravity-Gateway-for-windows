@@ -1,18 +1,50 @@
 import crypto from 'crypto';
 
 export function normalizeModelName(inputModel) {
-  if (!inputModel) return 'gemini-2.5-pro';
-  const m = inputModel.toLowerCase();
+  if (!inputModel) return 'gemini-3.8-flash';
+  const m = inputModel.toLowerCase().trim();
 
-  if (m.includes('flash-lite') || m.includes('mini') || m.includes('3.5-turbo') || m.includes('haiku')) {
+  // Gemini 3.8 Flash (User primary model)
+  if (m.includes('3.8') || m.includes('3-8') || m === 'gemini-3.8-flash-medium' || m === 'gemini-3.8-flash') {
+    return 'gemini-3.8-flash';
+  }
+
+  // Gemini 3.7 Flash
+  if (m.includes('3.7') || m.includes('3-7')) {
+    return 'gemini-3.7-flash';
+  }
+
+  // Gemini 3 Flash / 3.5 Flash
+  if (m.includes('3.5-flash') || m.includes('gemini-3-flash') || m === 'gemini-3-flash') {
+    return 'gemini-3-flash';
+  }
+
+  // Explicit 2.5 Flash
+  if (m.includes('2.5-flash') || m.includes('2.5-flash-lite')) {
     return 'gemini-2.5-flash';
   }
+
+  // Other lightweight / turbo aliases default to 3.8 flash
+  if (m.includes('flash-lite') || m.includes('mini') || m.includes('3.5-turbo') || m.includes('haiku')) {
+    return 'gemini-3.8-flash';
+  }
+
+  // Generic flash defaults to 3.8 flash
   if (m.includes('flash')) {
-    return 'gemini-2.5-flash';
+    return 'gemini-3.8-flash';
+  }
+
+  // Pro & Frontier models
+  if (m.includes('3.1-pro') || m.includes('3-1-pro')) {
+    return 'gemini-3.1-pro-high';
+  }
+  if (m.includes('2.5-pro') || m.includes('2-5-pro')) {
+    return 'gemini-2.5-pro';
   }
   if (m.includes('pro') || m.includes('4o') || m.includes('claude') || m.includes('sonnet') || m.includes('opus')) {
     return 'gemini-2.5-pro';
   }
+
   return inputModel;
 }
 
@@ -142,10 +174,32 @@ export const CLOUDCODE_STREAM_ENDPOINTS = [
   'https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse'
 ];
 
+export function mapToGoogleInternalModel(model) {
+  if (!model) return 'gemini-3.8-flash-medium';
+  const m = model.toLowerCase().trim();
+  if (m === 'gemini-3.8-flash' || m.includes('3.8-flash') || m.includes('3.8')) {
+    return 'gemini-3.8-flash-medium';
+  }
+  if (m === 'gemini-3.7-flash' || m.includes('3.7-flash')) {
+    return 'gemini-3.7-flash-medium';
+  }
+  if (m === 'gemini-3-flash' || m.includes('3-flash')) {
+    return 'gemini-3-flash';
+  }
+  if (m === 'gemini-2.5-flash' || m.includes('2.5-flash')) {
+    return 'gemini-2.5-flash';
+  }
+  if (m === 'gemini-2.5-pro' || m.includes('2.5-pro')) {
+    return 'gemini-2.5-pro';
+  }
+  return model;
+}
+
 export function wrapGeminiV1Internal(geminiBody, model, projectId) {
+  const internalModel = mapToGoogleInternalModel(model);
   return {
     project: projectId || undefined,
-    model: model || 'gemini-2.5-pro',
+    model: internalModel,
     request: {
       contents: geminiBody.contents || [],
       systemInstruction: geminiBody.system_instruction || undefined,
@@ -227,9 +281,12 @@ export function getOpenAIModelsList() {
   return {
     object: 'list',
     data: [
-      { id: 'gemini-2.5-pro', object: 'model', created: 1715000000, owned_by: 'google' },
-      { id: 'gemini-2.5-flash', object: 'model', created: 1715000000, owned_by: 'google' },
+      { id: 'gemini-3.8-flash', object: 'model', created: 1715000000, owned_by: 'google' },
+      { id: 'gemini-3.8-flash-medium', object: 'model', created: 1715000000, owned_by: 'google' },
+      { id: 'gemini-3.7-flash', object: 'model', created: 1715000000, owned_by: 'google' },
       { id: 'gemini-3-flash', object: 'model', created: 1715000000, owned_by: 'google' },
+      { id: 'gemini-2.5-flash', object: 'model', created: 1715000000, owned_by: 'google' },
+      { id: 'gemini-2.5-pro', object: 'model', created: 1715000000, owned_by: 'google' },
       { id: 'gemini-3.1-pro-high', object: 'model', created: 1715000000, owned_by: 'google' },
       { id: 'claude-3-5-sonnet', object: 'model', created: 1715000000, owned_by: 'anthropic-alias' },
       { id: 'claude-3-7-sonnet', object: 'model', created: 1715000000, owned_by: 'anthropic-alias' },

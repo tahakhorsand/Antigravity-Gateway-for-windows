@@ -28,6 +28,7 @@ import {
   convertGeminiToOpenAI, 
   convertGeminiToAnthropic, 
   getOpenAIModelsList,
+  normalizeModelName,
   CLOUDCODE_GENERATE_ENDPOINTS,
   CLOUDCODE_STREAM_ENDPOINTS
 } from './translator.js';
@@ -145,6 +146,48 @@ function parseTokenUsageFromBuffer(buffer, requestLength) {
   };
 }
 
+function extractModelFromProxyRequest(req, urlPath, bodyBuffer) {
+  // 1. Check custom headers
+  const headerModel = req.headers['x-model'] || req.headers['x-goog-model'] || req.headers['model'];
+  if (headerModel) return normalizeModelName(headerModel);
+
+  // 2. Check JSON request body
+  if (bodyBuffer && bodyBuffer.length > 0) {
+    try {
+      const text = bodyBuffer.toString('utf-8');
+      const json = JSON.parse(text);
+      const rawModel = json.model || json.modelName || json.request?.model || json.clientMetadata?.model;
+      if (rawModel) return normalizeModelName(rawModel);
+    } catch (e) {
+      const text = bodyBuffer.toString('utf-8');
+      const modelMatch = text.match(/"model"\s*:\s*"([^"]+)"/) || text.match(/"modelName"\s*:\s*"([^"]+)"/);
+      if (modelMatch && modelMatch[1]) {
+        return normalizeModelName(modelMatch[1]);
+      }
+    }
+  }
+
+  // 3. Check query parameters
+  try {
+    const parsedUrl = new URL(urlPath, 'http://localhost');
+    const qModel = parsedUrl.searchParams.get('model');
+    if (qModel) return normalizeModelName(qModel);
+  } catch (e) {}
+
+  // 4. Check URL Path
+  const p = (urlPath || '').toLowerCase();
+  if (p.includes('gemini-3.8-flash') || p.includes('3.8-flash') || p.includes('3.8')) return 'gemini-3.8-flash';
+  if (p.includes('gemini-3.7-flash') || p.includes('3.7-flash')) return 'gemini-3.7-flash';
+  if (p.includes('gemini-3-flash') || p.includes('3-flash')) return 'gemini-3-flash';
+  if (p.includes('gemini-2.5-pro') || p.includes('2.5-pro')) return 'gemini-2.5-pro';
+  if (p.includes('gemini-2.5-flash') || p.includes('2.5-flash')) return 'gemini-2.5-flash';
+  if (p.includes('image')) return 'imagen-3';
+  if (p.includes('claude')) return 'claude-sonnet-4-6';
+
+  // 5. Default to the user's active model: Gemini 3.8 Flash
+  return 'gemini-3.8-flash';
+}
+
 async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates) {
   const isAnthropic = urlPath.includes('/messages');
   let jsonBody = {};
@@ -163,7 +206,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
   const primaryModel = translation.model;
   const geminiBody = translation.geminiBody;
   const startTime = Date.now();
-  const modelTiers = primaryModel !== 'gemini-2.5-flash' ? [primaryModel, 'gemini-2.5-flash'] : [primaryModel];
+  const modelTiers = primaryModel !== 'gemini-3.8-flash' ? [primaryModel, 'gemini-3.8-flash'] : [primaryModel];
 
   for (const targetModel of modelTiers) {
     if (targetModel !== primaryModel) {
@@ -260,6 +303,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           accountId: account.id,
           email: account.email,
           duration,
+          model: targetModel,
           tokens: {
             input: promptTokens,
             output: completionTokens,
@@ -377,6 +421,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           accountId: account.id,
           email: account.email,
           duration,
+          model: targetModel,
           tokens: {
             input: 20,
             output: totalOutTokens,
@@ -649,10 +694,8 @@ async function handleProxyRequest(req, res) {
       const fullResponseBuffer = Buffer.concat(responseChunks);
       const tokenUsage = parseTokenUsageFromBuffer(fullResponseBuffer, bodyBuffer.length);
       
-      // Determine model used from URL or header
-      let modelUsed = 'gemini-2.5-pro';
-      if (urlPath.includes('flash')) modelUsed = 'gemini-2.5-flash';
-      if (urlPath.includes('image')) modelUsed = 'imagen-3';
+      // Determine exact model used from request body, headers, or URL
+      const modelUsed = extractModelFromProxyRequest(req, urlPath, bodyBuffer);
 
       recordRequestSuccess(account.id, duration, tokenUsage, modelUsed, {
         requestId: reqId,
@@ -667,6 +710,7 @@ async function handleProxyRequest(req, res) {
         email: account.email, 
         status: upstreamRes.status, 
         duration,
+        model: modelUsed,
         tokens: tokenUsage
       });
 

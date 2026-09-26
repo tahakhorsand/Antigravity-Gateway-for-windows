@@ -150,7 +150,7 @@ export async function fetchLiveAccountQuota(account) {
         proPct = Math.round(proModel.quotaInfo.remainingFraction * 1000) / 10;
       }
 
-      const flashModel = models['gemini-2.5-flash'] || models['gemini-3.5-flash-lite'] || models['gemini-3-flash'];
+      const flashModel = models['gemini-3.8-flash-medium'] || models['gemini-3.8-flash-high'] || models['gemini-3.7-flash-medium'] || models['gemini-2.5-flash'] || models['gemini-3.5-flash-lite'] || models['gemini-3-flash'];
       if (flashModel?.quotaInfo?.remainingFraction !== undefined) {
         flashPct = Math.round(flashModel.quotaInfo.remainingFraction * 1000) / 10;
       }

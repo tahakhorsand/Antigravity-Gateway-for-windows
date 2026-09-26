@@ -78,7 +78,7 @@ export function recordRequestDb({
   requestId = null,
   accountId,
   accountEmail,
-  model = 'gemini-2.5-pro',
+  model = 'gemini-3.8-flash',
   endpoint = '/v1/chat/completions',
   statusCode = 200,
   latencyMs = 0,
@@ -294,7 +294,7 @@ export function getModelDistributionDb() {
     const db = getDatabase();
     const query = db.prepare(`
       SELECT 
-        COALESCE(model, 'gemini-2.5-pro') AS model,
+        COALESCE(model, 'gemini-3.8-flash') AS model,
         COUNT(*) AS requestCount,
         COALESCE(SUM(total_tokens), 0) AS totalTokens
       FROM request_logs
