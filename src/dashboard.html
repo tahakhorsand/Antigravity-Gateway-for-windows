@@ -558,6 +558,156 @@
       font-size: 11px;
       color: var(--muted-foreground);
     }
+
+    /* Modern Navigation Tabs Menu */
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 2px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .nav-tab:hover {
+      color: #fafafa;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .nav-tab.active {
+      color: #fafafa;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      font-weight: 600;
+    }
+
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted-foreground);
+    }
+
+    .nav-tab.active .tab-badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+    }
+
+    .tab-badge-accent {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      display: inline-block;
+      animation: pulse-dot-anim 2s infinite;
+    }
+
+    @keyframes pulse-dot-anim {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Tab Panes */
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+      animation: fadeInTab 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    @keyframes fadeInTab {
+      from {
+        opacity: 0;
+        transform: translateY(3px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* SQLite Logs Table */
+    .db-logs-table-wrapper {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+    }
+
+    .db-logs-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .db-logs-table th {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted-foreground);
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .db-logs-table td {
+      padding: 10px 14px;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: #e4e4e7;
+    }
+
+    .db-logs-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
   </style>
 </head>
 <body>
@@ -601,239 +751,311 @@
       </div>
     </div>
 
-    <!-- Real-Time Token Telemetry Strip -->
-    <div class="token-strip">
-      <div class="token-tile">
-        <div class="token-tile-top">
-          <span class="token-tile-label"><i data-lucide="layers" style="width: 13px; height: 13px; color: #a855f7;"></i> Total Tokens</span>
-          <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; font-size: 10px;">Global</span>
+    <!-- Modern Navigation Menu Bar -->
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" data-tab="pane-accounts" onclick="switchTab('pane-accounts')">
+        <i data-lucide="users" style="width: 14px; height: 14px;"></i>
+        <span>Accounts & Quotas</span>
+        <span class="tab-badge" id="tab-accounts-badge">4</span>
+      </button>
+
+      <button class="nav-tab" data-tab="pane-analytics" onclick="switchTab('pane-analytics')">
+        <i data-lucide="bar-chart-3" style="width: 14px; height: 14px;"></i>
+        <span>Token Analytics & Savings</span>
+        <span class="tab-badge-accent" id="tab-savings-badge">$0.00 Saved</span>
+      </button>
+
+      <button class="nav-tab" data-tab="pane-logs" onclick="switchTab('pane-logs')">
+        <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
+        <span>Live Stream & SQLite Logs</span>
+        <span class="pulse-dot"></span>
+      </button>
+
+      <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
+        <i data-lucide="cpu" style="width: 14px; height: 14px;"></i>
+        <span>Universal API & Integrations</span>
+      </button>
+    </nav>
+
+    <!-- Tab Pane 1: Accounts & Headroom -->
+    <div class="tab-pane active" id="pane-accounts">
+      <!-- Dual Hero Panels: Active Session + Pool Headroom Advisor -->
+      <div class="hero-grid">
+        <!-- Panel 1: Current Antigravity Session -->
+        <div class="hero-card hero-session">
+          <div class="hero-top">
+            <div class="hero-label">
+              <i data-lucide="radio" style="width: 13px; height: 13px;"></i>
+              <span>Current Antigravity Session</span>
+            </div>
+            <span id="session-live-badge" class="badge badge-session">
+              <i data-lucide="check" style="width: 11px; height: 11px;"></i>
+              <span>Active</span>
+            </span>
+          </div>
+
+          <div class="hero-main">
+            <div class="hero-title" id="session-email">Detecting Antigravity session...</div>
+            <div class="hero-sub" id="session-sub">Monitoring active account and conversation state.</div>
+          </div>
+
+          <div class="hero-footer">
+            <span id="session-quota-summary">Weekly: --% • 5h Burst: --%</span>
+            <span style="color: #38bdf8;">IDE Linked</span>
+          </div>
         </div>
-        <div class="token-tile-val" id="stat-total-tokens">0</div>
-        <div class="token-tile-sub">Input + Output + Cached</div>
+
+        <!-- Panel 2: Capacity Advisor & 1-Click Switch -->
+        <div class="hero-card hero-advisor">
+          <div class="hero-top">
+            <div class="hero-label">
+              <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
+              <span>Pool Capacity Advisor</span>
+            </div>
+            <span id="advisor-badge" class="badge badge-success">
+              <i data-lucide="shield-check" style="width: 11px; height: 11px;"></i>
+              <span id="advisor-badge-text">Optimal Headroom</span>
+            </span>
+          </div>
+
+          <div class="hero-main">
+            <div class="hero-title" id="advisor-email">Calculating quota buffers...</div>
+            <div class="hero-sub" id="advisor-sub">Analyzing remaining weekly & burst quotas across all Google accounts.</div>
+          </div>
+
+          <div class="hero-footer">
+            <span id="advisor-diff-text">Highest available capacity</span>
+            <button class="btn btn-default btn-sm" id="btn-activate-best" style="display: none;" onclick="activateBestAccount()">
+              <i data-lucide="arrow-right-left" style="width: 12px; height: 12px;"></i>
+              <span id="btn-activate-text">1-Click Switch</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div class="token-tile">
-        <div class="token-tile-top">
-          <span class="token-tile-label"><i data-lucide="arrow-up-right" style="width: 13px; height: 13px; color: #38bdf8;"></i> Prompt / Input</span>
-          <span class="badge" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 10px;">Context</span>
-        </div>
-        <div class="token-tile-val" id="stat-input-tokens" style="color: #38bdf8;">0</div>
-        <div class="token-tile-sub">User messages & system instructions</div>
+      <!-- Account Matrix Section -->
+      <div class="section-title">
+        <span>Account Matrix (<span id="acc-count">0</span>)</span>
+        <span style="font-size: 11px; text-transform: none; color: var(--muted-foreground);" id="matrix-sub">
+          Real-time limits verified from Google Cloud Code PA
+        </span>
       </div>
 
-      <div class="token-tile">
-        <div class="token-tile-top">
-          <span class="token-tile-label"><i data-lucide="arrow-down-left" style="width: 13px; height: 13px; color: #34d399;"></i> Generated Output</span>
-          <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #34d399; font-size: 10px;">Completion</span>
-        </div>
-        <div class="token-tile-val" id="stat-output-tokens" style="color: #34d399;">0</div>
-        <div class="token-tile-sub">LLM response tokens generated</div>
-      </div>
-
-      <div class="token-tile">
-        <div class="token-tile-top">
-          <span class="token-tile-label"><i data-lucide="activity" style="width: 13px; height: 13px; color: #fbbf24;"></i> Live Speedometer</span>
-          <span class="badge" id="rate-badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; font-size: 10px;">Live Rate</span>
-        </div>
-        <div class="token-tile-val" id="stat-speedometer" style="font-size: 19px; color: #fbbf24;">
-          <span id="stat-tpm">0</span> <span style="font-size: 12px; font-weight: 500; color: var(--muted-foreground);">TPM</span>
-        </div>
-        <div class="token-tile-sub" id="stat-rpm-sub">0 req/min • 0 in-flight</div>
-      </div>
-
-      <div class="token-tile">
-        <div class="token-tile-top">
-          <span class="token-tile-label"><i data-lucide="piggy-bank" style="width: 13px; height: 13px; color: #10b981;"></i> Commercial Saved</span>
-          <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #34d399; font-size: 10px;">Free Quota</span>
-        </div>
-        <div class="token-tile-val" id="stat-money-saved" style="color: #34d399;">$0.00</div>
-        <div class="token-tile-sub">vs. Claude 3.5 & GPT-4o API rates</div>
+      <div class="account-grid" id="account-grid">
+        <!-- Dynamic ShadCN Account Cards Injected Here -->
       </div>
     </div>
 
-    <!-- Dual Hero Panels: Active Session + Pool Headroom Advisor -->
-    <div class="hero-grid">
-      <!-- Panel 1: Current Antigravity Session -->
-      <div class="hero-card hero-session">
-        <div class="hero-top">
-          <div class="hero-label">
-            <i data-lucide="radio" style="width: 13px; height: 13px;"></i>
-            <span>Current Antigravity Session</span>
+    <!-- Tab Pane 2: Token Analytics & Cost Savings -->
+    <div class="tab-pane" id="pane-analytics">
+      <!-- Real-Time Token Telemetry Strip -->
+      <div class="token-strip">
+        <div class="token-tile">
+          <div class="token-tile-top">
+            <span class="token-tile-label"><i data-lucide="layers" style="width: 13px; height: 13px; color: #a855f7;"></i> Total Tokens</span>
+            <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; font-size: 10px;">Global</span>
           </div>
-          <span id="session-live-badge" class="badge badge-session">
-            <i data-lucide="check" style="width: 11px; height: 11px;"></i>
-            <span>Active</span>
-          </span>
+          <div class="token-tile-val" id="stat-total-tokens">0</div>
+          <div class="token-tile-sub">Input + Output + Cached</div>
         </div>
 
-        <div class="hero-main">
-          <div class="hero-title" id="session-email">Detecting Antigravity session...</div>
-          <div class="hero-sub" id="session-sub">Monitoring active account and conversation state.</div>
+        <div class="token-tile">
+          <div class="token-tile-top">
+            <span class="token-tile-label"><i data-lucide="arrow-up-right" style="width: 13px; height: 13px; color: #38bdf8;"></i> Prompt / Input</span>
+            <span class="badge" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 10px;">Context</span>
+          </div>
+          <div class="token-tile-val" id="stat-input-tokens" style="color: #38bdf8;">0</div>
+          <div class="token-tile-sub">User messages & system instructions</div>
         </div>
 
-        <div class="hero-footer">
-          <span id="session-quota-summary">Weekly: --% • 5h Burst: --%</span>
-          <span style="color: #38bdf8;">IDE Linked</span>
+        <div class="token-tile">
+          <div class="token-tile-top">
+            <span class="token-tile-label"><i data-lucide="arrow-down-left" style="width: 13px; height: 13px; color: #34d399;"></i> Generated Output</span>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #34d399; font-size: 10px;">Completion</span>
+          </div>
+          <div class="token-tile-val" id="stat-output-tokens" style="color: #34d399;">0</div>
+          <div class="token-tile-sub">LLM response tokens generated</div>
+        </div>
+
+        <div class="token-tile">
+          <div class="token-tile-top">
+            <span class="token-tile-label"><i data-lucide="activity" style="width: 13px; height: 13px; color: #fbbf24;"></i> Live Speedometer</span>
+            <span class="badge" id="rate-badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; font-size: 10px;">Live Rate</span>
+          </div>
+          <div class="token-tile-val" id="stat-speedometer" style="font-size: 19px; color: #fbbf24;">
+            <span id="stat-tpm">0</span> <span style="font-size: 12px; font-weight: 500; color: var(--muted-foreground);">TPM</span>
+          </div>
+          <div class="token-tile-sub" id="stat-rpm-sub">0 req/min • 0 in-flight</div>
+        </div>
+
+        <div class="token-tile">
+          <div class="token-tile-top">
+            <span class="token-tile-label"><i data-lucide="piggy-bank" style="width: 13px; height: 13px; color: #10b981;"></i> Commercial Saved</span>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #34d399; font-size: 10px;">Free Quota</span>
+          </div>
+          <div class="token-tile-val" id="stat-money-saved" style="color: #34d399;">$0.00</div>
+          <div class="token-tile-sub">vs. Claude 3.5 & GPT-4o API rates</div>
         </div>
       </div>
 
-      <!-- Panel 2: Capacity Advisor & 1-Click Switch -->
-      <div class="hero-card hero-advisor">
-        <div class="hero-top">
-          <div class="hero-label">
-            <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
-            <span>Pool Capacity Advisor</span>
+      <!-- 7-Day Visual Token Analytics & Cost Savings Card -->
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="bar-chart-3" style="width: 15px; height: 15px; color: #38bdf8;"></i>
+              <span>7-Day Token Velocity & Cost Savings</span>
+            </div>
+            <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 2px;">
+              Daily tokens ingested & generated from local coding sessions.
+            </div>
           </div>
-          <span id="advisor-badge" class="badge badge-success">
-            <i data-lucide="shield-check" style="width: 11px; height: 11px;"></i>
-            <span id="advisor-badge-text">Optimal Headroom</span>
-          </span>
-        </div>
 
-        <div class="hero-main">
-          <div class="hero-title" id="advisor-email">Calculating quota buffers...</div>
-          <div class="hero-sub" id="advisor-sub">Analyzing remaining weekly & burst quotas across all Google accounts.</div>
-        </div>
-
-        <div class="hero-footer">
-          <span id="advisor-diff-text">Highest available capacity</span>
-          <button class="btn btn-default btn-sm" id="btn-activate-best" style="display: none;" onclick="activateBestAccount()">
-            <i data-lucide="arrow-right-left" style="width: 12px; height: 12px;"></i>
-            <span id="btn-activate-text">1-Click Switch</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 7-Day Visual Token Analytics & Cost Savings Card -->
-    <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <div style="font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-            <i data-lucide="bar-chart-3" style="width: 15px; height: 15px; color: #38bdf8;"></i>
-            <span>7-Day Token Velocity & Cost Savings</span>
-          </div>
-          <div style="font-size: 11px; color: var(--muted-foreground); margin-top: 2px;">
-            Daily tokens ingested & generated from local coding sessions.
+          <div style="display: flex; align-items: center; gap: 14px; font-size: 11px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 2px; background: #38bdf8;"></span>
+              <span style="color: var(--muted-foreground);">Prompt Context</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 2px; background: #10b981;"></span>
+              <span style="color: var(--muted-foreground);">Generated Output</span>
+            </div>
+            <span id="chart-saved-badge" class="badge badge-success" style="font-size: 11px;">
+              $0.00 Saved Today
+            </span>
           </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 14px; font-size: 11px;">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="width: 8px; height: 8px; border-radius: 2px; background: #38bdf8;"></span>
-            <span style="color: var(--muted-foreground);">Prompt Context</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="width: 8px; height: 8px; border-radius: 2px; background: #10b981;"></span>
-            <span style="color: var(--muted-foreground);">Generated Output</span>
-          </div>
-          <span id="chart-saved-badge" class="badge badge-success" style="font-size: 11px;">
-            $0.00 Saved Today
-          </span>
-        </div>
-      </div>
-
-      <!-- 7-Day Chart Canvas / Bar Grid -->
-      <div id="daily-chart-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; height: 140px; align-items: end; padding: 8px 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
-        <!-- Injected via JavaScript -->
-      </div>
-
-      <!-- Model Traffic Share Bar -->
-      <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 2px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
-          <span style="color: var(--muted-foreground); font-weight: 500;">Traffic Distribution by Model</span>
-          <span id="model-share-summary" style="color: #a1a1aa;">Gemini 3.8 Flash (100%)</span>
-        </div>
-        <div class="progress" id="model-share-bar" style="height: 6px; display: flex; overflow: hidden; background: rgba(255, 255, 255, 0.05);">
+        <!-- 7-Day Chart Canvas / Bar Grid -->
+        <div id="daily-chart-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; height: 140px; align-items: end; padding: 8px 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
           <!-- Injected via JavaScript -->
         </div>
-      </div>
-    </div>
 
-    <!-- Account Matrix Section -->
-    <div class="section-title">
-      <span>Account Matrix (<span id="acc-count">0</span>)</span>
-      <span style="font-size: 11px; text-transform: none; color: var(--muted-foreground);" id="matrix-sub">
-        Real-time limits verified from Google Cloud Code PA
-      </span>
-    </div>
-
-    <div class="account-grid" id="account-grid">
-      <!-- Dynamic ShadCN Account Cards Injected Here -->
-    </div>
-
-    <!-- Universal AI Protocol & Menu Bar Extra Section -->
-    <div class="section-title">
-      <span>Universal AI Client & Menu Bar Extra</span>
-      <span style="font-size: 11px; color: #38bdf8;">● Multi-Tool Adapter Active</span>
-    </div>
-
-    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px;">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-        <!-- Cursor / OpenAI Protocol -->
-        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-              <i data-lucide="terminal" style="width: 14px; height: 14px; color: #10b981;"></i>
-              Cursor / OpenAI Protocol
-            </span>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">SSE Stream</span>
+        <!-- Model Traffic Share Bar -->
+        <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 2px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+            <span style="color: var(--muted-foreground); font-weight: 500;">Traffic Distribution by Model</span>
+            <span id="model-share-summary" style="color: #a1a1aa;">Gemini 3.8 Flash (100%)</span>
           </div>
-          <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Base URL for Cursor, Roo Code, Cline or Continue.dev:</p>
-          <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, monospace; font-size: 12px; color: #38bdf8; display: flex; align-items: center; justify-content: space-between;">
-            <code>http://127.0.0.1:8045/v1</code>
-            <button onclick="copySnippet('http://127.0.0.1:8045/v1', this)" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Copy">
-              <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
-            </button>
-          </div>
-        </div>
-
-        <!-- Claude Code / Anthropic Protocol -->
-        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-              <i data-lucide="cpu" style="width: 14px; height: 14px; color: #a855f7;"></i>
-              Claude Code / Anthropic
-            </span>
-            <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.2);">V1 Messages</span>
-          </div>
-          <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Run in shell or add to ~/.zshrc for unlimited Claude Code:</p>
-          <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, monospace; font-size: 12px; color: #c084fc; display: flex; align-items: center; justify-content: space-between;">
-            <code>export ANTHROPIC_BASE_URL="http://127.0.0.1:8045"</code>
-            <button onclick="copySnippet('export ANTHROPIC_BASE_URL=\&quot;http://127.0.0.1:8045\&quot;', this)" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Copy">
-              <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
-            </button>
-          </div>
-        </div>
-
-        <!-- macOS System Tray Extra -->
-        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-              <i data-lucide="zap" style="width: 14px; height: 14px; color: #fbbf24;"></i>
-              macOS System Tray Extra
-            </span>
-            <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2);">Menu Bar</span>
-          </div>
-          <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Access real-time quotas & 1-click active switch directly from top bar:</p>
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #e4e4e7;">
-            <span style="padding: 3px 8px; background: rgba(255,255,255,0.06); border-radius: 4px; font-weight: 600; color: #fbbf24;">⚡ AGY</span>
-            <span>Always running in top system menu bar</span>
+          <div class="progress" id="model-share-bar" style="height: 6px; display: flex; overflow: hidden; background: rgba(255, 255, 255, 0.05);">
+            <!-- Injected via JavaScript -->
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Live Event Stream -->
-    <div class="section-title">
-      <span>Live Dispatch & Execution Stream</span>
-      <span style="font-size: 11px; color: #10b981;">● Connected</span>
+    <!-- Tab Pane 3: Live Stream & SQLite Logs -->
+    <div class="tab-pane" id="pane-logs">
+      <!-- Live Event Stream -->
+      <div class="section-title">
+        <span>Live Dispatch & Execution Stream</span>
+        <span style="font-size: 11px; color: #10b981;">● Connected</span>
+      </div>
+
+      <div class="stream-box" id="stream-box">
+        <div class="stream-entry">
+          <span class="stream-time">[INIT]</span>
+          <span>Gateway active on <b>http://127.0.0.1:8045</b>. Automatic multi-account failover active.</span>
+        </div>
+      </div>
+
+      <!-- Persistent Request History (SQLite) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+        <div class="section-title" style="margin: 0;">
+          <span>Persistent Request History (SQLite)</span>
+          <span style="font-size: 11px; color: var(--muted-foreground);">Stored in data/harness.db</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="fetchDbLogs()">
+          <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
+          <span>Refresh Database Logs</span>
+        </button>
+      </div>
+
+      <div class="db-logs-table-wrapper">
+        <table class="db-logs-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Account</th>
+              <th>Model</th>
+              <th>Latency</th>
+              <th>Tokens</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="db-logs-tbody">
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--muted-foreground); padding: 24px;">
+                Loading SQLite request logs...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="stream-box" id="stream-box">
-      <div class="stream-entry">
-        <span class="stream-time">[INIT]</span>
-        <span>Gateway active on <b>http://127.0.0.1:8045</b>. Automatic multi-account failover active.</span>
+    <!-- Tab Pane 4: Universal API & Integrations -->
+    <div class="tab-pane" id="pane-api">
+      <div class="section-title">
+        <span>Universal AI Client & Multi-Tool Adapter</span>
+        <span style="font-size: 11px; color: #38bdf8;">● Multi-Tool Adapter Active</span>
+      </div>
+
+      <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <!-- Cursor / OpenAI Protocol -->
+          <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="terminal" style="width: 14px; height: 14px; color: #10b981;"></i>
+                Cursor / OpenAI Protocol
+              </span>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">SSE Stream</span>
+            </div>
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Base URL for Cursor, Roo Code, Cline or Continue.dev:</p>
+            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, monospace; font-size: 12px; color: #38bdf8; display: flex; align-items: center; justify-content: space-between;">
+              <code>http://127.0.0.1:8045/v1</code>
+              <button onclick="copySnippet('http://127.0.0.1:8045/v1', this)" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Copy">
+                <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Claude Code / Anthropic Protocol -->
+          <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="cpu" style="width: 14px; height: 14px; color: #a855f7;"></i>
+                Claude Code / Anthropic
+              </span>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.2);">V1 Messages</span>
+            </div>
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Run in shell or add to ~/.zshrc for unlimited Claude Code:</p>
+            <div style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, monospace; font-size: 12px; color: #c084fc; display: flex; align-items: center; justify-content: space-between;">
+              <code>export ANTHROPIC_BASE_URL="http://127.0.0.1:8045"</code>
+              <button onclick="copySnippet('export ANTHROPIC_BASE_URL=\&quot;http://127.0.0.1:8045\&quot;', this)" style="background: transparent; border: none; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;" title="Copy">
+                <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- macOS System Tray Extra -->
+          <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="zap" style="width: 14px; height: 14px; color: #fbbf24;"></i>
+                macOS System Tray Extra
+              </span>
+              <span class="badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2);">Menu Bar</span>
+            </div>
+            <p style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px;">Access real-time quotas & 1-click active switch directly from top bar:</p>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #e4e4e7;">
+              <span style="padding: 3px 8px; background: rgba(255,255,255,0.06); border-radius: 4px; font-weight: 600; color: #fbbf24;">⚡ AGY</span>
+              <span>Always running in top system menu bar</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -842,6 +1064,60 @@
     let activeRunningId = null;
     let bestAccountId = null;
     let isSyncing = false;
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+      });
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === tabId);
+      });
+      try {
+        localStorage.setItem('harness_active_tab', tabId);
+      } catch (e) {}
+
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+
+      if (tabId === 'pane-logs') {
+        fetchDbLogs();
+      }
+    }
+
+    async function fetchDbLogs() {
+      const tbody = document.getElementById('db-logs-tbody');
+      if (!tbody) return;
+      try {
+        const res = await fetch('/api/db/logs?limit=30');
+        if (!res.ok) return;
+        const logs = await res.json();
+        if (!logs || logs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted-foreground); padding: 24px;">No requests recorded in SQLite database yet.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = logs.map(l => {
+          const timeStr = l.created_at ? new Date(l.created_at).toLocaleTimeString() : (l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : '--');
+          const isOk = l.status_code >= 200 && l.status_code < 400;
+          const statusBadge = isOk 
+            ? `<span class="badge badge-success" style="font-size: 10px;">${l.status_code} OK</span>`
+            : `<span class="badge badge-destructive" style="font-size: 10px;">${l.status_code} ERR</span>`;
+          return `
+            <tr>
+              <td style="font-family: ui-monospace, monospace; color: var(--muted-foreground);">#${l.request_id || l.id}</td>
+              <td style="color: var(--muted-foreground);">${timeStr}</td>
+              <td style="font-weight: 500; color: #fff;">${l.account_email}</td>
+              <td><span style="color: #38bdf8; font-weight: 600;">${formatModelDisplayName(l.model)}</span></td>
+              <td style="font-family: ui-monospace, monospace; color: var(--muted-foreground);">${l.latency_ms}ms</td>
+              <td><b>${formatNumber(l.total_tokens || 0)}</b> <span style="color: var(--muted-foreground); font-size: 10px;">(↑${l.input_tokens || 0} ↓${l.output_tokens || 0})</span></td>
+              <td>${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error('Error fetching DB logs:', e);
+      }
+    }
 
     function getBarColor(pct) {
       if (pct > 50) return 'bar-high';
@@ -888,6 +1164,12 @@
         const accounts = Object.values(data.accounts || {});
         document.getElementById('acc-count').innerText = accounts.length;
         document.getElementById('header-acc-count').innerText = `${accounts.length} Accounts Pooled`;
+
+        const tabAccBadge = document.getElementById('tab-accounts-badge');
+        if (tabAccBadge) tabAccBadge.innerText = accounts.length;
+
+        const tabSavBadge = document.getElementById('tab-savings-badge');
+        if (tabSavBadge) tabSavBadge.innerText = `${data.global?.dollarsSavedFormatted || '$0.00'} Saved`;
 
         // Update Real-Time Token Telemetry Strip
         const totalTokens = data.global?.totalTokens || 0;
@@ -1280,8 +1562,12 @@
           } else if (item.type === 'account_idle') {
             activeRunningId = null;
             const tok = item.tokens;
+            const tokText = tok ? ` • <b>+${tok.total || 0} tokens</b> (${tok.input || 0} in / ${tok.output || 0} out)` : '';
             const modelBadge = item.model ? ` • <span style="color: #38bdf8; font-weight: 500;">${formatModelDisplayName(item.model)}</span>` : '';
             addLog(`✅ <span class="stream-acc">${item.email}</span> completed prompt (${item.duration}ms)${modelBadge}${tokText}`);
+            if (document.getElementById('pane-logs')?.classList.contains('active')) {
+              fetchDbLogs();
+            }
             fetchMatrix();
           } else if (item.type === 'account_banned') {
             addLog(`🚫 <span class="stream-err">${item.email}</span> received 403 Forbidden! Isolated from pool.`, 'err');
@@ -1299,6 +1585,14 @@
         } catch (err) {}
       };
     } catch (e) {}
+
+    // Restore saved tab or default to accounts
+    const savedTab = localStorage.getItem('harness_active_tab');
+    if (savedTab && document.getElementById(savedTab)) {
+      switchTab(savedTab);
+    } else {
+      switchTab('pane-accounts');
+    }
 
     fetchMatrix();
     setInterval(fetchMatrix, 3000);
