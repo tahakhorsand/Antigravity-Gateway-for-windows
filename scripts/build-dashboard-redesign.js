@@ -1501,6 +1501,8 @@ const htmlContent = `<!DOCTYPE html>
     let logSearchDebounce = null;
     let cachedAccountsList = [];
     let nextResetTimestamp = null;
+    let nextResetEmail = null;
+    let nextResetWindow = null;
     let currentViewMode = localStorage.getItem('harness_view_mode') || 'table';
 
     function setViewMode(mode) {
@@ -1598,6 +1600,7 @@ const htmlContent = `<!DOCTYPE html>
     // Live Reset Countdown Timer (Updates every second)
     function updateResetCountdown() {
       const timerEl = document.getElementById('header-reset-timer');
+      const pill = document.getElementById('pill-next-reset');
       if (!timerEl || !nextResetTimestamp) return;
 
       const diffMs = nextResetTimestamp - Date.now();
@@ -1611,10 +1614,18 @@ const htmlContent = `<!DOCTYPE html>
       const mins = Math.floor((totalSec % 3600) / 60);
       const secs = totalSec % 60;
 
+      const shortUser = nextResetEmail ? nextResetEmail.split('@')[0] : '';
+      const tag = shortUser ? ' (' + shortUser + ')' : '';
+
       if (hours > 0) {
-        timerEl.innerText = \`\${hours}h \${mins}m \${secs}s\`;
+        timerEl.innerText = \`\${hours}h \${mins}m \${secs}s\${tag}\`;
       } else {
-        timerEl.innerText = \`\${mins}m \${secs}s\`;
+        timerEl.innerText = \`\${mins}m \${secs}s\${tag}\`;
+      }
+
+      if (pill && nextResetEmail) {
+        const timeStr = new Date(nextResetTimestamp).toLocaleTimeString();
+        pill.title = \`Earliest quota reset: \${nextResetEmail} • \${nextResetWindow || 'Burst'} at \${timeStr}\`;
       }
     }
     setInterval(updateResetCountdown, 1000);
@@ -1855,18 +1866,30 @@ const htmlContent = `<!DOCTYPE html>
           syncEl.style.color = ideStatus?.inSync ? 'var(--green)' : 'var(--text-3)';
         }
 
-        // Update Next Reset Countdown Timestamp
+        // Update Next Reset Countdown Timestamp across all account windows
         let earliestReset = null;
+        let earliestEmail = null;
+        let earliestWindow = null;
+
         for (const a of accounts) {
-          const t1 = a.gemini5h?.resetTime ? new Date(a.gemini5h.resetTime).getTime() : null;
-          const t2 = a.geminiWeekly?.resetTime ? new Date(a.geminiWeekly.resetTime).getTime() : null;
-          for (const t of [t1, t2]) {
+          const windows = [
+            { name: 'Gemini 5h Burst', time: a.gemini5h?.resetTime },
+            { name: 'Gemini Weekly', time: a.geminiWeekly?.resetTime },
+            { name: 'Claude 5h Burst', time: a.claude5h?.resetTime },
+            { name: 'Claude Weekly', time: a.claudeWeekly?.resetTime }
+          ];
+          for (const w of windows) {
+            const t = w.time ? new Date(w.time).getTime() : null;
             if (t && t > Date.now() && (!earliestReset || t < earliestReset)) {
               earliestReset = t;
+              earliestEmail = a.email;
+              earliestWindow = w.name;
             }
           }
         }
         nextResetTimestamp = earliestReset;
+        nextResetEmail = earliestEmail;
+        nextResetWindow = earliestWindow;
         updateResetCountdown();
 
         // Update KPIs
