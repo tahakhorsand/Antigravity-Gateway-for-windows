@@ -18,7 +18,9 @@ import {
   getAllStats,
   getRecentLogsDb,
   getDailyAnalyticsDb,
-  setBroadcastCallback
+  setBroadcastCallback,
+  setQuotaExhaustionCallback,
+  getRealActiveAntigravityEmail
 } from './stats.js';
 import { getMetadataDb, setMetadataDb, queryLogsDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
@@ -34,6 +36,7 @@ import {
   CLOUDCODE_GENERATE_ENDPOINTS,
   CLOUDCODE_STREAM_ENDPOINTS
 } from './translator.js';
+import { orderAccountCandidates, shouldAdoptActiveSession } from './account-order.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,7 +44,6 @@ const DASHBOARD_PATH = path.resolve(__dirname, 'dashboard.html');
 const ICON_PATH = path.resolve(__dirname, '../assets/chip_ai_1024.png');
 
 let requestCounter = 0;
-let roundRobinIndex = 0;
 let isSyncingQuotas = false;
 const eventSubscribers = new Set();
 
@@ -56,8 +58,11 @@ function broadcastEvent(data) {
   }
 }
 
-// Connect Antigravity IDE live transcript tailer to SSE broadcaster
+// Connect Antigravity IDE live transcript tailer to SSE broadcaster and quota exhaustion handler
 setBroadcastCallback(broadcastEvent);
+setQuotaExhaustionCallback(async () => {
+  await checkAndApplySmartShield();
+});
 
 export async function syncAllQuotas() {
   if (isSyncingQuotas) return;
@@ -83,7 +88,7 @@ export async function syncAllQuotas() {
   console.log(`${colors.green}[QuotaSync] ✅ Live Google quotas and reset timers updated successfully.${colors.reset}`);
   
   // Proactive Smart Quota Shield check
-  checkAndApplySmartShield();
+  void checkAndApplySmartShield();
 }
 
 export function sendMacNotification(title, message, sound = 'Subtle') {
@@ -95,56 +100,91 @@ export function sendMacNotification(title, message, sound = 'Subtle') {
   } catch (e) {}
 }
 
-export function checkAndApplySmartShield() {
+export async function checkAndApplySmartShield() {
   const isEnabled = getMetadataDb('smart_shield_enabled', true);
   if (!isEnabled) return;
 
   const stats = getAllStats();
-  const activeSessionId = stats.global?.activeSessionAccountId;
-  const activeSessionEmail = stats.global?.activeSessionEmail;
-  if (!activeSessionId && !activeSessionEmail) return;
-
   const accounts = getAccounts();
-  const currentAcc = accounts.find(a => a.id === activeSessionId || (activeSessionEmail && a.email.toLowerCase() === activeSessionEmail.toLowerCase()));
+  if (!accounts || accounts.length <= 1) return;
+
+  // Protect active session: never trigger background auto-switch while a task/model is actively generating!
+  if (stats.global?.isSessionGenerating || (stats.global?.inFlightRequests && stats.global.inFlightRequests > 0)) {
+    return;
+  }
+
+  const activeEmail = (
+    stats.global?.activeSessionEmail ||
+    getRealActiveAntigravityEmail() ||
+    ''
+  ).toLowerCase();
+
+  const currentAcc = accounts.find(a => 
+    (a.id === stats.global?.activeSessionAccountId) ||
+    (activeEmail && a.email.toLowerCase() === activeEmail)
+  );
   if (!currentAcc) return;
 
   const currentStats = stats.accounts?.[currentAcc.id];
   if (!currentStats) return;
 
-  const weeklyPct = currentStats.geminiWeekly?.pct ?? 100;
+  const weeklyPct = currentStats.geminiWeekly?.pct ?? (currentStats.quotas?.pro ?? 100);
   const burstPct = currentStats.gemini5h?.pct ?? 100;
 
   const threshold = parseInt(getMetadataDb('smart_shield_threshold', 20), 10) || 20;
 
-  // If weekly or burst quota drops below threshold
+  // If weekly or burst quota drops below threshold (or hits 0)
   if (weeklyPct < threshold || burstPct < threshold) {
-    const bestId = stats.global?.bestAccountId;
-    if (bestId && bestId !== currentAcc.id) {
-      const targetAcc = accounts.find(a => a.id === bestId);
-      const targetStats = stats.accounts?.[bestId];
-      const targetWeekly = targetStats?.geminiWeekly?.pct ?? 0;
+    // Find all alternative healthy candidates
+    const minHeadroom = Math.max(25, threshold + 5);
+    const candidates = [];
 
-      // Only switch if the target account has healthy headroom (> threshold + 10%)
-      const minHeadroom = Math.max(30, threshold + 10);
-      if (targetAcc && targetWeekly > minHeadroom) {
-        console.log(`${colors.cyan}[SmartShield] 🛡️ Proactive Switch: ${currentAcc.email} (${weeklyPct}% weekly, ${burstPct}% 5h) ➜ ${targetAcc.email} (${targetWeekly}% headroom, threshold ${threshold}%)${colors.reset}`);
-        switchAntigravityActiveAccount(bestId, targetAcc);
-        setActiveAccount(bestId);
+    for (const acc of accounts) {
+      if (acc.id === currentAcc.id) continue;
+      const accStats = stats.accounts?.[acc.id];
+      if (!accStats || !accStats.enabled || accStats.is403Banned) continue;
+      if (isCoolingDown(acc.id)) continue;
 
-        broadcastEvent({
-          type: 'proactive_switch',
-          from: currentAcc.email,
-          to: targetAcc.email,
-          fromWeekly: weeklyPct,
-          toWeekly: targetWeekly,
-          threshold
-        });
+      const cWeekly = accStats.geminiWeekly?.pct ?? (accStats.quotas?.pro ?? 100);
+      const cBurst = accStats.gemini5h?.pct ?? 100;
 
-        sendMacNotification(
-          'Antigravity Smart Shield 🛡️',
-          `Proactive switch (${threshold}% threshold): ${currentAcc.email} (${weeklyPct}%) ➜ ${targetAcc.email} (${targetWeekly}%). Session kept uninterrupted!`
-        );
+      // Ensure candidate has healthy weekly headroom and non-exhausted 5h burst quota
+      if (cWeekly > minHeadroom && cBurst > 15) {
+        const score = (cWeekly * 0.6) + (cBurst * 0.4);
+        candidates.push({ acc, accStats, cWeekly, cBurst, score });
       }
+    }
+
+    if (candidates.length > 0) {
+      // Pick candidate with best score
+      candidates.sort((a, b) => b.score - a.score);
+      const target = candidates[0];
+      const targetAcc = target.acc;
+      const targetWeekly = target.cWeekly;
+      const targetBurst = target.cBurst;
+
+      console.log(`${colors.cyan}[SmartShield] 🛡️ Proactive Auto-Switch: ${currentAcc.email} (${weeklyPct}% weekly, ${burstPct}% 5h) ➜ ${targetAcc.email} (${targetWeekly}% weekly, ${targetBurst}% 5h, threshold ${threshold}%)${colors.reset}`);
+      
+      await switchAntigravityActiveAccount(targetAcc.id, targetAcc, { restartLanguageServer: true });
+      setActiveAccount(targetAcc.id);
+
+      broadcastEvent({
+        type: 'proactive_switch',
+        from: currentAcc.email,
+        to: targetAcc.email,
+        fromWeekly: weeklyPct,
+        fromBurst: burstPct,
+        toWeekly: targetWeekly,
+        toBurst: targetBurst,
+        threshold
+      });
+
+      sendMacNotification(
+        'Antigravity Smart Shield 🛡️',
+        `Proactive switch (${threshold}% threshold): ${currentAcc.email} (${weeklyPct}%/5h:${burstPct}%) ➜ ${targetAcc.email} (${targetWeekly}%). Session kept uninterrupted!`
+      );
+    } else {
+      console.warn(`[SmartShield] ⚠️ Account ${currentAcc.email} is below threshold (${weeklyPct}% weekly, ${burstPct}% 5h), but no alternative account has sufficient headroom (> ${minHeadroom}%).`);
     }
   }
 }
@@ -162,28 +202,23 @@ const colors = {
 };
 
 function getNextAccountCandidates(accounts, statsData) {
-  if (accounts.length === 0) return [];
-  
-  // Filter out 403 banned accounts entirely!
-  const validAccounts = accounts.filter(a => {
-    const accStats = statsData.accounts[a.id];
-    return !accStats || !accStats.is403Banned;
+  return orderAccountCandidates(accounts, statsData.accounts || {}, {
+    activeSessionId: statsData.global?.activeSessionAccountId,
+    activeSessionEmail: statsData.global?.activeSessionEmail,
+    isCoolingDown
   });
+}
 
-  if (validAccounts.length === 0) return [];
-
-  const order = [];
-  for (let i = 0; i < validAccounts.length; i++) {
-    const idx = (roundRobinIndex + i) % validAccounts.length;
-    order.push(validAccounts[idx]);
-  }
-  
-  roundRobinIndex = (roundRobinIndex + 1) % validAccounts.length;
-  
-  const available = order.filter(a => !isCoolingDown(a.id));
-  const cooling = order.filter(a => isCoolingDown(a.id));
-  
-  return [...available, ...cooling];
+function adoptSessionAfterFailover(account, statsData) {
+  if (!shouldAdoptActiveSession(statsData?.global, account)) return;
+  const switched = switchAntigravityActiveAccount(account.id, account);
+  if (!switched) return;
+  console.log(`${colors.cyan}[Session] Active session moved to ${account.email} so it matches the account whose token served the request.${colors.reset}`);
+  broadcastEvent({
+    type: 'account_switch',
+    accountId: account.id,
+    email: account.email
+  });
 }
 
 function parseTokenUsageFromBuffer(buffer, requestLength) {
@@ -259,7 +294,7 @@ function extractModelFromProxyRequest(req, urlPath, bodyBuffer) {
   return 'gemini-3.8-flash';
 }
 
-async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates) {
+async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates, statsData) {
   const isAnthropic = urlPath.includes('/messages');
   let jsonBody = {};
   try {
@@ -370,6 +405,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           cached: 0,
           total: totalTokens
         }, targetModel, { requestId: reqId, endpoint: urlPath, statusCode: 200 });
+        adoptSessionAfterFailover(account, statsData);
 
         broadcastEvent({
           type: 'account_idle',
@@ -488,6 +524,7 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
           cached: 0,
           total: 20 + totalOutTokens
         }, targetModel, { requestId: reqId, endpoint: urlPath, statusCode: 200 });
+        adoptSessionAfterFailover(account, statsData);
 
         broadcastEvent({
           type: 'account_idle',
@@ -616,7 +653,7 @@ async function handleProxyRequest(req, res) {
     if (accountId) {
       const accounts = getAccounts();
       const targetAcc = accounts.find(a => a.id === accountId);
-      switchAntigravityActiveAccount(accountId, targetAcc);
+      await switchAntigravityActiveAccount(accountId, targetAcc, { restartLanguageServer: true });
       setActiveAccount(accountId);
       broadcastEvent({ 
         type: 'account_switch', 
@@ -713,10 +750,12 @@ async function handleProxyRequest(req, res) {
 
   // Universal Protocol Translator (OpenAI /v1/chat/completions & Anthropic /v1/messages)
   if (urlPath === '/v1/chat/completions' || urlPath === '/v1/messages') {
-    return handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates);
+    return handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates, statsData);
   }
 
-  const targetBaseUrl = CONFIG.UPSTREAM_BASE_URL;
+  const targetBaseUrl = urlPath.startsWith('/v1internal:') 
+    ? 'https://daily-cloudcode-pa.googleapis.com' 
+    : CONFIG.UPSTREAM_BASE_URL;
 
   for (let attempt = 0; attempt < candidates.length; attempt++) {
     const account = candidates[attempt];
@@ -817,6 +856,9 @@ async function handleProxyRequest(req, res) {
         endpoint: urlPath,
         statusCode: upstreamRes.status
       });
+      if (upstreamRes.status < 400) {
+        adoptSessionAfterFailover(account, statsData);
+      }
 
       broadcastEvent({ 
         type: 'account_idle',
@@ -859,7 +901,7 @@ ${colors.bold}${colors.green}  🚀 Antigravity Multi-Account Harness & Shield i
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════${colors.reset}
   ${colors.bold}• Dashboard UI:${colors.reset}    http://${CONFIG.HOST}:${CONFIG.PORT}
   ${colors.bold}• Pooled Accounts:${colors.reset} ${colors.magenta}${accounts.length} active account(s)${colors.reset}
-  ${colors.bold}• Scheduling:${colors.reset}      Dynamic Round-Robin + Instant 429 Failover
+  ${colors.bold}• Scheduling:${colors.reset}      Active session first, then quota failover
   ${colors.bold}• Quotas Tracked:${colors.reset}  Pro, Flash, Claude & Imagen 3
   ${colors.bold}• Accounts:${colors.reset}
 ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} (${a.name || 'Pro Account'})`).join('\n')}

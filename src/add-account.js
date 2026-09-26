@@ -2,6 +2,7 @@ import http from 'http';
 import { exec } from 'child_process';
 import { CONFIG } from './config.js';
 import { loadAccounts, saveAccounts } from './auth.js';
+import { mergeAccount } from './account-pool.js';
 
 const CALLBACK_PORT = 8085;
 const CALLBACK_URL = `http://localhost:${CALLBACK_PORT}/oauth/callback`;
@@ -64,15 +65,18 @@ const server = http.createServer(async (req, res) => {
 
       // Save to accounts.json
       const accounts = loadAccounts();
-      const existingIdx = accounts.findIndex(a => a.email === userEmail);
-      const newAccount = {
-        id: existingIdx >= 0 ? accounts[existingIdx].id : `acc-${Date.now()}`,
+      const existingIdx = accounts.findIndex(a => a.email.toLowerCase() === userEmail.toLowerCase());
+      const existing = existingIdx >= 0 ? accounts[existingIdx] : null;
+      const newAccount = mergeAccount(existing, {
+        id: existing?.id || `acc-${Date.now()}`,
         email: userEmail,
         name: userName,
         refresh_token: tokenData.refresh_token,
         access_token: tokenData.access_token,
-        expiry_timestamp: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600)
-      };
+        expiry_timestamp: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600),
+        project_id: existing?.project_id || 'aicode-consumers',
+        id_token: tokenData.id_token || existing?.id_token
+      });
 
       if (existingIdx >= 0) {
         accounts[existingIdx] = newAccount;

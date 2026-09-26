@@ -2,21 +2,24 @@ import fs from 'fs';
 import { CONFIG } from './config.js';
 
 let accountsCache = [];
+let accountsMtime = -1;
 const cooldownMap = new Map(); // account_id -> cooldown_until_timestamp
 
 export function loadAccounts() {
   if (!fs.existsSync(CONFIG.ACCOUNTS_FILE)) {
     accountsCache = [];
+    accountsMtime = 0;
     return accountsCache;
   }
   try {
+    accountsMtime = fs.statSync(CONFIG.ACCOUNTS_FILE).mtimeMs;
     const raw = fs.readFileSync(CONFIG.ACCOUNTS_FILE, 'utf-8');
     const data = JSON.parse(raw);
     accountsCache = data.accounts || [];
     return accountsCache;
   } catch (err) {
     console.error('❌ Failed to parse accounts.json:', err.message);
-    return [];
+    return accountsCache;
   }
 }
 
@@ -26,8 +29,11 @@ export function saveAccounts(accounts) {
 }
 
 export function getAccounts() {
-  if (accountsCache.length === 0) {
-    return loadAccounts();
+  try {
+    const mtime = fs.existsSync(CONFIG.ACCOUNTS_FILE) ? fs.statSync(CONFIG.ACCOUNTS_FILE).mtimeMs : 0;
+    if (mtime !== accountsMtime) return loadAccounts();
+  } catch {
+    if (accountsCache.length === 0) return loadAccounts();
   }
   return accountsCache;
 }

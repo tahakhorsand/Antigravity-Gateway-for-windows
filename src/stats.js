@@ -12,6 +12,9 @@ import {
   getMetadataDb,
   setMetadataDb
 } from './db.js';
+import { getAccounts } from './auth.js';
+import { syncAntigravityAccount } from './antigravity-auth-sync.js';
+import { knownAccountRecord } from './account-pool.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +56,9 @@ export function loadStats() {
       console.error('Failed to load stats.json');
     }
   }
+
+  // 0. Detect active Antigravity session from google_accounts.json first
+  checkAntigravityLiveSession();
 
   // 1. One-time migration to SQLite if database is fresh
   migrateExistingJsonStats(stats);
@@ -350,7 +356,40 @@ export function setBroadcastCallback(cb) {
   broadcastCallback = cb;
 }
 
+let quotaExhaustionCallback = null;
+export function setQuotaExhaustionCallback(cb) {
+  quotaExhaustionCallback = cb;
+}
+
 const fileStepTrackers = new Map();
+
+export function getRealActiveAntigravityEmail() {
+  try {
+    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
+      if (data.active) return data.active.trim().toLowerCase();
+    }
+  } catch (e) {}
+  if (stats.global.activeSessionEmail) {
+    return stats.global.activeSessionEmail.trim().toLowerCase();
+  }
+  return '';
+}
+
+export function getRealActiveAntigravityAccountId() {
+  const activeEmail = getRealActiveAntigravityEmail();
+  if (activeEmail) {
+    const accs = getAccounts();
+    const found = accs.find(a => a.email && a.email.toLowerCase() === activeEmail);
+    if (found) return found.id;
+    for (const id in stats.accounts) {
+      if (stats.accounts[id].email && stats.accounts[id].email.toLowerCase() === activeEmail) {
+        return id;
+      }
+    }
+  }
+  return stats.global.activeSessionAccountId || stats.global.bestAccountId || Object.keys(stats.accounts)[0];
+}
 
 export function syncHistoricalAntigravityTranscripts() {
   try {
@@ -361,10 +400,8 @@ export function syncHistoricalAntigravityTranscripts() {
     const convs = fs.readdirSync(BRAIN_DIR);
     const db = getDatabase();
 
-    const activeEmail = (stats.global.activeSessionEmail || 'bob@example.com').toLowerCase();
-    let targetAccId = Object.keys(stats.accounts).find(
-      id => stats.accounts[id].email.toLowerCase() === activeEmail
-    ) || Object.keys(stats.accounts)[0];
+    const activeEmail = getRealActiveAntigravityEmail();
+    let targetAccId = getRealActiveAntigravityAccountId();
 
     if (!targetAccId) return;
     const targetEmail = stats.accounts[targetAccId]?.email || activeEmail;
@@ -495,10 +532,8 @@ export function tailLiveAntigravityTranscripts() {
     const now = Date.now();
     const convs = fs.readdirSync(BRAIN_DIR);
 
-    const activeEmail = (stats.global.activeSessionEmail || 'bob@example.com').toLowerCase();
-    const activeId = Object.keys(stats.accounts).find(
-      id => stats.accounts[id].email.toLowerCase() === activeEmail
-    ) || stats.global.bestAccountId || Object.keys(stats.accounts)[0];
+    const activeEmail = getRealActiveAntigravityEmail();
+    const activeId = getRealActiveAntigravityAccountId();
     const activeAcc = stats.accounts[activeId];
 
     for (const c of convs) {
@@ -533,6 +568,18 @@ export function tailLiveAntigravityTranscripts() {
             const stepIdx = step.step_index;
             if (stepIdx !== undefined && stepIdx > tracker.lastIndex) {
               tracker.lastIndex = stepIdx;
+
+              // Immediate detection of 429 quota exhaustion in Antigravity app session
+              const isQuotaError = step.status === 'ERROR' && /quota|resource_exhausted|rate limit|exhausted your|429/i.test(step.content || '');
+              if (isQuotaError && activeId && stats.accounts[activeId]) {
+                const accObj = stats.accounts[activeId];
+                if (!accObj.gemini5h) accObj.gemini5h = { pct: 0, resetText: 'Limit Hit' };
+                else accObj.gemini5h.pct = 0;
+                console.log(`[LiveWatch] ⚠️ Detected quota limit on active Antigravity session (${activeAcc?.email || activeId})`);
+                if (quotaExhaustionCallback) {
+                  try { quotaExhaustionCallback(activeId, activeAcc); } catch (e) {}
+                }
+              }
 
               if (step.source === 'USER_EXPLICIT') {
                 const promptTokens = Math.max(1, Math.round((step.content || '').length / 3.8));
@@ -590,13 +637,19 @@ export function checkAntigravityLiveSession() {
   try {
     if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
       const data = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
-      const activeEmail = (data.active || '').toLowerCase();
+      const activeEmail = (data.active || '').trim().toLowerCase();
       if (activeEmail) {
         stats.global.activeSessionEmail = activeEmail;
-        for (const id in stats.accounts) {
-          if (stats.accounts[id].email.toLowerCase() === activeEmail) {
-            stats.global.activeSessionAccountId = id;
-            break;
+        const accs = getAccounts();
+        const found = accs.find(a => a.email && a.email.toLowerCase() === activeEmail);
+        if (found) {
+          stats.global.activeSessionAccountId = found.id;
+        } else {
+          for (const id in stats.accounts) {
+            if (stats.accounts[id].email && stats.accounts[id].email.toLowerCase() === activeEmail) {
+              stats.global.activeSessionAccountId = id;
+              break;
+            }
           }
         }
       }
@@ -615,7 +668,7 @@ export function checkAntigravityLiveSession() {
           const stat = fs.statSync(logFile);
           if (now - stat.mtimeMs < 5000) {
             isCurrentlyGenerating = true;
-            activeConvId = conv.slice(0, 8);
+            activeConvId = conv;
             break;
           }
         }
@@ -646,7 +699,30 @@ export function checkAntigravityLiveSession() {
   } catch (e) {}
 }
 
-export function switchAntigravityActiveAccount(accountId, accountDetails) {
+export function getActiveConversationId() {
+  if (stats.global.currentConversationId) return stats.global.currentConversationId;
+  if (!fs.existsSync(BRAIN_DIR)) return null;
+  try {
+    const convs = fs.readdirSync(BRAIN_DIR);
+    let latestId = null;
+    let latestMtime = 0;
+    for (const conv of convs) {
+      const logFile = path.join(BRAIN_DIR, conv, '.system_generated', 'logs', 'transcript.jsonl');
+      if (fs.existsSync(logFile)) {
+        const stat = fs.statSync(logFile);
+        if (stat.mtimeMs > latestMtime) {
+          latestMtime = stat.mtimeMs;
+          latestId = conv;
+        }
+      }
+    }
+    return latestId;
+  } catch {
+    return null;
+  }
+}
+
+export async function switchAntigravityActiveAccount(accountId, accountDetails, options = {}) {
   loadStats();
   const acc = stats.accounts[accountId];
   if (!acc || acc.is403Banned) return false;
@@ -655,22 +731,7 @@ export function switchAntigravityActiveAccount(accountId, accountDetails) {
   stats.global.activeSessionEmail = acc.email;
   stats.global.bestAccountId = accountId;
 
-  // 1. Update ~/.gemini/google_accounts.json
-  try {
-    let existingOld = [];
-    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
-      const curr = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
-      if (curr.active && curr.active !== acc.email) {
-        existingOld = Array.from(new Set([...(curr.old || []), curr.active]));
-      }
-    }
-    fs.writeFileSync(GEMINI_ACCOUNTS_FILE, JSON.stringify({
-      active: acc.email,
-      old: existingOld
-    }, null, 2));
-  } catch (e) {
-    console.error('Failed to update google_accounts.json:', e.message);
-  }
+  writeKnownAntigravityAccounts(acc.email);
 
   // 2. Update ~/.gemini/oauth_creds.json if account details provided
   if (accountDetails && accountDetails.access_token) {
@@ -689,12 +750,79 @@ export function switchAntigravityActiveAccount(accountId, accountDetails) {
   }
 
   saveStats();
+
+  const liveAccount = accountDetails?.refresh_token
+    ? accountDetails
+    : getAccounts().find((item) => item.email && item.email.toLowerCase() === acc.email.toLowerCase());
+  if (liveAccount?.refresh_token) {
+    try {
+      const opts = { conversationId: getActiveConversationId(), ...options };
+      const result = await syncAntigravityAccount(liveAccount, undefined, opts);
+      if (result.ok) {
+        console.log(`[Antigravity] IDE credentials synchronized to ${result.email || acc.email} (restarted: ${!!result.restarted})`);
+      } else {
+        console.error(`[Antigravity] IDE sync notice: ${result.reason || 'unknown'}`);
+      }
+    } catch (error) {
+      console.error(`[Antigravity] IDE account sync error: ${error.message}`);
+    }
+  }
+
   return true;
+}
+
+export function writeKnownAntigravityAccounts(activeEmail) {
+  const poolEmails = getAccounts().map((account) => account.email);
+  const record = knownAccountRecord(activeEmail, poolEmails);
+  if (!record.active) return record;
+
+  try {
+    let current = null;
+    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
+      current = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
+    }
+    const sameActive = (current?.active || '') === record.active;
+    const sameOld = JSON.stringify(current?.old || []) === JSON.stringify(record.old);
+    if (!sameActive || !sameOld) {
+      fs.writeFileSync(GEMINI_ACCOUNTS_FILE, JSON.stringify(record, null, 2));
+    }
+  } catch (e) {
+    console.error('Failed to update google_accounts.json:', e.message);
+  }
+  return record;
+}
+
+function resolveActivePoolEmail(accounts) {
+  if (stats.global.activeSessionEmail) return stats.global.activeSessionEmail;
+  try {
+    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
+      const current = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
+      if (current.active) return current.active;
+    }
+  } catch { /* keep the pool fallback */ }
+  return accounts[0]?.email || '';
+}
+
+function ensurePoolAccounts() {
+  const accounts = getAccounts();
+  let added = false;
+  for (const account of accounts) {
+    if (!stats.accounts[account.id]) {
+      initAccountStats(account);
+      added = true;
+    }
+  }
+  writeKnownAntigravityAccounts(resolveActivePoolEmail(accounts));
+  if (added) {
+    computeBestAccount();
+    saveStats();
+  }
 }
 
 // Clean up expired cooldowns & track live Antigravity sessions
 setInterval(() => {
   checkAntigravityLiveSession();
+  ensurePoolAccounts();
   updateLoadMetrics();
   let changed = false;
   const now = Date.now();
