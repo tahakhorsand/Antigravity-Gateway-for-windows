@@ -881,7 +881,42 @@ export function getAllStats() {
   stats.global.dailyAnalytics = getDailyAnalyticsDb(7);
   stats.global.modelDistribution = getModelDistributionDb();
 
+  // Sync alias and enabled states from accounts.json
+  try {
+    const poolAccounts = getAccounts();
+    for (const acc of poolAccounts) {
+      if (stats.accounts[acc.id]) {
+        stats.accounts[acc.id].enabled = acc.enabled !== false;
+        stats.accounts[acc.id].alias = acc.alias || null;
+      }
+    }
+  } catch {}
+
   return stats;
+}
+
+export function updateAccountEnabledState(accountId, enabled) {
+  loadStats();
+  if (stats.accounts[accountId]) {
+    stats.accounts[accountId].enabled = !!enabled;
+    saveStats();
+  }
+}
+
+export function updateAccountAlias(accountId, alias) {
+  loadStats();
+  if (stats.accounts[accountId]) {
+    stats.accounts[accountId].alias = alias || null;
+    saveStats();
+  }
+}
+
+export function removeAccountStats(accountId) {
+  loadStats();
+  if (stats.accounts[accountId]) {
+    delete stats.accounts[accountId];
+    saveStats();
+  }
 }
 
 export function setActiveAccount(accountId) {

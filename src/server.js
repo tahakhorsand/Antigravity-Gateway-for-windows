@@ -4,7 +4,7 @@ import path from 'path';
 import { exec, execFile, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { CONFIG } from './config.js';
-import { loadAccounts, getAccounts, getValidAccessToken, markCooldown, isCoolingDown } from './auth.js';
+import { loadAccounts, getAccounts, saveAccounts, getValidAccessToken, markCooldown, isCoolingDown } from './auth.js';
 import { 
   loadStats, 
   initAccountStats, 
@@ -21,7 +21,10 @@ import {
   setBroadcastCallback,
   setQuotaExhaustionCallback,
   getRealActiveAntigravityEmail,
-  adoptIdeAccount
+  adoptIdeAccount,
+  updateAccountEnabledState,
+  updateAccountAlias,
+  removeAccountStats
 } from './stats.js';
 import { getMetadataDb, setMetadataDb, queryLogsDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
@@ -953,6 +956,43 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify(payload, null, 2));
   }
 
+  // Export Request Logs to CSV or JSON
+  if (urlPath.startsWith('/api/db/logs/export')) {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const format = query.get('format') === 'json' ? 'json' : 'csv';
+    const logsResult = queryLogsDb({ limit: 5000, page: 1 });
+    const logs = logsResult.logs || [];
+    if (format === 'json') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': 'attachment; filename="antigravity_logs.json"'
+      });
+      return res.end(JSON.stringify(logs, null, 2));
+    } else {
+      const headers = ['id', 'timestamp', 'account_email', 'model', 'status_code', 'latency_ms', 'input_tokens', 'output_tokens', 'dollars_saved'];
+      const csvLines = [headers.join(',')];
+      for (const l of logs) {
+        const row = [
+          l.request_id || l.id,
+          JSON.stringify(l.created_at || ''),
+          JSON.stringify(l.account_email || ''),
+          JSON.stringify(l.model || ''),
+          l.status_code || 200,
+          l.latency_ms || 0,
+          l.input_tokens || 0,
+          l.output_tokens || 0,
+          (l.dollars_saved || 0).toFixed(4)
+        ];
+        csvLines.push(row.join(','));
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="antigravity_logs.csv"'
+      });
+      return res.end(csvLines.join('\n'));
+    }
+  }
+
   // SQLite Persistent Request Logs with Search, Filter & Pagination
   if (urlPath.startsWith('/api/db/logs')) {
     const query = new URL(req.url, 'http://localhost').searchParams;
@@ -1062,6 +1102,64 @@ async function handleProxyRequest(req, res) {
     }
     res.writeHead(400, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: false, error: 'Missing ?id=' }));
+  }
+
+  // Toggle Account Enabled / Paused
+  if (urlPath.startsWith('/api/accounts/toggle') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const accountId = query.get('id');
+    const accounts = getAccounts();
+    const targetAcc = accounts.find(a => a.id === accountId);
+    if (!targetAcc) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Account not found' }));
+    }
+    targetAcc.enabled = targetAcc.enabled === false ? true : false;
+    saveAccounts(accounts);
+    updateAccountEnabledState(accountId, targetAcc.enabled);
+    broadcastEvent({ type: 'account_updated', accountId, enabled: targetAcc.enabled });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, accountId, enabled: targetAcc.enabled }));
+  }
+
+  // Update Account Custom Alias / Tag
+  if (urlPath.startsWith('/api/accounts/alias') && req.method === 'POST') {
+    let bodyStr = '';
+    for await (const chunk of req) bodyStr += chunk;
+    let body = {};
+    try { body = JSON.parse(bodyStr || '{}'); } catch {}
+    const accountId = body.id || new URL(req.url, 'http://localhost').searchParams.get('id');
+    const alias = typeof body.alias === 'string' ? body.alias.trim() : '';
+    const accounts = getAccounts();
+    const targetAcc = accounts.find(a => a.id === accountId);
+    if (!targetAcc) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Account not found' }));
+    }
+    targetAcc.alias = alias || null;
+    saveAccounts(accounts);
+    updateAccountAlias(accountId, targetAcc.alias);
+    broadcastEvent({ type: 'account_updated', accountId, alias: targetAcc.alias });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, accountId, alias: targetAcc.alias }));
+  }
+
+  // Delete / Unlink Account from Pool
+  if (urlPath.startsWith('/api/accounts/delete') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const accountId = query.get('id');
+    const accounts = getAccounts();
+    const targetIndex = accounts.findIndex(a => a.id === accountId);
+    if (targetIndex === -1) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Account not found' }));
+    }
+    const removed = accounts.splice(targetIndex, 1)[0];
+    saveAccounts(accounts);
+    removeAccountStats(accountId);
+    broadcastEvent({ type: 'account_deleted', accountId, email: removed.email });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, accountId, email: removed.email }));
   }
 
   // Diagnostics: save Antigravity's web UI files and its window-state keys into tmp/antigravity-ui/

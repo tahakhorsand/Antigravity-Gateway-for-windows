@@ -48,3 +48,15 @@ test('after the session account is exhausted, fallback serves another account an
   }, ordered[0]), true);
   assert.notEqual(ordered[0].email, 'bob@example.com');
 });
+
+test('disabled accounts are completely excluded from candidate list', () => {
+  const disabledBob = { id: 'nabiaz', email: 'bob@example.com', enabled: false };
+  const ordered = orderAccountCandidates(
+    [mushfiq, disabledBob, aqualink],
+    statsAccounts,
+    { isCoolingDown: () => false }
+  );
+
+  assert.equal(ordered.some(a => a.email === 'bob@example.com'), false);
+  assert.equal(ordered.length, 2);
+});

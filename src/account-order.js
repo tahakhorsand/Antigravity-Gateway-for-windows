@@ -20,6 +20,7 @@ export function orderAccountCandidates(accounts, statsAccounts = {}, options = {
 
   const valid = accounts.filter((account) => {
     const accStats = statsAccounts[account.id];
+    if (account.enabled === false || accStats?.enabled === false) return false;
     return !accStats || !accStats.is403Banned;
   });
 
