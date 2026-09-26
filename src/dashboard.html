@@ -1037,8 +1037,8 @@
           <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
         </button>
 
-        <button class="btn btn-ghost btn-sm" id="btn-toggle-notifications" onclick="toggleNotifications()" title="Desktop &amp; Browser Push Notifications">
-          <i data-lucide="bell" id="bell-icon" style="width: 13px; height: 13px;"></i>
+        <button class="btn btn-ghost btn-sm" id="btn-notifications" onclick="toggleNotifications()" title="Desktop &amp; Browser Push Notifications">
+          <i data-lucide="bell-off" id="bell-icon" style="width: 13px; height: 13px;"></i>
           <span id="notif-label">Notify: Off</span>
         </button>
 
@@ -2842,19 +2842,53 @@
       addLog(`📥 Exported SQLite logs as ${format.toUpperCase()}`);
     }
 
-    // Desktop / Browser Notifications
+    // Sound chime generator using Web Audio API (Zero dependencies, works across all browsers)
+    function playNotificationSound(type = 'chime') {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        if (type === 'alert') {
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.1);
+        } else {
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.setValueAtTime(880, now + 0.1);
+        }
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.36);
+      } catch (e) {}
+    }
+
+    // Desktop & Audio Notifications
     let notificationsEnabled = localStorage.getItem('harness_notifications') === 'true';
 
     function updateNotificationButton() {
-      const btn = document.getElementById('btn-notifications');
+      const btn = document.getElementById('btn-notifications') || document.getElementById('btn-toggle-notifications');
       if (!btn) return;
+
       if (notificationsEnabled) {
-        btn.innerHTML = '<i data-lucide="bell" style="width:12px;height:12px;color:var(--green);display:inline-block;vertical-align:-1px;"></i> Notify: On';
-        btn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        btn.innerHTML = '<i data-lucide="bell" style="width: 13px; height: 13px; color: var(--green); display: inline-block; vertical-align: -1px;"></i> <span style="color: var(--green); font-weight: 500;">Notify: On</span>';
+        btn.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+        btn.style.background = 'rgba(16, 185, 129, 0.08)';
       } else {
-        btn.innerHTML = '<i data-lucide="bell-off" style="width:12px;height:12px;color:var(--text-4);display:inline-block;vertical-align:-1px;"></i> Notify: Off';
+        btn.innerHTML = '<i data-lucide="bell-off" style="width: 13px; height: 13px; color: var(--text-4); display: inline-block; vertical-align: -1px;"></i> <span style="color: var(--text-3);">Notify: Off</span>';
         btn.style.borderColor = 'var(--border-subtle)';
+        btn.style.background = 'transparent';
       }
+
       if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
         try { window.lucide.createIcons(); } catch (e) {}
       }
@@ -2862,31 +2896,45 @@
 
     async function toggleNotifications() {
       if (!notificationsEnabled) {
+        let granted = false;
         if ('Notification' in window) {
-          const perm = await Notification.requestPermission();
-          if (perm === 'granted') {
-            notificationsEnabled = true;
-            localStorage.setItem('harness_notifications', 'true');
-            addLog('🔔 Desktop notifications enabled for Smart Shield & rotation events.');
-            sendDesktopNotification('Antigravity Alerts Armed', 'You will receive desktop push alerts when quotas rotate.');
-          } else {
-            alert('Notifications were blocked in browser settings. Please permit notifications for this origin.');
-            notificationsEnabled = false;
-            localStorage.setItem('harness_notifications', 'false');
+          try {
+            if (Notification.permission === 'granted') {
+              granted = true;
+            } else if (Notification.permission !== 'denied') {
+              const res = await Notification.requestPermission();
+              granted = res === 'granted';
+            }
+          } catch (e) {
+            try {
+              granted = await new Promise((resolve) => Notification.requestPermission(p => resolve(p === 'granted')));
+            } catch (err) {}
           }
+        }
+
+        notificationsEnabled = true;
+        localStorage.setItem('harness_notifications', 'true');
+        updateNotificationButton();
+        playNotificationSound('chime');
+
+        if (granted) {
+          addLog('🔔 Desktop push and audio notifications enabled.');
+          sendDesktopNotification('Antigravity Alerts Armed', 'Desktop push and audio notifications are active for Smart Shield failover.');
         } else {
-          alert('Desktop notifications are not supported in this browser.');
+          addLog('🔔 Audio chime notifications enabled (browser desktop push was not permitted).');
         }
       } else {
         notificationsEnabled = false;
         localStorage.setItem('harness_notifications', 'false');
-        addLog('🔕 Desktop notifications disabled.');
+        updateNotificationButton();
+        addLog('🔕 Notifications disabled.');
       }
-      updateNotificationButton();
     }
 
     function sendDesktopNotification(title, body) {
-      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      if (!notificationsEnabled) return;
+      playNotificationSound('alert');
+      if ('Notification' in window && Notification.permission === 'granted') {
         try {
           new Notification(title, { body, icon: '/favicon.ico' });
         } catch (e) {}
