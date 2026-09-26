@@ -8,6 +8,7 @@ import { loadAccounts, getAccounts, getValidAccessToken, markCooldown, isCooling
 import { 
   loadStats, 
   initAccountStats, 
+  updateAccountLiveQuota,
   recordRequestStart,
   recordRequestSuccess, 
   recordFailover, 
@@ -15,6 +16,7 @@ import {
   setActiveAccount,
   getAllStats 
 } from './stats.js';
+import { fetchLiveAccountQuota } from './quota.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +25,7 @@ const ICON_PATH = path.resolve(__dirname, '../assets/chip_ai_1024.png');
 
 let requestCounter = 0;
 let roundRobinIndex = 0;
+let isSyncingQuotas = false;
 const eventSubscribers = new Set();
 
 function broadcastEvent(data) {
@@ -34,6 +37,30 @@ function broadcastEvent(data) {
       eventSubscribers.delete(client);
     }
   }
+}
+
+export async function syncAllQuotas() {
+  if (isSyncingQuotas) return;
+  isSyncingQuotas = true;
+  const accounts = getAccounts();
+  console.log(`${colors.cyan}[QuotaSync] 🔄 Syncing real-time limits from Google Cloud Code for ${accounts.length} accounts...${colors.reset}`);
+  broadcastEvent({ type: 'quota_sync_start', total: accounts.length });
+
+  for (const acc of accounts) {
+    try {
+      const liveQuota = await fetchLiveAccountQuota(acc);
+      updateAccountLiveQuota(acc.id, liveQuota);
+      if (liveQuota.is403) {
+        broadcastEvent({ type: 'account_banned', accountId: acc.id, email: acc.email });
+      }
+    } catch (e) {
+      console.error(`[QuotaSync] Error for ${acc.email}:`, e.message);
+    }
+  }
+
+  isSyncingQuotas = false;
+  broadcastEvent({ type: 'quotas_synced', timestamp: Date.now() });
+  console.log(`${colors.green}[QuotaSync] ✅ Live Google quotas and reset timers updated successfully.${colors.reset}`);
 }
 
 // Colors for terminal logs
@@ -202,6 +229,14 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify({ ok: true }));
   }
 
+  // API Action: Live Refresh Quotas from Google
+  if (urlPath === '/api/refresh-quotas' && req.method === 'POST') {
+    await syncAllQuotas();
+    const statsData = getAllStats();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, stats: statsData }));
+  }
+
   // Buffer request body
   const bodyChunks = [];
   for await (const chunk of req) {
@@ -365,4 +400,14 @@ ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} 
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
   ${colors.dim}Ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
 `);
+
+  // Initial live quota sync from Google
+  setTimeout(() => {
+    syncAllQuotas().catch(console.error);
+  }, 1000);
+
+  // Periodic background sync every 3 minutes
+  setInterval(() => {
+    syncAllQuotas().catch(console.error);
+  }, 180000);
 });

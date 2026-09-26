@@ -57,6 +57,8 @@ export function initAccountStats(account) {
       email: account.email,
       name: account.name || 'Pro Account',
       provider: account.email.includes('claude') ? 'anthropic' : 'google',
+      subscriptionTier: 'PRO',
+      lastSynced: null,
       enabled: true,
       is403Banned: false,
       banReason: null,
@@ -70,20 +72,64 @@ export function initAccountStats(account) {
       lastUsed: 0,
       avgLatency: 175,
       latencies: [],
+      // Real limits from Google Quota API
+      geminiWeekly: { pct: 100, resetTime: null, resetText: 'Active', desc: '' },
+      gemini5h: { pct: 100, resetTime: null, resetText: 'Active', desc: '' },
+      claudeWeekly: { pct: 100, resetTime: null, resetText: 'Active', desc: '' },
+      claude5h: { pct: 100, resetTime: null, resetText: 'Active', desc: '' },
       // Quota gauges (0 - 100%)
       quotas: {
         pro: 100,
         flash: 100,
-        claude: account.email.includes('claude') ? 100 : 85,
+        claude: 100,
         imagen: 100
       }
     };
   } else {
     // Ensure all quota fields exist
     if (!stats.accounts[account.id].quotas) {
-      stats.accounts[account.id].quotas = { pro: 100, flash: 100, claude: 85, imagen: 100 };
+      stats.accounts[account.id].quotas = { pro: 100, flash: 100, claude: 100, imagen: 100 };
+    }
+    if (!stats.accounts[account.id].geminiWeekly) {
+      stats.accounts[account.id].geminiWeekly = { pct: 100, resetTime: null, resetText: 'Active', desc: '' };
+    }
+    if (!stats.accounts[account.id].gemini5h) {
+      stats.accounts[account.id].gemini5h = { pct: 100, resetTime: null, resetText: 'Active', desc: '' };
+    }
+    if (!stats.accounts[account.id].claudeWeekly) {
+      stats.accounts[account.id].claudeWeekly = { pct: 100, resetTime: null, resetText: 'Active', desc: '' };
+    }
+    if (!stats.accounts[account.id].claude5h) {
+      stats.accounts[account.id].claude5h = { pct: 100, resetTime: null, resetText: 'Active', desc: '' };
     }
   }
+}
+
+export function updateAccountLiveQuota(accountId, liveQuota) {
+  loadStats();
+  const acc = stats.accounts[accountId];
+  if (!acc) return;
+
+  if (liveQuota.is403) {
+    acc.is403Banned = true;
+    acc.banReason = '403 Forbidden / Restricted by Google';
+    acc.enabled = false;
+  } else {
+    acc.is403Banned = false;
+    acc.banReason = null;
+    acc.subscriptionTier = liveQuota.subscriptionTier || acc.subscriptionTier || 'PRO';
+    acc.lastSynced = liveQuota.lastSynced || new Date().toISOString();
+    if (liveQuota.geminiWeekly) acc.geminiWeekly = liveQuota.geminiWeekly;
+    if (liveQuota.gemini5h) acc.gemini5h = liveQuota.gemini5h;
+    if (liveQuota.claudeWeekly) acc.claudeWeekly = liveQuota.claudeWeekly;
+    if (liveQuota.claude5h) acc.claude5h = liveQuota.claude5h;
+    if (liveQuota.quotas) {
+      acc.quotas = { ...acc.quotas, ...liveQuota.quotas };
+    }
+  }
+
+  computeBestAccount();
+  saveStats();
 }
 
 export function computeBestAccount() {
@@ -101,9 +147,17 @@ export function computeBestAccount() {
     const isCooling = acc.cooldownUntil && acc.cooldownUntil > now;
     if (isCooling) continue;
 
-    const q = acc.quotas || { pro: 100, flash: 100, claude: 100, imagen: 100 };
-    // Weighted quota score: Pro (50%), Flash (20%), Claude (20%), Imagen (10%)
-    const score = (q.pro * 0.5) + (q.flash * 0.2) + (q.claude * 0.2) + (q.imagen * 0.1);
+    // Use genuine Google Weekly & 5h limits if available
+    const gWeekly = acc.geminiWeekly?.pct ?? (acc.quotas?.pro ?? 100);
+    const g5h = acc.gemini5h?.pct ?? 100;
+    const cWeekly = acc.claudeWeekly?.pct ?? (acc.quotas?.claude ?? 100);
+    const c5h = acc.claude5h?.pct ?? 100;
+
+    // Tier bonus (Pro > Free)
+    const tierBonus = acc.subscriptionTier === 'PRO' ? 10 : 0;
+
+    // Weighted real score (Pro weekly + 5h buffer have highest priority)
+    const score = (gWeekly * 0.45) + (g5h * 0.3) + (cWeekly * 0.15) + (c5h * 0.1) + tierBonus;
     
     if (score > highestScore) {
       highestScore = score;
@@ -160,18 +214,6 @@ export function recordRequestSuccess(accountId, latencyMs, tokens = {}, model = 
     acc.cachedTokens += cached;
     acc.totalTokens += total;
     acc.lastUsed = Date.now();
-
-    // Consume specific model quota
-    if (model.includes('flash')) {
-      acc.quotas.flash = Math.max(0, acc.quotas.flash - 0.5);
-    } else if (model.includes('claude')) {
-      acc.quotas.claude = Math.max(0, acc.quotas.claude - 2.0);
-    } else if (model.includes('image') || model.includes('imagen')) {
-      acc.quotas.imagen = Math.max(0, acc.quotas.imagen - 5.0);
-    } else {
-      // Default to Pro quota
-      acc.quotas.pro = Math.max(0, acc.quotas.pro - 1.5);
-    }
 
     acc.latencies.push(latencyMs);
     if (acc.latencies.length > 20) acc.latencies.shift();
@@ -236,7 +278,7 @@ function updateLoadMetrics() {
   stats.global.loadPercentage = Math.min(100, Math.round(concurrencyLoad + rpmLoad));
 }
 
-// Replenish quotas over time
+// Clean up expired cooldowns
 setInterval(() => {
   updateLoadMetrics();
   let changed = false;
@@ -247,19 +289,12 @@ setInterval(() => {
       acc.cooldownUntil = 0;
       changed = true;
     }
-    // Slowly replenish Pro, Flash, Claude, and Imagen quotas
-    if (acc.quotas) {
-      if (acc.quotas.pro < 100) { acc.quotas.pro = Math.min(100, acc.quotas.pro + 2); changed = true; }
-      if (acc.quotas.flash < 100) { acc.quotas.flash = Math.min(100, acc.quotas.flash + 3); changed = true; }
-      if (acc.quotas.claude < 100) { acc.quotas.claude = Math.min(100, acc.quotas.claude + 2); changed = true; }
-      if (acc.quotas.imagen < 100) { acc.quotas.imagen = Math.min(100, acc.quotas.imagen + 2); changed = true; }
-    }
   }
   if (changed) {
     computeBestAccount();
     saveStats();
   }
-}, 10000);
+}, 5000);
 
 export function getAllStats() {
   loadStats();
