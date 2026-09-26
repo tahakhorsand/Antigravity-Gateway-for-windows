@@ -18,6 +18,17 @@ import {
   getAllStats 
 } from './stats.js';
 import { fetchLiveAccountQuota } from './quota.js';
+import crypto from 'crypto';
+import { 
+  convertOpenAIToGemini, 
+  convertAnthropicToGemini, 
+  wrapGeminiV1Internal, 
+  convertGeminiToOpenAI, 
+  convertGeminiToAnthropic, 
+  getOpenAIModelsList,
+  CLOUDCODE_GENERATE_ENDPOINTS,
+  CLOUDCODE_STREAM_ENDPOINTS
+} from './translator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,6 +143,247 @@ function parseTokenUsageFromBuffer(buffer, requestLength) {
   };
 }
 
+async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates) {
+  const isAnthropic = urlPath.includes('/messages');
+  let jsonBody = {};
+  try {
+    jsonBody = JSON.parse(bodyBuffer.toString('utf-8'));
+  } catch (e) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: { message: 'Invalid JSON request body' } }));
+  }
+
+  const isStream = !!jsonBody.stream;
+  const translation = isAnthropic 
+    ? convertAnthropicToGemini(jsonBody)
+    : convertOpenAIToGemini(jsonBody);
+
+  const primaryModel = translation.model;
+  const geminiBody = translation.geminiBody;
+  const startTime = Date.now();
+  const modelTiers = primaryModel !== 'gemini-2.5-flash' ? [primaryModel, 'gemini-2.5-flash'] : [primaryModel];
+
+  for (const targetModel of modelTiers) {
+    if (targetModel !== primaryModel) {
+      console.log(`${colors.yellow}[UniversalAI] ${primaryModel} quota exhausted across all accounts. Resilient fallback to ${targetModel}...${colors.reset}`);
+    }
+    for (let attempt = 0; attempt < candidates.length; attempt++) {
+      const account = candidates[attempt];
+      try {
+        recordRequestStart(account.id);
+        broadcastEvent({
+          type: 'account_active',
+          accountId: account.id,
+          email: account.email,
+          reqId
+        });
+
+      const accessToken = await getValidAccessToken(account);
+      const payload = wrapGeminiV1Internal(geminiBody, targetModel, account.project_id);
+      const ua = 'antigravity/4.3.0 darwin/arm64';
+      const endpoints = isStream ? CLOUDCODE_STREAM_ENDPOINTS : CLOUDCODE_GENERATE_ENDPOINTS;
+
+      let upstreamRes = null;
+      let lastErr = null;
+
+      for (const ep of endpoints) {
+        try {
+          const resp = await fetch(ep, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'User-Agent': ua
+            },
+            body: JSON.stringify(payload)
+          });
+          if (resp.status !== 503 && resp.status !== 502) {
+            upstreamRes = resp;
+            break;
+          }
+          upstreamRes = resp;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!upstreamRes) {
+        throw new Error(lastErr?.message || 'Upstream connection failed');
+      }
+
+      // Handle 429 rate limit with instant failover
+      if (upstreamRes.status === 429) {
+        console.warn(`${colors.yellow}[Req #${reqId}] ⚠️ Account ${account.email} hit 429! Failover to next account...${colors.reset}`);
+        markCooldown(account.id, 60);
+        recordFailover(account.id, 60);
+        broadcastEvent({ type: 'quota_hit', accountId: account.id, email: account.email });
+        continue;
+      }
+
+      // Handle 403 Forbidden
+      if (upstreamRes.status === 403) {
+        console.error(`${colors.red}[Req #${reqId}] 🚫 Account ${account.email} 403 Forbidden! Isolating...${colors.reset}`);
+        record403Banned(account.id);
+        broadcastEvent({ type: 'account_banned', accountId: account.id, email: account.email });
+        continue;
+      }
+
+      // Non-streaming response
+      if (!isStream) {
+        const rawJson = await upstreamRes.json();
+        const duration = Date.now() - startTime;
+
+        if (!upstreamRes.ok) {
+          res.writeHead(upstreamRes.status, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify(rawJson));
+        }
+
+        const converted = isAnthropic
+          ? convertGeminiToAnthropic(rawJson, targetModel)
+          : convertGeminiToOpenAI(rawJson, targetModel);
+
+        const promptTokens = converted.usage?.prompt_tokens || converted.usage?.input_tokens || 20;
+        const completionTokens = converted.usage?.completion_tokens || converted.usage?.output_tokens || 10;
+        const totalTokens = promptTokens + completionTokens;
+
+        recordRequestSuccess(account.id, duration, {
+          input: promptTokens,
+          output: completionTokens,
+          cached: 0,
+          total: totalTokens
+        }, targetModel);
+
+        broadcastEvent({
+          type: 'account_idle',
+          accountId: account.id,
+          email: account.email,
+          duration
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(converted));
+      }
+
+      // Streaming response (SSE)
+      if (isStream) {
+        const duration = Date.now() - startTime;
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        });
+
+        const completionId = isAnthropic ? `msg_${crypto.randomUUID()}` : `chatcmpl-${crypto.randomUUID()}`;
+        const createdTime = Math.floor(Date.now() / 1000);
+        let totalOutTokens = 0;
+
+        if (isAnthropic) {
+          res.write(`event: message_start\ndata: ${JSON.stringify({
+            type: 'message_start',
+            message: {
+              id: completionId,
+              type: 'message',
+              role: 'assistant',
+              model: targetModel,
+              content: [],
+              stop_reason: null,
+              stop_sequence: null,
+              usage: { input_tokens: 20, output_tokens: 0 }
+            }
+          })}\n\n`);
+          res.write(`event: content_block_start\ndata: ${JSON.stringify({
+            type: 'content_block_start',
+            index: 0,
+            content_block: { type: 'text', text: '' }
+          })}\n\n`);
+        }
+
+        const reader = upstreamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const rawData = trimmed.slice(6).trim();
+              if (!rawData || rawData === '[DONE]') continue;
+              try {
+                const chunkObj = JSON.parse(rawData);
+                const root = chunkObj.response || chunkObj;
+                const part = root.candidates?.[0]?.content?.parts?.[0];
+                const text = part && !part.thought ? (part.text || '') : '';
+                if (text) {
+                  totalOutTokens += Math.max(1, Math.round(text.length / 4));
+                  if (isAnthropic) {
+                    res.write(`event: content_block_delta\ndata: ${JSON.stringify({
+                      type: 'content_block_delta',
+                      index: 0,
+                      delta: { type: 'text_delta', text }
+                    })}\n\n`);
+                  } else {
+                    res.write(`data: ${JSON.stringify({
+                      id: completionId,
+                      object: 'chat.completion.chunk',
+                      created: createdTime,
+                      model: targetModel,
+                      choices: [{ index: 0, delta: { content: text }, finish_reason: null }]
+                    })}\n\n`);
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        if (isAnthropic) {
+          res.write(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}\n\n`);
+          res.write(`event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: totalOutTokens } })}\n\n`);
+          res.write(`event: message_stop\ndata: ${JSON.stringify({ type: 'message_stop' })}\n\n`);
+        } else {
+          res.write(`data: ${JSON.stringify({
+            id: completionId,
+            object: 'chat.completion.chunk',
+            created: createdTime,
+            model: targetModel,
+            choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
+          })}\n\n`);
+          res.write('data: [DONE]\n\n');
+        }
+
+        recordRequestSuccess(account.id, duration, {
+          input: 20,
+          output: totalOutTokens,
+          cached: 0,
+          total: 20 + totalOutTokens
+        }, targetModel);
+
+        broadcastEvent({
+          type: 'account_idle',
+          accountId: account.id,
+          email: account.email,
+          duration
+        });
+
+        return res.end();
+      }
+    } catch (err) {
+      console.error(`${colors.red}[UniversalAI] Error on ${account.email}: ${err.message}${colors.reset}`);
+      continue;
+    }
+  }
+  }
+
+  res.writeHead(503, { 'Content-Type': 'application/json' });
+  return res.end(JSON.stringify({ error: 'All accounts exceeded rate limits or unavailable.' }));
+}
+
 async function handleProxyRequest(req, res) {
   const reqId = ++requestCounter;
   const startTime = Date.now();
@@ -151,6 +403,12 @@ async function handleProxyRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'image/png' });
       return res.end(fs.readFileSync(ICON_PATH));
     }
+  }
+
+  // Universal Models List (OpenAI format)
+  if (urlPath === '/v1/models' || urlPath === '/models') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(getOpenAIModelsList(), null, 2));
   }
 
   // Full Stats & Metrics Endpoint
@@ -260,6 +518,11 @@ async function handleProxyRequest(req, res) {
     console.error(`${colors.red}[Req #${reqId}] ❌ No valid accounts available (all banned or none configured)!${colors.reset}`);
     res.writeHead(503, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ error: 'No active Google Pro accounts available. All accounts may be 403 restricted.' }));
+  }
+
+  // Universal Protocol Translator (OpenAI /v1/chat/completions & Anthropic /v1/messages)
+  if (urlPath === '/v1/chat/completions' || urlPath === '/v1/messages') {
+    return handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates);
   }
 
   const targetBaseUrl = CONFIG.UPSTREAM_BASE_URL;
