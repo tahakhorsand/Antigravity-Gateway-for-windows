@@ -1692,8 +1692,9 @@
         </button>
 
         <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
-          <i data-lucide="code-2" style="width: 13px; height: 13px;"></i>
-          <span>Universal API</span>
+          <i data-lucide="key" style="width: 13px; height: 13px; color: var(--amber);"></i>
+          <span>API Keys &amp; Gateway</span>
+          <span class="nav-tab-badge" id="nav-keys-badge" style="background: rgba(245, 158, 11, 0.15); color: var(--amber); border-color: rgba(245, 158, 11, 0.3);">0 Keys</span>
         </button>
       </nav>
 
@@ -2587,6 +2588,30 @@
         </div>
       </div>
 
+      <!-- Virtual API Key Manager Card -->
+      <div class="card" style="margin-bottom: 12px; border-color: rgba(245, 158, 11, 0.25);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="key" style="width: 14px; height: 14px; color: var(--amber);"></i>
+              <span>Gateway Virtual API Keys</span>
+              <span class="badge-tag" id="keys-count-badge">0 Keys</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-3);">Create and manage Bearer API keys to secure remote Tailscale &amp; public access</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openCreateKeyModal()">
+            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+            <span>Create New API Key</span>
+          </button>
+        </div>
+
+        <div id="keys-list-container">
+          <div style="text-align: center; padding: 24px; color: var(--text-4); font-size: 12px;">
+            No API keys created yet. Without an API key, external access is unrestricted. Create a key to protect your Gateway on public internet.
+          </div>
+        </div>
+      </div>
+
       <div class="settings-grid">
         <div class="card">
           <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">OpenAI Compatible Endpoint</div>
@@ -2613,30 +2638,6 @@
     "messages": [{"role": "user", "content": "Hello"}]
   }'</code></pre>
             <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copySnippet(`curl http://127.0.0.1:8045/v1/messages -H 'Content-Type: application/json' -d '{"model":"claude-3-5-sonnet","messages":[{"role":"user","content":"Hello"}]}'`, this)">Copy</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Virtual API Key Manager Card -->
-      <div class="card" style="margin-top: 10px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-          <div>
-            <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-              <i data-lucide="key" style="width: 14px; height: 14px; color: var(--amber);"></i>
-              <span>Gateway Virtual API Keys</span>
-              <span class="badge-tag" id="keys-count-badge">0 Keys</span>
-            </div>
-            <div style="font-size: 11px; color: var(--text-3);">Create and manage Bearer API keys to secure remote Tailscale &amp; public access</div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="openCreateKeyModal()">
-            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
-            <span>Create New API Key</span>
-          </button>
-        </div>
-
-        <div id="keys-list-container">
-          <div style="text-align: center; padding: 24px; color: var(--text-4); font-size: 12px;">
-            No API keys created yet. Without an API key, external access is unrestricted. Create a key to protect your Gateway on public internet.
           </div>
         </div>
       </div>
@@ -3154,6 +3155,9 @@
         fetchSmartShieldConfig();
       } else if (tabId === 'pane-simulator') {
         runSimulation();
+      } else if (tabId === 'pane-api') {
+        fetchApiKeys();
+        fetchTailscaleStatus();
       }
       if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
         try { window.lucide.createIcons(); } catch (e) {}
@@ -4100,6 +4104,16 @@
       if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
       if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
       return String(num);
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function copySnippet(text, btnElement) {
@@ -5602,16 +5616,22 @@
       }
     }
 
+    let currentApiKeys = [];
+
     async function fetchApiKeys() {
       try {
         const res = await fetch('/api/keys');
         const data = await res.json();
+        currentApiKeys = data.keys || [];
         const container = document.getElementById('keys-list-container');
         const badge = document.getElementById('keys-count-badge');
-        if (badge) badge.innerText = `${data.keys?.length || 0} Key${data.keys?.length === 1 ? '' : 's'}`;
+        const navBadge = document.getElementById('nav-keys-badge');
+        const countText = `${currentApiKeys.length} Key${currentApiKeys.length === 1 ? '' : 's'}`;
+        if (badge) badge.innerText = countText;
+        if (navBadge) navBadge.innerText = countText;
         if (!container) return;
 
-        if (!data.keys || data.keys.length === 0) {
+        if (currentApiKeys.length === 0) {
           container.innerHTML = `
             <div style="text-align: center; padding: 24px; color: var(--text-4); font-size: 12px;">
               No API keys created yet. Without an API key, external access is unrestricted. Create a key to protect your Gateway on public internet.
@@ -5633,7 +5653,7 @@
                 </tr>
               </thead>
               <tbody>
-                ${data.keys.map(k => {
+                ${currentApiKeys.map(k => {
                   let reqsHtml = '';
                   if (k.max_requests && k.max_requests > 0) {
                     const reqPct = Math.min(100, Math.round(((k.requests_count || 0) / k.max_requests) * 100));
@@ -5693,7 +5713,7 @@
                         <button class="btn btn-ghost btn-icon-sm" onclick="resetApiKeyUsage('${k.id}')" title="Reset Usage Counter to 0">
                           <i data-lucide="rotate-ccw" style="width: 12px; height: 12px; color: var(--blue);"></i>
                         </button>
-                        <button class="btn btn-ghost btn-icon-sm" onclick="openEditKeyModal('${k.id}', '${escapeHtml(k.name)}', ${k.max_requests || 0}, ${k.max_tokens || 0})" title="Configure Usage Limits">
+                        <button class="btn btn-ghost btn-icon-sm" onclick="openEditKeyModal('${k.id}')" title="Configure Usage Limits">
                           <i data-lucide="sliders" style="width: 12px; height: 12px; color: var(--amber);"></i>
                         </button>
                         <button class="btn btn-ghost btn-sm" style="color: ${k.is_active ? 'var(--green)' : 'var(--text-4)'}; font-size: 10px; padding: 2px 6px;" onclick="toggleApiKey('${k.id}')">
@@ -5710,7 +5730,9 @@
             </table>
           </div>`;
         try { window.lucide.createIcons(); } catch (e) {}
-      } catch (e) {}
+      } catch (e) {
+        console.error('Error fetching API keys:', e);
+      }
     }
 
     function openCreateKeyModal() {
@@ -5767,17 +5789,19 @@
       }
     }
 
-    function openEditKeyModal(id, name, maxReq, maxTok) {
+    function openEditKeyModal(id) {
+      const k = currentApiKeys.find(item => item.id === id);
+      if (!k) return;
       const modal = document.getElementById('edit-key-modal');
       const idInput = document.getElementById('edit-key-id');
       const nameLabel = document.getElementById('edit-key-name-label');
       const reqInput = document.getElementById('edit-key-max-requests');
       const tokInput = document.getElementById('edit-key-max-tokens');
 
-      if (idInput) idInput.value = id;
-      if (nameLabel) nameLabel.innerText = `Key: ${name}`;
-      if (reqInput) reqInput.value = (maxReq && maxReq > 0) ? maxReq : '';
-      if (tokInput) tokInput.value = (maxTok && maxTok > 0) ? maxTok : '';
+      if (idInput) idInput.value = k.id;
+      if (nameLabel) nameLabel.innerText = `Key: ${k.name}`;
+      if (reqInput) reqInput.value = (k.max_requests && k.max_requests > 0) ? k.max_requests : '';
+      if (tokInput) tokInput.value = (k.max_tokens && k.max_tokens > 0) ? k.max_tokens : '';
       if (modal) modal.classList.add('open');
     }
 
