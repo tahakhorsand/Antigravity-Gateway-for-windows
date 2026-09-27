@@ -934,6 +934,10 @@
       padding: 20px;
     }
 
+    .modal-backdrop.open {
+      display: flex !important;
+    }
+
     .modal-box {
       background: #0d0d0d;
       border: 1px solid var(--border-muted);
@@ -2599,10 +2603,82 @@
             </div>
             <div style="font-size: 11px; color: var(--text-3);">Create and manage Bearer API keys to secure remote Tailscale &amp; public access</div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openCreateKeyModal()">
+          <button class="btn btn-primary btn-sm" onclick="toggleCreateKeyPanel()">
             <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
             <span>Create New API Key</span>
           </button>
+        </div>
+
+        <!-- Inline Create API Key Form Panel -->
+        <div id="create-key-panel" style="display: none; background: #080808; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="plus-circle" style="width: 14px; height: 14px; color: var(--amber);"></i>
+              <span>Generate Virtual Gateway API Key</span>
+            </div>
+            <button class="btn btn-ghost btn-icon-sm" onclick="toggleCreateKeyPanel(false)" title="Close Form">
+              <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+            </button>
+          </div>
+
+          <div id="panel-form-content">
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 11px; font-weight: 500; color: var(--text-2); margin-bottom: 5px;">Key Label / Description</label>
+              <input type="text" id="panel-key-name" placeholder="e.g. Cursor Pro - Personal Laptop" style="width: 100%; padding: 8px 10px; background: #111111; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px;">
+            </div>
+
+            <!-- Usage Limits Configuration Form -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px;">
+              <!-- Request Limit Section -->
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label style="font-size: 11px; font-weight: 600; color: var(--text-2);">Request Limit (Max Calls)</label>
+                  <span style="font-size: 10px; color: var(--text-4);">Leave blank for unlimited</span>
+                </div>
+                <input type="number" id="panel-key-max-requests" placeholder="Unlimited (∞)" min="0" style="width: 100%; padding: 7px 10px; background: #111111; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px; margin-bottom: 6px;">
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelReqPreset(0)">Unlimited (∞)</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelReqPreset(100)">100 reqs</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelReqPreset(500)">500 reqs</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelReqPreset(1000)">1K reqs</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelReqPreset(5000)">5K reqs</button>
+                </div>
+              </div>
+
+              <!-- Token Limit Section -->
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label style="font-size: 11px; font-weight: 600; color: var(--text-2);">Token Limit (Max Tokens)</label>
+                  <span style="font-size: 10px; color: var(--text-4);">Leave blank for unlimited</span>
+                </div>
+                <input type="number" id="panel-key-max-tokens" placeholder="Unlimited (∞)" min="0" style="width: 100%; padding: 7px 10px; background: #111111; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px; margin-bottom: 6px;">
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelTokPreset(0)">Unlimited (∞)</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelTokPreset(250000)">250K tok</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelTokPreset(1000000)">1M tok</button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 7px;" onclick="setPanelTokPreset(5000000)">5M tok</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+              <button class="btn btn-secondary btn-sm" onclick="toggleCreateKeyPanel(false)">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="submitCreateKeyFromPanel()">
+                <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
+                <span>Generate Key with Limits</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="panel-created-result" style="display: none;">
+            <div style="font-size: 12px; color: var(--green); margin-bottom: 8px; font-weight: 600;">✨ API Key Created Successfully!</div>
+            <div style="display: flex; align-items: center; gap: 8px; background: #111111; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+              <code id="panel-new-key-display" style="font-family: var(--font-mono); font-size: 12px; color: var(--amber); word-break: break-all; flex: 1;"></code>
+              <button class="btn btn-secondary btn-sm" onclick="copySnippet(document.getElementById('panel-new-key-display').innerText, this)">Copy Key</button>
+            </div>
+            <div style="font-size: 11px; color: var(--text-4); margin-bottom: 12px;">Use in Cursor / Claude Code / Continue: <code>Authorization: Bearer sk-ag-...</code></div>
+            <button class="btn btn-secondary btn-sm" onclick="toggleCreateKeyPanel(false)">Done</button>
+          </div>
         </div>
 
         <div id="keys-list-container">
@@ -5735,24 +5811,84 @@
       }
     }
 
+    function toggleCreateKeyPanel(show) {
+      const panel = document.getElementById('create-key-panel');
+      const formBox = document.getElementById('panel-form-content');
+      const resBox = document.getElementById('panel-created-result');
+      const nameInput = document.getElementById('panel-key-name');
+      const reqInput = document.getElementById('panel-key-max-requests');
+      const tokInput = document.getElementById('panel-key-max-tokens');
+
+      if (!panel) return;
+      const isOpening = show !== undefined ? show : (panel.style.display === 'none' || panel.style.display === '');
+      if (isOpening) {
+        panel.style.display = 'block';
+        if (formBox) formBox.style.display = 'block';
+        if (resBox) resBox.style.display = 'none';
+        if (nameInput) { nameInput.value = ''; setTimeout(() => nameInput.focus(), 50); }
+        if (reqInput) reqInput.value = '';
+        if (tokInput) tokInput.value = '';
+        try { window.lucide.createIcons(); } catch (e) {}
+      } else {
+        panel.style.display = 'none';
+      }
+    }
+
+    function setPanelReqPreset(val) {
+      const el = document.getElementById('panel-key-max-requests');
+      if (el) el.value = val === 0 ? '' : val;
+    }
+
+    function setPanelTokPreset(val) {
+      const el = document.getElementById('panel-key-max-tokens');
+      if (el) el.value = val === 0 ? '' : val;
+    }
+
+    async function submitCreateKeyFromPanel() {
+      const nameInput = document.getElementById('panel-key-name');
+      const reqInput = document.getElementById('panel-key-max-requests');
+      const tokInput = document.getElementById('panel-key-max-tokens');
+
+      const name = nameInput ? nameInput.value.trim() : '';
+      const maxRequests = reqInput && reqInput.value ? parseInt(reqInput.value, 10) : null;
+      const maxTokens = tokInput && tokInput.value ? parseInt(tokInput.value, 10) : null;
+
+      try {
+        const res = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            name: name || 'Cursor Pro',
+            maxRequests,
+            maxTokens
+          })
+        });
+        const data = await res.json();
+        if (data.ok && data.key) {
+          const formBox = document.getElementById('panel-form-content');
+          const resBox = document.getElementById('panel-created-result');
+          const display = document.getElementById('panel-new-key-display');
+          if (formBox) formBox.style.display = 'none';
+          if (resBox) resBox.style.display = 'block';
+          if (display) display.innerText = data.key.apiKey;
+          addLog(`🔑 Generated new API key: "${data.key.name}" ${maxRequests ? `(Limit: ${maxRequests} reqs)` : '(Unlimited)'}`);
+          fetchApiKeys();
+        }
+      } catch (e) {
+        addLog(`❌ Failed to create API key: ${e.message}`);
+      }
+    }
+
     function openCreateKeyModal() {
-      const modal = document.getElementById('create-key-modal');
-      const form = document.getElementById('create-key-form');
-      const res = document.getElementById('create-key-result');
-      const input = document.getElementById('input-key-name');
-      const maxReq = document.getElementById('input-key-max-requests');
-      const maxTok = document.getElementById('input-key-max-tokens');
-      if (form) form.style.display = 'block';
-      if (res) res.style.display = 'none';
-      if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
-      if (maxReq) maxReq.value = '';
-      if (maxTok) maxTok.value = '';
-      if (modal) modal.classList.add('open');
+      toggleCreateKeyPanel(true);
     }
 
     function closeCreateKeyModal() {
       const modal = document.getElementById('create-key-modal');
-      if (modal) modal.classList.remove('open');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('open');
+      }
     }
 
     async function submitCreateKey() {
@@ -5802,12 +5938,18 @@
       if (nameLabel) nameLabel.innerText = `Key: ${k.name}`;
       if (reqInput) reqInput.value = (k.max_requests && k.max_requests > 0) ? k.max_requests : '';
       if (tokInput) tokInput.value = (k.max_tokens && k.max_tokens > 0) ? k.max_tokens : '';
-      if (modal) modal.classList.add('open');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('open');
+      }
     }
 
     function closeEditKeyModal() {
       const modal = document.getElementById('edit-key-modal');
-      if (modal) modal.classList.remove('open');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('open');
+      }
     }
 
     async function submitUpdateKeyLimits() {
@@ -6378,6 +6520,12 @@
     });
     document.getElementById('account-details-modal')?.addEventListener('click', (e) => {
       if (e.target.id === 'account-details-modal') closeAccountDetails();
+    });
+    document.getElementById('create-key-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'create-key-modal') closeCreateKeyModal();
+    });
+    document.getElementById('edit-key-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'edit-key-modal') closeEditKeyModal();
     });
 
     // Playground Cmd+Enter Shortcut
