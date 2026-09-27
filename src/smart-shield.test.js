@@ -174,6 +174,29 @@ test('returns to the main account once it has recovered, but not before', () => 
   assert.equal(notYet.action, 'none', 'main account 5h window has not recovered enough');
 });
 
+test('does not return to main account if current account was explicitly manually selected and is healthy', () => {
+  const manual = planShieldSwitch({
+    accounts, statsAccounts: { nabiaz: q(90, 95), aqua: q(70, 80), diit: q(95, 95) },
+    currentId: 'aqua', primaryId: 'nabiaz', manualActiveId: 'aqua', threshold: 20, now: NOW
+  });
+  assert.equal(manual.action, 'none', 'manually selected account remains active while healthy');
+
+  const manualFlag = planShieldSwitch({
+    accounts, statsAccounts: { nabiaz: q(90, 95), aqua: q(70, 80), diit: q(95, 95) },
+    currentId: 'aqua', primaryId: 'nabiaz', isManualActive: true, threshold: 20, now: NOW
+  });
+  assert.equal(manualFlag.action, 'none', 'isManualActive flag protects healthy account');
+});
+
+test('still fails over away from manually selected account if it actually runs out of quota', () => {
+  const exhausted = planShieldSwitch({
+    accounts, statsAccounts: { nabiaz: q(90, 95), aqua: q(10, 10), diit: q(95, 95) },
+    currentId: 'aqua', primaryId: 'nabiaz', manualActiveId: 'aqua', threshold: 20, now: NOW
+  });
+  assert.equal(exhausted.action, 'switch', 'fails over when exhausted');
+  assert.equal(exhausted.target.account.id, 'nabiaz', 'switches to primary if ready');
+});
+
 test('watches Claude limits when Claude is in use', () => {
   const withClaude = (gw, g5, cw, c5) => ({ enabled: true, geminiWeekly: { pct: gw }, gemini5h: { pct: g5 }, claudeWeekly: { pct: cw }, claude5h: { pct: c5 } });
   const statsAccounts = { nabiaz: withClaude(90, 90, 40, 5), aqua: withClaude(90, 90, 10, 90), diit: withClaude(60, 60, 80, 80) };

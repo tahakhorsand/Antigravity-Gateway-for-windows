@@ -2494,7 +2494,13 @@
         );
       }
 
-      const activeSessionEmail = (lastIdeStatus?.ideEmail || lastStatsData?.global?.activeSessionEmail || '').toLowerCase();
+      const activeSessionEmail = (
+        (lastIdeStatus?.inSync ? lastIdeStatus?.ideEmail : null) ||
+        lastStatsData?.global?.activeSessionEmail ||
+        lastIdeStatus?.pendingSwitch?.email ||
+        lastIdeStatus?.ideEmail ||
+        ''
+      ).toLowerCase();
       const activeSessionId = lastStatsData?.global?.activeSessionAccountId;
 
       if (currentAccountFilter === 'active') {
@@ -3376,7 +3382,14 @@
         }
 
         // Active Session Email & Sync Status
-        const activeEmail = (ideStatus?.ideEmail || data.global?.activeSessionEmail || rawAccounts[0]?.email || '').toLowerCase();
+        const activeEmail = (
+          (ideStatus?.inSync ? ideStatus?.ideEmail : null) ||
+          data.global?.activeSessionEmail ||
+          ideStatus?.pendingSwitch?.email ||
+          ideStatus?.ideEmail ||
+          rawAccounts[0]?.email ||
+          ''
+        ).toLowerCase();
         const activeId = data.global?.activeSessionAccountId;
         const activeEmailEl = document.getElementById('header-active-email');
         if (activeEmailEl) activeEmailEl.innerText = activeEmail || 'Unknown';

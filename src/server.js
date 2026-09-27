@@ -24,7 +24,8 @@ import {
   adoptIdeAccount,
   updateAccountEnabledState,
   updateAccountAlias,
-  removeAccountStats
+  removeAccountStats,
+  clearManualActiveAccount
 } from './stats.js';
 import { getMetadataDb, setMetadataDb, queryLogsDb, getHourlyHeatmapDb } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
@@ -247,6 +248,8 @@ let lastStrandedNoticeAt = 0;
 // What Antigravity's language server says, refreshed every few seconds.
 const ideState = { email: null, detected: false, checkedAt: 0 };
 let idePolling = false;
+let manualSwitchLockUntil = 0;
+let manualSwitchTargetEmail = null;
 
 /** Keep the harness (and dashboard) in step with the account Antigravity is really using. */
 async function pollIdeAccount() {
@@ -257,6 +260,24 @@ async function pollIdeAccount() {
     ideState.checkedAt = Date.now();
     ideState.detected = !!email;
     if (!email) return; // Antigravity closed or its language server is restarting: keep last known
+
+    // If an explicit switch is pending (waiting for idle session), ignore the old server's email
+    const pending = getPendingSwitch();
+    if (pending && pending.email) {
+      if (email !== pending.email.toLowerCase()) {
+        return;
+      }
+    }
+
+    // If a manual switch was recently executed, do not adopt the stale old email while supervisor restarts
+    if (Date.now() < manualSwitchLockUntil && manualSwitchTargetEmail) {
+      if (email !== manualSwitchTargetEmail) {
+        return;
+      }
+      manualSwitchLockUntil = 0;
+      manualSwitchTargetEmail = null;
+    }
+
     ideState.email = email;
     if (adoptIdeAccount(email)) {
       const acc = getAccounts().find((a) => a.email && a.email.toLowerCase() === email);
@@ -271,6 +292,15 @@ async function pollIdeAccount() {
 }
 
 async function resolveIdeAccount(accounts, stats) {
+  const pending = getPendingSwitch();
+  if (pending && pending.email) {
+    const acc = accounts.find((a) => a.email && a.email.toLowerCase() === pending.email.toLowerCase());
+    if (acc) return acc;
+  }
+  if (Date.now() < manualSwitchLockUntil && manualSwitchTargetEmail) {
+    const acc = accounts.find((a) => a.email && a.email.toLowerCase() === manualSwitchTargetEmail);
+    if (acc) return acc;
+  }
   // Ask Antigravity's language server who it is really signed in as; fall back to harness state.
   const ideEmail = await readLanguageServerEmail();
   const email = (ideEmail || stats.global?.activeSessionEmail || getRealActiveAntigravityEmail() || '').toLowerCase();
@@ -357,6 +387,7 @@ export async function checkAndApplySmartShield({ quotaHit = false, conversationI
     const settings = shieldSettings();
     const families = familiesToWatch(settings);
     const primary = settings.primaryEmail ? accounts.find((a) => a.email && a.email.toLowerCase() === settings.primaryEmail) : null;
+    const manualActiveId = stats.global?.manualActiveAccountId || null;
     const plan = planShieldSwitch({
       accounts,
       statsAccounts: stats.accounts || {},
@@ -365,6 +396,7 @@ export async function checkAndApplySmartShield({ quotaHit = false, conversationI
       burstThreshold: settings.burstThreshold,
       families,
       primaryId: primary ? primary.id : null,
+      manualActiveId,
       resetGraceMs: settings.resetGraceMinutes * 60 * 1000,
       isCoolingDown,
       forceLow: quotaHit
@@ -426,6 +458,7 @@ export async function checkAndApplySmartShield({ quotaHit = false, conversationI
 
     const result = await switchAntigravityActiveAccount(targetAcc.id, targetAcc, {
       restartLanguageServer: true,
+      isManual: false,
       restoreConversationId: resumeInto || undefined,
       onConversationRestored,
       // an optional switch back to the main account waits for a longer quiet period
@@ -446,7 +479,7 @@ export async function checkAndApplySmartShield({ quotaHit = false, conversationI
       }
     });
     if (!result) return;
-    setActiveAccount(targetAcc.id);
+    setActiveAccount(targetAcc.id, { manual: false });
 
     const ide = result.ide || {};
     const state = ide.deferred ? 'scheduled' : (ide.ok ? 'switched' : 'failed');
@@ -1151,10 +1184,22 @@ async function handleProxyRequest(req, res) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: `Unknown account id ${accountId}` }));
       }
+
+      const targetEmail = targetAcc.email.toLowerCase();
+      manualSwitchLockUntil = Date.now() + 20000;
+      manualSwitchTargetEmail = targetEmail;
+
+      // If smart_shield_primary_email was set, keep affinity aligned with the user's manual choice
+      const currentPrimary = (getMetadataDb('smart_shield_primary_email', '') || '').trim();
+      if (currentPrimary) {
+        setMetadataDb('smart_shield_primary_email', targetEmail);
+      }
+
       // Manual switch: restart Antigravity's language server so the IDE really signs in as the
       // chosen account. If a task is running, the restart waits until the session is idle.
       const switchResult = await switchAntigravityActiveAccount(accountId, targetAcc, {
         restartLanguageServer: true,
+        isManual: true,
         onDeferredDone: (result) => broadcastEvent({
           type: 'ide_switch_result',
           accountId,
@@ -1168,7 +1213,7 @@ async function handleProxyRequest(req, res) {
         res.writeHead(409, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: 'Account is unknown to the stats store or 403-restricted' }));
       }
-      setActiveAccount(accountId);
+      setActiveAccount(accountId, { manual: true });
       broadcastEvent({ 
         type: 'account_switch', 
         accountId, 

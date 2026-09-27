@@ -99,6 +99,8 @@ export function planShieldSwitch({
   forceLow = false,
   resetGraceMs = 15 * 60 * 1000,
   primaryId = null,
+  manualActiveId = null,
+  isManualActive = false,
   now = Date.now()
 } = {}) {
   const current = accounts.find((a) => a.id === currentId);
@@ -144,8 +146,9 @@ export function planShieldSwitch({
     ? { account: primary, weekly: primaryReady.weekly, burst: primaryReady.burst, weeklyResetAt: primaryReady.weeklyResetAt, score: Infinity }
     : null;
 
+  const isManuallySelected = isManualActive || (manualActiveId && current.id === manualActiveId);
   if (low.length === 0 && !forceLow) {
-    if (primaryCandidate) {
+    if (primaryCandidate && !isManuallySelected) {
       return { action: 'switch', reason: 'return_to_main', target: primaryCandidate, candidates: [primaryCandidate, ...candidates], low, ...base };
     }
     return { action: 'none', reason: 'current account above thresholds', low, ...base };

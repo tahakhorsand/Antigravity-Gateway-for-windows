@@ -34,6 +34,9 @@ let stats = {
     activeAccountId: null,
     activeSessionAccountId: null,
     activeSessionEmail: null,
+    manualActiveAccountId: null,
+    manualActiveEmail: null,
+    manualActiveAt: 0,
     isSessionGenerating: false,
     currentConversationId: null,
     bestAccountId: null,
@@ -732,6 +735,15 @@ export async function switchAntigravityActiveAccount(accountId, accountDetails, 
   stats.global.activeSessionAccountId = accountId;
   stats.global.activeSessionEmail = acc.email;
   stats.global.bestAccountId = accountId;
+  if (options.isManual === true) {
+    stats.global.manualActiveAccountId = accountId;
+    stats.global.manualActiveEmail = acc.email.toLowerCase();
+    stats.global.manualActiveAt = Date.now();
+  } else if (options.isManual === false) {
+    stats.global.manualActiveAccountId = null;
+    stats.global.manualActiveEmail = null;
+    stats.global.manualActiveAt = 0;
+  }
 
   writeKnownAntigravityAccounts(acc.email);
 
@@ -919,12 +931,29 @@ export function removeAccountStats(accountId) {
   }
 }
 
-export function setActiveAccount(accountId) {
+export function setActiveAccount(accountId, options = {}) {
   loadStats();
   if (stats.accounts[accountId] && !stats.accounts[accountId].is403Banned) {
     stats.global.bestAccountId = accountId;
+    if (options.manual === true) {
+      stats.global.manualActiveAccountId = accountId;
+      stats.global.manualActiveEmail = (stats.accounts[accountId].email || '').toLowerCase();
+      stats.global.manualActiveAt = Date.now();
+    } else if (options.manual === false) {
+      stats.global.manualActiveAccountId = null;
+      stats.global.manualActiveEmail = null;
+      stats.global.manualActiveAt = 0;
+    }
     saveStats();
   }
+}
+
+export function clearManualActiveAccount() {
+  loadStats();
+  stats.global.manualActiveAccountId = null;
+  stats.global.manualActiveEmail = null;
+  stats.global.manualActiveAt = 0;
+  saveStats();
 }
 
 export { getRecentLogsDb, getDailyAnalyticsDb, getModelDistributionDb } from './db.js';
