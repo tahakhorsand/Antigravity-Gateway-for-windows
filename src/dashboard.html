@@ -1604,6 +1604,13 @@
           <strong id="header-shield-val">Armed (&lt;20%)</strong>
         </div>
 
+        <!-- Tailscale Remote Access Pill -->
+        <div class="telemetry-pill interactive" id="pill-tailscale-status" onclick="switchTab('pane-api')" title="Tailscale Private Remote Access">
+          <i data-lucide="network" style="width: 13px; height: 13px; color: var(--blue);"></i>
+          <span style="color: var(--text-3);">Tailnet:</span>
+          <strong id="header-tailscale-val">Connecting...</strong>
+        </div>
+
         <!-- Emergency Quick Rotate Button -->
         <button class="btn btn-secondary btn-sm" id="btn-quick-rotate" onclick="triggerEmergencyRotate()" title="Emergency Rotate: Instantly rotate active session to highest-headroom standby account (Shortcut: ⇧⌘R)" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); color: var(--amber);">
           <i data-lucide="zap" style="width: 12px; height: 12px; color: var(--amber);"></i>
@@ -2526,6 +2533,58 @@
       <div class="section-heading">
         <span>Universal API &amp; Protocol Translator</span>
         <span class="section-sub">&bull; Use Antigravity's pooled Pro accounts in any OpenAI or Anthropic tool</span>
+      </div>
+
+      <!-- Tailscale Remote AI Mesh Card -->
+      <div class="card" style="margin-bottom: 12px; border-color: rgba(59, 130, 246, 0.25); background: linear-gradient(180deg, rgba(59, 130, 246, 0.04) 0%, rgba(10, 10, 10, 0.8) 100%);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(59, 130, 246, 0.12); display: flex; align-items: center; justify-content: center; color: var(--blue);">
+              <i data-lucide="network" style="width: 15px; height: 15px;"></i>
+            </div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span>Tailscale Remote AI Mesh</span>
+                <span class="status-badge" id="ts-badge-status" style="background: rgba(16, 185, 129, 0.1); color: var(--green); border-color: rgba(16, 185, 129, 0.25);">Online</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-3);" id="ts-sub-info">Encrypted WireGuard Mesh &bull; MagicDNS Active</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button class="btn btn-secondary btn-sm" id="btn-ts-serve" onclick="toggleTailscale(false)" style="font-size: 11px;">
+              <i data-lucide="shield" style="width: 12px; height: 12px; color: var(--green);"></i>
+              <span>Private Serve</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-ts-funnel" onclick="toggleTailscale(true)" style="font-size: 11px;">
+              <i data-lucide="globe" style="width: 12px; height: 12px; color: var(--blue);"></i>
+              <span>Public Funnel</span>
+            </button>
+            <button class="btn btn-ghost btn-icon-sm" onclick="fetchTailscaleStatus(true)" title="Refresh Tailscale Status">
+              <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
+          <div style="background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--text-4); font-weight: 600; margin-bottom: 4px;">MagicDNS Secure URL</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <code id="ts-magic-url" style="color: var(--blue); font-size: 11px; font-family: var(--font-mono); word-break: break-all;">https://md.tail58fb78.ts.net</code>
+              <button class="btn btn-ghost btn-icon-sm" onclick="copySnippet(document.getElementById('ts-magic-url').innerText, this)" title="Copy URL">
+                <i data-lucide="copy" style="width: 11px; height: 11px;"></i>
+              </button>
+            </div>
+          </div>
+          <div style="background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--text-4); font-weight: 600; margin-bottom: 4px;">Cursor / VS Code Base URL</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <code id="ts-openai-base" style="color: var(--green); font-size: 11px; font-family: var(--font-mono); word-break: break-all;">https://md.tail58fb78.ts.net/v1</code>
+              <button class="btn btn-ghost btn-icon-sm" onclick="copySnippet(document.getElementById('ts-openai-base').innerText, this)" title="Copy Base URL">
+                <i data-lucide="copy" style="width: 11px; height: 11px;"></i>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="settings-grid">
@@ -5360,6 +5419,80 @@
       }
     }
 
+    async function fetchTailscaleStatus(verbose = false) {
+      try {
+        const res = await fetch('/api/tailscale/status');
+        const data = await res.json();
+        const pillVal = document.getElementById('header-tailscale-val');
+        const badge = document.getElementById('ts-badge-status');
+        const subInfo = document.getElementById('ts-sub-info');
+        const magicUrl = document.getElementById('ts-magic-url');
+        const openaiBase = document.getElementById('ts-openai-base');
+        const btnServe = document.getElementById('btn-ts-serve');
+        const btnFunnel = document.getElementById('btn-ts-funnel');
+
+        if (!data.running) {
+          if (pillVal) { pillVal.innerText = 'Offline'; pillVal.style.color = 'var(--text-4)'; }
+          if (badge) { badge.innerText = 'Stopped'; badge.style.color = 'var(--text-4)'; badge.style.background = 'rgba(255,255,255,0.05)'; }
+          if (subInfo) subInfo.innerText = 'Tailscale daemon is stopped';
+          return;
+        }
+
+        const isServe = !!data.serve?.active;
+        const isFunnel = !!data.serve?.funnel;
+        const url = data.serve?.url || (data.dnsName ? `https://${data.dnsName}` : 'https://localhost');
+
+        if (pillVal) {
+          pillVal.innerText = isFunnel ? 'Funnel' : (isServe ? 'Serve' : 'Ready');
+          pillVal.style.color = isFunnel ? 'var(--blue)' : 'var(--green)';
+        }
+        if (badge) {
+          badge.innerText = isFunnel ? 'Public Funnel' : (isServe ? 'Tailnet Serve' : 'Ready');
+          badge.style.color = isFunnel ? 'var(--blue)' : 'var(--green)';
+        }
+        if (subInfo) {
+          subInfo.innerText = isServe 
+            ? `${isFunnel ? 'Public HTTPS Funnel' : 'Private Encrypted Tailnet'} • Proxying Port 8045`
+            : `${data.dnsName || 'Tailscale'} online • Proxy disabled`;
+        }
+        if (magicUrl) magicUrl.innerText = url;
+        if (openaiBase) openaiBase.innerText = `${url}/v1`;
+
+        if (btnServe) {
+          btnServe.style.background = isServe && !isFunnel ? 'rgba(16, 185, 129, 0.2)' : '';
+          btnServe.style.borderColor = isServe && !isFunnel ? 'var(--green)' : '';
+        }
+        if (btnFunnel) {
+          btnFunnel.style.background = isFunnel ? 'rgba(59, 130, 246, 0.2)' : '';
+          btnFunnel.style.borderColor = isFunnel ? 'var(--blue)' : '';
+        }
+
+        if (verbose) addLog(`🌐 Tailscale: ${data.dnsName} (${isServe ? 'Serving' : 'Idle'})`);
+      } catch (e) {
+        if (verbose) addLog(`⚠️ Could not reach Tailscale status API: ${e.message}`);
+      }
+    }
+
+    async function toggleTailscale(funnel = false) {
+      try {
+        addLog(`🌐 Configuring Tailscale ${funnel ? 'Public Funnel' : 'Private Serve'}...`);
+        const res = await fetch('/api/tailscale/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ funnel, enable: true })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          addLog(`✅ Tailscale ${funnel ? 'Public Funnel' : 'Private Serve'} enabled.`);
+        } else {
+          addLog(`⚠️ Tailscale error: ${data.error || 'Failed'}`);
+        }
+        await fetchTailscaleStatus();
+      } catch (e) {
+        addLog(`❌ Tailscale toggle failed: ${e.message}`);
+      }
+    }
+
     function launchDesktop() {
       fetch('/api/launch-desktop', { method: 'POST' });
       addLog('🚀 Launching Antigravity IDE...');
@@ -5791,6 +5924,8 @@
             addLog(`✅ Account added: ${item.email}`);
             showToast(`✅ Account added: ${item.email}`, 'success');
             fetchMatrix();
+          } else if (item.type === 'tailscale_updated') {
+            fetchTailscaleStatus();
           }
         } catch (err) {}
       };
@@ -5885,6 +6020,7 @@
     updateNotificationButton();
     setViewMode(currentViewMode);
     fetchSmartShieldConfig();
+    fetchTailscaleStatus();
     try { runSimulation(); } catch (e) {}
     const hashTab = (window.location.hash || '').replace('#', '');
     const savedTab = (hashTab && document.getElementById(hashTab)) ? hashTab : localStorage.getItem('harness_active_tab');

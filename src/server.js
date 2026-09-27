@@ -44,6 +44,7 @@ import {
 } from './translator.js';
 import { orderAccountCandidates, shouldAdoptActiveSession, planShieldSwitch, familyBuckets } from './account-order.js';
 import { readLanguageServerEmail, getPendingSwitch, cancelPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage } from './antigravity-auth-sync.js';
+import { getTailscaleStatus, setTailscaleServe, resetTailscaleServe } from './tailscale.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1628,6 +1629,34 @@ async function handleProxyRequest(req, res) {
         };
       })
     }, null, 2));
+  }
+
+  // Tailscale Remote Access Status & Control
+  if (urlPath === '/api/tailscale/status') {
+    const status = await getTailscaleStatus();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(status, null, 2));
+  }
+
+  if (urlPath === '/api/tailscale/toggle' && req.method === 'POST') {
+    let body = {};
+    try {
+      let str = '';
+      for await (const chunk of req) str += chunk;
+      body = JSON.parse(str || '{}');
+    } catch {}
+    const funnel = !!body.funnel;
+    const enable = body.enable !== false;
+    let result;
+    if (enable) {
+      result = await setTailscaleServe(CONFIG.PORT, { funnel });
+    } else {
+      result = await resetTailscaleServe();
+    }
+    const current = await getTailscaleStatus();
+    broadcastEvent({ type: 'tailscale_updated', tailscale: current });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, result, current }, null, 2));
   }
 
   // Server-Sent Events for Live Telemetry & Real-Time Tracking
