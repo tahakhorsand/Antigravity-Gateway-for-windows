@@ -2667,7 +2667,7 @@
 
   <!-- Create API Key Modal -->
   <div class="modal-backdrop" id="create-key-modal">
-    <div class="modal-box" style="max-width: 460px;">
+    <div class="modal-box" style="max-width: 480px;">
       <div class="modal-header">
         <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
           <i data-lucide="key" style="width: 14px; height: 14px; color: var(--amber);"></i>
@@ -2680,7 +2680,21 @@
       <div class="modal-body" style="padding: 16px;">
         <div id="create-key-form">
           <label style="display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px;">Key Label / Description</label>
-          <input type="text" id="input-key-name" placeholder="e.g. Cursor Pro - MacBook Air" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px; margin-bottom: 14px;" onkeydown="if(event.key==='Enter') submitCreateKey()">
+          <input type="text" id="input-key-name" placeholder="e.g. Cursor Pro - MacBook Air" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px; margin-bottom: 12px;">
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+            <div>
+              <label style="display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px;">Usage Limit (Requests)</label>
+              <input type="number" id="input-key-max-requests" placeholder="Unlimited (0)" min="0" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px;">
+              <div style="font-size: 10px; color: var(--text-4); margin-top: 4px;">e.g. 500 requests</div>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px;">Usage Limit (Tokens)</label>
+              <input type="number" id="input-key-max-tokens" placeholder="Unlimited (0)" min="0" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px;">
+              <div style="font-size: 10px; color: var(--text-4); margin-top: 4px;">e.g. 1,000,000 tokens</div>
+            </div>
+          </div>
+
           <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="submitCreateKey()">
             <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
             <span>Generate Key</span>
@@ -2694,6 +2708,43 @@
           </div>
           <div style="font-size: 11px; color: var(--text-4); margin-bottom: 14px;">Use in Cursor / Claude Code: <code>Authorization: Bearer sk-ag-...</code></div>
           <button class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="closeCreateKeyModal()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit API Key Limits Modal -->
+  <div class="modal-backdrop" id="edit-key-modal">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header">
+        <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="sliders" style="width: 14px; height: 14px; color: var(--amber);"></i>
+          <span>Configure API Key Limits</span>
+        </div>
+        <button class="btn btn-ghost btn-icon-sm" onclick="closeEditKeyModal()">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <input type="hidden" id="edit-key-id">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 12px;" id="edit-key-name-label">Key Name</div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px;">Max Requests Limit</label>
+            <input type="number" id="edit-key-max-requests" placeholder="Unlimited (0)" min="0" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px;">
+            <div style="font-size: 10px; color: var(--text-4); margin-top: 4px;">0 or blank = unlimited</div>
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px;">Max Tokens Limit</label>
+            <input type="number" id="edit-key-max-tokens" placeholder="Unlimited (0)" min="0" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px;">
+            <div style="font-size: 10px; color: var(--text-4); margin-top: 4px;">0 or blank = unlimited</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button class="btn btn-secondary btn-sm" onclick="closeEditKeyModal()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="submitUpdateKeyLimits()">Save Limits</button>
         </div>
       </div>
     </div>
@@ -5573,35 +5624,88 @@
             <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
               <thead>
                 <tr style="text-align: left; color: var(--text-4); border-bottom: 1px solid var(--border-subtle);">
-                  <th style="padding: 8px;">Name</th>
+                  <th style="padding: 8px;">Name &amp; Status</th>
                   <th style="padding: 8px;">Key</th>
-                  <th style="padding: 8px;">Requests</th>
+                  <th style="padding: 8px;">Request Limit / Usage</th>
+                  <th style="padding: 8px;">Tokens Burned</th>
                   <th style="padding: 8px;">Last Used</th>
                   <th style="padding: 8px; text-align: right;">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                ${data.keys.map(k => `
+                ${data.keys.map(k => {
+                  let reqsHtml = '';
+                  if (k.max_requests && k.max_requests > 0) {
+                    const reqPct = Math.min(100, Math.round(((k.requests_count || 0) / k.max_requests) * 100));
+                    const reqColor = reqPct >= 100 ? 'var(--red)' : reqPct >= 80 ? 'var(--amber)' : 'var(--green)';
+                    reqsHtml = `
+                      <div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px;">
+                          <span style="font-weight: 600; color: ${reqColor}; font-size: 11px;">${formatNumber(k.requests_count || 0)} / ${formatNumber(k.max_requests)}</span>
+                          <span style="font-size: 10px; color: var(--text-4);">${reqPct}%</span>
+                        </div>
+                        <div style="height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; width: 120px;">
+                          <div style="height: 100%; width: ${reqPct}%; background: ${reqColor};"></div>
+                        </div>
+                      </div>`;
+                  } else {
+                    reqsHtml = `<span style="color: var(--text-3); font-weight: 500;">${formatNumber(k.requests_count || 0)} / &infin;</span>`;
+                  }
+
+                  let tokensHtml = '';
+                  if (k.max_tokens && k.max_tokens > 0) {
+                    const tokPct = Math.min(100, Math.round(((k.tokens_count || 0) / k.max_tokens) * 100));
+                    const tokColor = tokPct >= 100 ? 'var(--red)' : tokPct >= 80 ? 'var(--amber)' : 'var(--blue)';
+                    tokensHtml = `
+                      <div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px;">
+                          <span style="font-weight: 600; color: ${tokColor}; font-size: 11px;">${formatNumber(k.tokens_count || 0)} / ${formatNumber(k.max_tokens)}</span>
+                          <span style="font-size: 10px; color: var(--text-4);">${tokPct}%</span>
+                        </div>
+                        <div style="height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; width: 120px;">
+                          <div style="height: 100%; width: ${tokPct}%; background: ${tokColor};"></div>
+                        </div>
+                      </div>`;
+                  } else {
+                    tokensHtml = `<span style="color: var(--text-4); font-family: var(--font-mono);">${formatNumber(k.tokens_count || 0)}</span>`;
+                  }
+
+                  return `
                   <tr style="border-bottom: 1px solid var(--border-subtle);">
-                    <td style="padding: 8px; font-weight: 600; color: var(--text-1);">${escapeHtml(k.name)}</td>
+                    <td style="padding: 8px;">
+                      <div style="font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px;">
+                        <span>${escapeHtml(k.name)}</span>
+                        ${k.is_exhausted ? `<span class="badge-tag" style="font-size: 9px; padding: 1px 4px; background: rgba(239,68,68,0.15); color: var(--red);">Exhausted</span>` : ''}
+                        ${!k.is_active ? `<span class="badge-tag" style="font-size: 9px; padding: 1px 4px; color: var(--text-4);">Disabled</span>` : ''}
+                      </div>
+                    </td>
                     <td style="padding: 8px; font-family: var(--font-mono); color: var(--amber);">
                       <code>${escapeHtml(k.preview)}</code>
                       <button class="btn btn-ghost btn-icon-sm" style="margin-left: 4px;" onclick="copySnippet('${k.apiKey}', this)" title="Copy Full Key">
                         <i data-lucide="copy" style="width: 11px; height: 11px;"></i>
                       </button>
                     </td>
-                    <td style="padding: 8px; color: var(--text-3);">${formatNumber(k.requests_count || 0)}</td>
-                    <td style="padding: 8px; color: var(--text-4);">${k.last_used_at ? new Date(k.last_used_at).toLocaleTimeString() : 'Never'}</td>
+                    <td style="padding: 8px;">${reqsHtml}</td>
+                    <td style="padding: 8px;">${tokensHtml}</td>
+                    <td style="padding: 8px; color: var(--text-4); font-size: 10px;">${k.last_used_at ? new Date(k.last_used_at).toLocaleTimeString() : 'Never'}</td>
                     <td style="padding: 8px; text-align: right;">
-                      <button class="btn btn-ghost btn-sm" style="color: ${k.is_active ? 'var(--green)' : 'var(--text-4)'}; font-size: 10px;" onclick="toggleApiKey('${k.id}')">
-                        ${k.is_active ? 'Active' : 'Disabled'}
-                      </button>
-                      <button class="btn btn-ghost btn-icon-sm" style="color: var(--red);" onclick="deleteApiKey('${k.id}')" title="Revoke Key">
-                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
-                      </button>
+                      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                        <button class="btn btn-ghost btn-icon-sm" onclick="resetApiKeyUsage('${k.id}')" title="Reset Usage Counter to 0">
+                          <i data-lucide="rotate-ccw" style="width: 12px; height: 12px; color: var(--blue);"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-icon-sm" onclick="openEditKeyModal('${k.id}', '${escapeHtml(k.name)}', ${k.max_requests || 0}, ${k.max_tokens || 0})" title="Configure Usage Limits">
+                          <i data-lucide="sliders" style="width: 12px; height: 12px; color: var(--amber);"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" style="color: ${k.is_active ? 'var(--green)' : 'var(--text-4)'}; font-size: 10px; padding: 2px 6px;" onclick="toggleApiKey('${k.id}')">
+                          ${k.is_active ? 'Active' : 'Disabled'}
+                        </button>
+                        <button class="btn btn-ghost btn-icon-sm" style="color: var(--red);" onclick="deleteApiKey('${k.id}')" title="Revoke Key">
+                          <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                        </button>
+                      </div>
                     </td>
-                  </tr>
-                `).join('')}
+                  </tr>`;
+                }).join('')}
               </tbody>
             </table>
           </div>`;
@@ -5614,9 +5718,13 @@
       const form = document.getElementById('create-key-form');
       const res = document.getElementById('create-key-result');
       const input = document.getElementById('input-key-name');
+      const maxReq = document.getElementById('input-key-max-requests');
+      const maxTok = document.getElementById('input-key-max-tokens');
       if (form) form.style.display = 'block';
       if (res) res.style.display = 'none';
       if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
+      if (maxReq) maxReq.value = '';
+      if (maxTok) maxTok.value = '';
       if (modal) modal.classList.add('open');
     }
 
@@ -5627,12 +5735,21 @@
 
     async function submitCreateKey() {
       const input = document.getElementById('input-key-name');
+      const maxReqInput = document.getElementById('input-key-max-requests');
+      const maxTokInput = document.getElementById('input-key-max-tokens');
       const name = input ? input.value.trim() : '';
+      const maxRequests = maxReqInput && maxReqInput.value ? parseInt(maxReqInput.value, 10) : null;
+      const maxTokens = maxTokInput && maxTokInput.value ? parseInt(maxTokInput.value, 10) : null;
+
       try {
         const res = await fetch('/api/keys', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name || 'Cursor Pro' })
+          body: JSON.stringify({ 
+            name: name || 'Cursor Pro',
+            maxRequests,
+            maxTokens
+          })
         });
         const data = await res.json();
         if (data.ok && data.key) {
@@ -5642,11 +5759,69 @@
           if (form) form.style.display = 'none';
           if (resBox) resBox.style.display = 'block';
           if (display) display.innerText = data.key.apiKey;
-          addLog(`🔑 Generated new API key: "${data.key.name}"`);
+          addLog(`🔑 Generated new API key: "${data.key.name}" ${maxRequests ? `(Limit: ${maxRequests} reqs)` : '(Unlimited)'}`);
           fetchApiKeys();
         }
       } catch (e) {
         addLog(`❌ Failed to create API key: ${e.message}`);
+      }
+    }
+
+    function openEditKeyModal(id, name, maxReq, maxTok) {
+      const modal = document.getElementById('edit-key-modal');
+      const idInput = document.getElementById('edit-key-id');
+      const nameLabel = document.getElementById('edit-key-name-label');
+      const reqInput = document.getElementById('edit-key-max-requests');
+      const tokInput = document.getElementById('edit-key-max-tokens');
+
+      if (idInput) idInput.value = id;
+      if (nameLabel) nameLabel.innerText = `Key: ${name}`;
+      if (reqInput) reqInput.value = (maxReq && maxReq > 0) ? maxReq : '';
+      if (tokInput) tokInput.value = (maxTok && maxTok > 0) ? maxTok : '';
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeEditKeyModal() {
+      const modal = document.getElementById('edit-key-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function submitUpdateKeyLimits() {
+      const id = document.getElementById('edit-key-id')?.value;
+      const reqVal = document.getElementById('edit-key-max-requests')?.value;
+      const tokVal = document.getElementById('edit-key-max-tokens')?.value;
+
+      const maxRequests = reqVal ? parseInt(reqVal, 10) : null;
+      const maxTokens = tokVal ? parseInt(tokVal, 10) : null;
+
+      try {
+        const res = await fetch('/api/keys/update-limit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, maxRequests, maxTokens })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          addLog(`⚙️ API key limits updated.`);
+          closeEditKeyModal();
+          fetchApiKeys();
+        }
+      } catch (e) {
+        addLog(`❌ Failed to update limits: ${e.message}`);
+      }
+    }
+
+    async function resetApiKeyUsage(id) {
+      if (!confirm('Reset usage count for this API key back to 0?')) return;
+      try {
+        const res = await fetch(`/api/keys/reset-usage?id=${encodeURIComponent(id)}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          addLog('🔄 API Key usage counters reset to 0.');
+          fetchApiKeys();
+        }
+      } catch (e) {
+        addLog(`❌ Failed to reset usage: ${e.message}`);
       }
     }
 

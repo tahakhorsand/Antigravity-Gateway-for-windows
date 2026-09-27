@@ -87,9 +87,16 @@ function initSchema() {
       created_at INTEGER NOT NULL,
       last_used_at INTEGER,
       requests_count INTEGER DEFAULT 0,
+      max_requests INTEGER DEFAULT NULL,
+      tokens_count INTEGER DEFAULT 0,
+      max_tokens INTEGER DEFAULT NULL,
       is_active INTEGER DEFAULT 1
     );
   `);
+
+  try { db.exec('ALTER TABLE api_keys ADD COLUMN max_requests INTEGER DEFAULT NULL;'); } catch {}
+  try { db.exec('ALTER TABLE api_keys ADD COLUMN tokens_count INTEGER DEFAULT 0;'); } catch {}
+  try { db.exec('ALTER TABLE api_keys ADD COLUMN max_tokens INTEGER DEFAULT NULL;'); } catch {}
 
   // Ensure daily_usage is aligned to local calendar dates
   try {
@@ -577,31 +584,52 @@ export function queryLogsDb({ limit = 25, page = 1, account = '', model = '', se
 // Virtual API Key Management & Validation
 // ----------------------------------------------------
 
-export function createApiKeyDb({ name = 'Default Key' } = {}) {
+export function createApiKeyDb({ name = 'Default Key', maxRequests = null, maxTokens = null } = {}) {
   const db = getDatabase();
   const id = crypto.randomUUID();
   const apiKey = `sk-ag-${crypto.randomBytes(24).toString('hex')}`;
   const now = Date.now();
+  const maxReq = maxRequests && Number(maxRequests) > 0 ? parseInt(maxRequests, 10) : null;
+  const maxTok = maxTokens && Number(maxTokens) > 0 ? parseInt(maxTokens, 10) : null;
+
   db.prepare(`
-    INSERT INTO api_keys (id, name, api_key, created_at, last_used_at, requests_count, is_active)
-    VALUES (?, ?, ?, ?, NULL, 0, 1)
-  `).run(id, (name || 'Default Key').trim(), apiKey, now);
-  return { id, name: (name || 'Default Key').trim(), apiKey, created_at: now, requests_count: 0, is_active: true };
+    INSERT INTO api_keys (id, name, api_key, created_at, last_used_at, requests_count, max_requests, tokens_count, max_tokens, is_active)
+    VALUES (?, ?, ?, ?, NULL, 0, ?, 0, ?, 1)
+  `).run(id, (name || 'Default Key').trim(), apiKey, now, maxReq, maxTok);
+  return { 
+    id, 
+    name: (name || 'Default Key').trim(), 
+    apiKey, 
+    created_at: now, 
+    requests_count: 0, 
+    max_requests: maxReq,
+    tokens_count: 0,
+    max_tokens: maxTok,
+    is_active: true 
+  };
 }
 
 export function listApiKeysDb() {
   const db = getDatabase();
   const rows = db.prepare(`SELECT * FROM api_keys ORDER BY created_at DESC`).all();
-  return rows.map(r => ({
-    id: r.id,
-    name: r.name,
-    apiKey: r.api_key,
-    preview: `${r.api_key.slice(0, 10)}...${r.api_key.slice(-4)}`,
-    created_at: r.created_at,
-    last_used_at: r.last_used_at,
-    requests_count: r.requests_count || 0,
-    is_active: r.is_active === 1
-  }));
+  return rows.map(r => {
+    const isReqExhausted = r.max_requests > 0 && (r.requests_count || 0) >= r.max_requests;
+    const isTokExhausted = r.max_tokens > 0 && (r.tokens_count || 0) >= r.max_tokens;
+    return {
+      id: r.id,
+      name: r.name,
+      apiKey: r.api_key,
+      preview: `${r.api_key.slice(0, 10)}...${r.api_key.slice(-4)}`,
+      created_at: r.created_at,
+      last_used_at: r.last_used_at,
+      requests_count: r.requests_count || 0,
+      max_requests: r.max_requests || null,
+      tokens_count: r.tokens_count || 0,
+      max_tokens: r.max_tokens || null,
+      is_exhausted: isReqExhausted || isTokExhausted,
+      is_active: r.is_active === 1
+    };
+  });
 }
 
 export function deleteApiKeyDb(id) {
@@ -619,14 +647,61 @@ export function toggleApiKeyDb(id) {
   return newStatus === 1;
 }
 
+export function updateApiKeyLimitDb(id, { maxRequests = null, maxTokens = null } = {}) {
+  const db = getDatabase();
+  const maxReq = maxRequests !== undefined && maxRequests !== null && Number(maxRequests) > 0 ? parseInt(maxRequests, 10) : null;
+  const maxTok = maxTokens !== undefined && maxTokens !== null && Number(maxTokens) > 0 ? parseInt(maxTokens, 10) : null;
+  const res = db.prepare(`UPDATE api_keys SET max_requests = ?, max_tokens = ? WHERE id = ?`).run(maxReq, maxTok, id);
+  return res.changes > 0;
+}
+
+export function resetApiKeyUsageDb(id) {
+  const db = getDatabase();
+  const res = db.prepare(`UPDATE api_keys SET requests_count = 0, tokens_count = 0 WHERE id = ?`).run(id);
+  return res.changes > 0;
+}
+
 export function validateApiKeyDb(rawKey) {
-  if (!rawKey) return null;
+  if (!rawKey) return { valid: false, reason: 'missing' };
   const db = getDatabase();
   const key = rawKey.trim();
-  const row = db.prepare(`SELECT * FROM api_keys WHERE api_key = ? AND is_active = 1`).get(key);
-  if (!row) return null;
+  const row = db.prepare(`SELECT * FROM api_keys WHERE api_key = ?`).get(key);
+  if (!row) return { valid: false, reason: 'not_found' };
+  if (row.is_active !== 1) return { valid: false, reason: 'disabled', key: row };
+
+  // Check request limit
+  if (row.max_requests > 0 && (row.requests_count || 0) >= row.max_requests) {
+    return { 
+      valid: false, 
+      reason: 'request_limit_exceeded', 
+      requestsCount: row.requests_count, 
+      maxRequests: row.max_requests, 
+      key: row 
+    };
+  }
+
+  // Check token limit
+  if (row.max_tokens > 0 && (row.tokens_count || 0) >= row.max_tokens) {
+    return { 
+      valid: false, 
+      reason: 'token_limit_exceeded', 
+      tokensCount: row.tokens_count, 
+      maxTokens: row.max_tokens, 
+      key: row 
+    };
+  }
+
+  // Increment requests count and set last_used_at
   db.prepare(`UPDATE api_keys SET last_used_at = ?, requests_count = requests_count + 1 WHERE id = ?`).run(Date.now(), row.id);
-  return row;
+  return { valid: true, key: row };
+}
+
+export function recordApiKeyTokensDb(keyId, totalTokens = 0) {
+  if (!keyId || !totalTokens || totalTokens <= 0) return;
+  try {
+    const db = getDatabase();
+    db.prepare(`UPDATE api_keys SET tokens_count = tokens_count + ? WHERE id = ?`).run(totalTokens, keyId);
+  } catch {}
 }
 
 export function hasActiveApiKeysDb() {

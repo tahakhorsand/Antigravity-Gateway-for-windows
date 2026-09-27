@@ -37,7 +37,10 @@ import {
   deleteApiKeyDb,
   toggleApiKeyDb,
   validateApiKeyDb,
-  hasActiveApiKeysDb
+  hasActiveApiKeysDb,
+  updateApiKeyLimitDb,
+  resetApiKeyUsageDb,
+  recordApiKeyTokensDb
 } from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
 import { createLoginUrl, completeLogin, loginResultPage } from './account-login.js';
@@ -750,6 +753,10 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
         const completionTokens = converted.usage?.completion_tokens || converted.usage?.output_tokens || 10;
         const totalTokens = promptTokens + completionTokens;
 
+        if (req.apiKeyRow?.id) {
+          recordApiKeyTokensDb(req.apiKeyRow.id, totalTokens);
+        }
+
         recordRequestSuccess(account.id, duration, {
           input: promptTokens,
           output: completionTokens,
@@ -867,6 +874,11 @@ async function handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, c
             choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
           })}\n\n`);
           res.write('data: [DONE]\n\n');
+        }
+
+        const streamTotalTokens = 20 + totalOutTokens;
+        if (req.apiKeyRow?.id) {
+          recordApiKeyTokensDb(req.apiKeyRow.id, streamTotalTokens);
         }
 
         recordRequestSuccess(account.id, duration, {
@@ -1684,10 +1696,39 @@ async function handleProxyRequest(req, res) {
       for await (const chunk of req) str += chunk;
       body = JSON.parse(str || '{}');
     } catch {}
-    const created = createApiKeyDb({ name: body.name });
+    const created = createApiKeyDb({ 
+      name: body.name, 
+      maxRequests: body.maxRequests, 
+      maxTokens: body.maxTokens 
+    });
     broadcastEvent({ type: 'keys_updated' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, key: created }, null, 2));
+  }
+
+  if (urlPath === '/api/keys/update-limit' && req.method === 'POST') {
+    let body = {};
+    try {
+      let str = '';
+      for await (const chunk of req) str += chunk;
+      body = JSON.parse(str || '{}');
+    } catch {}
+    const updated = updateApiKeyLimitDb(body.id, { 
+      maxRequests: body.maxRequests, 
+      maxTokens: body.maxTokens 
+    });
+    broadcastEvent({ type: 'keys_updated' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: !!updated }));
+  }
+
+  if (urlPath.startsWith('/api/keys/reset-usage') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const id = query.get('id');
+    const reset = resetApiKeyUsageDb(id);
+    broadcastEvent({ type: 'keys_updated' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: !!reset }));
   }
 
   if (urlPath.startsWith('/api/keys/delete') && req.method === 'POST') {
@@ -1811,10 +1852,45 @@ async function handleProxyRequest(req, res) {
     if (hasActiveApiKeysDb()) {
       const authHeader = req.headers['authorization'] || req.headers['x-api-key'] || '';
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
-      const validKey = validateApiKeyDb(token);
-      if (!validKey) {
+      const authResult = validateApiKeyDb(token);
+
+      if (!authResult.valid) {
         const host = req.headers['host'] || '';
         const isLocalhost = host.startsWith('127.0.0.1') || host.startsWith('localhost');
+
+        if (authResult.reason === 'request_limit_exceeded') {
+          res.writeHead(429, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({
+            error: {
+              message: `API key request limit exceeded (${authResult.requestsCount}/${authResult.maxRequests} requests). Please upgrade or reset quota in the dashboard.`,
+              type: 'insufficient_quota',
+              code: 'quota_exceeded'
+            }
+          }));
+        }
+
+        if (authResult.reason === 'token_limit_exceeded') {
+          res.writeHead(429, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({
+            error: {
+              message: `API key token limit exceeded (${authResult.tokensCount}/${authResult.maxTokens} tokens). Please upgrade or reset quota in the dashboard.`,
+              type: 'insufficient_quota',
+              code: 'quota_exceeded'
+            }
+          }));
+        }
+
+        if (authResult.reason === 'disabled') {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({
+            error: {
+              message: 'This Gateway API key has been disabled in the dashboard.',
+              type: 'invalid_request_error',
+              code: 'api_key_disabled'
+            }
+          }));
+        }
+
         if (!isLocalhost || token) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({
@@ -1825,6 +1901,8 @@ async function handleProxyRequest(req, res) {
             }
           }));
         }
+      } else {
+        req.apiKeyRow = authResult.key;
       }
     }
     return handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates, statsData);
