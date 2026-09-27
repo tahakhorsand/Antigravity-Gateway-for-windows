@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -77,6 +78,16 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS system_metadata (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      api_key TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER,
+      requests_count INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1
     );
   `);
 
@@ -561,3 +572,66 @@ export function queryLogsDb({ limit = 25, page = 1, account = '', model = '', se
     return { logs: [], pagination: { page: 1, limit, total: 0, totalPages: 1, hasPrev: false, hasNext: false } };
   }
 }
+
+// ----------------------------------------------------
+// Virtual API Key Management & Validation
+// ----------------------------------------------------
+
+export function createApiKeyDb({ name = 'Default Key' } = {}) {
+  const db = getDatabase();
+  const id = crypto.randomUUID();
+  const apiKey = `sk-ag-${crypto.randomBytes(24).toString('hex')}`;
+  const now = Date.now();
+  db.prepare(`
+    INSERT INTO api_keys (id, name, api_key, created_at, last_used_at, requests_count, is_active)
+    VALUES (?, ?, ?, ?, NULL, 0, 1)
+  `).run(id, (name || 'Default Key').trim(), apiKey, now);
+  return { id, name: (name || 'Default Key').trim(), apiKey, created_at: now, requests_count: 0, is_active: true };
+}
+
+export function listApiKeysDb() {
+  const db = getDatabase();
+  const rows = db.prepare(`SELECT * FROM api_keys ORDER BY created_at DESC`).all();
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    apiKey: r.api_key,
+    preview: `${r.api_key.slice(0, 10)}...${r.api_key.slice(-4)}`,
+    created_at: r.created_at,
+    last_used_at: r.last_used_at,
+    requests_count: r.requests_count || 0,
+    is_active: r.is_active === 1
+  }));
+}
+
+export function deleteApiKeyDb(id) {
+  const db = getDatabase();
+  const res = db.prepare(`DELETE FROM api_keys WHERE id = ?`).run(id);
+  return res.changes > 0;
+}
+
+export function toggleApiKeyDb(id) {
+  const db = getDatabase();
+  const row = db.prepare(`SELECT is_active FROM api_keys WHERE id = ?`).get(id);
+  if (!row) return false;
+  const newStatus = row.is_active === 1 ? 0 : 1;
+  db.prepare(`UPDATE api_keys SET is_active = ? WHERE id = ?`).run(newStatus, id);
+  return newStatus === 1;
+}
+
+export function validateApiKeyDb(rawKey) {
+  if (!rawKey) return null;
+  const db = getDatabase();
+  const key = rawKey.trim();
+  const row = db.prepare(`SELECT * FROM api_keys WHERE api_key = ? AND is_active = 1`).get(key);
+  if (!row) return null;
+  db.prepare(`UPDATE api_keys SET last_used_at = ?, requests_count = requests_count + 1 WHERE id = ?`).run(Date.now(), row.id);
+  return row;
+}
+
+export function hasActiveApiKeysDb() {
+  const db = getDatabase();
+  const row = db.prepare(`SELECT COUNT(*) as count FROM api_keys WHERE is_active = 1`).get();
+  return (row?.count || 0) > 0;
+}
+

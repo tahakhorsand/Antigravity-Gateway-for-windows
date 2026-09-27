@@ -27,7 +27,18 @@ import {
   removeAccountStats,
   clearManualActiveAccount
 } from './stats.js';
-import { getMetadataDb, setMetadataDb, queryLogsDb, getHourlyHeatmapDb } from './db.js';
+import { 
+  getMetadataDb, 
+  setMetadataDb, 
+  queryLogsDb, 
+  getHourlyHeatmapDb,
+  createApiKeyDb,
+  listApiKeysDb,
+  deleteApiKeyDb,
+  toggleApiKeyDb,
+  validateApiKeyDb,
+  hasActiveApiKeysDb
+} from './db.js';
 import { fetchLiveAccountQuota } from './quota.js';
 import { createLoginUrl, completeLogin, loginResultPage } from './account-login.js';
 import crypto from 'crypto';
@@ -1659,6 +1670,44 @@ async function handleProxyRequest(req, res) {
     return res.end(JSON.stringify({ ok: true, result, current }, null, 2));
   }
 
+  // Virtual API Keys Management
+  if (urlPath === '/api/keys' && req.method === 'GET') {
+    const keys = listApiKeysDb();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, keys }, null, 2));
+  }
+
+  if (urlPath === '/api/keys' && req.method === 'POST') {
+    let body = {};
+    try {
+      let str = '';
+      for await (const chunk of req) str += chunk;
+      body = JSON.parse(str || '{}');
+    } catch {}
+    const created = createApiKeyDb({ name: body.name });
+    broadcastEvent({ type: 'keys_updated' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, key: created }, null, 2));
+  }
+
+  if (urlPath.startsWith('/api/keys/delete') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const id = query.get('id');
+    const deleted = deleteApiKeyDb(id);
+    broadcastEvent({ type: 'keys_updated' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: !!deleted }));
+  }
+
+  if (urlPath.startsWith('/api/keys/toggle') && req.method === 'POST') {
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const id = query.get('id');
+    const active = toggleApiKeyDb(id);
+    broadcastEvent({ type: 'keys_updated' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, is_active: active }));
+  }
+
   // Server-Sent Events for Live Telemetry & Real-Time Tracking
   if (urlPath === '/api/events') {
     res.writeHead(200, {
@@ -1759,6 +1808,25 @@ async function handleProxyRequest(req, res) {
 
   // Universal Protocol Translator (OpenAI /v1/chat/completions & Anthropic /v1/messages)
   if (urlPath === '/v1/chat/completions' || urlPath === '/v1/messages') {
+    if (hasActiveApiKeysDb()) {
+      const authHeader = req.headers['authorization'] || req.headers['x-api-key'] || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
+      const validKey = validateApiKeyDb(token);
+      if (!validKey) {
+        const host = req.headers['host'] || '';
+        const isLocalhost = host.startsWith('127.0.0.1') || host.startsWith('localhost');
+        if (!isLocalhost || token) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({
+            error: {
+              message: 'Invalid or missing Gateway API key. Create a key in the Gateway Dashboard (API Keys tab).',
+              type: 'invalid_request_error',
+              code: 'invalid_api_key'
+            }
+          }));
+        }
+      }
+    }
     return handleUniversalCompletion(req, res, reqId, urlPath, bodyBuffer, candidates, statsData);
   }
 

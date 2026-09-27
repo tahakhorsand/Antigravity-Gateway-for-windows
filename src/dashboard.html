@@ -2617,8 +2617,32 @@
         </div>
       </div>
 
+      <!-- Virtual API Key Manager Card -->
+      <div class="card" style="margin-top: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="key" style="width: 14px; height: 14px; color: var(--amber);"></i>
+              <span>Gateway Virtual API Keys</span>
+              <span class="badge-tag" id="keys-count-badge">0 Keys</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-3);">Create and manage Bearer API keys to secure remote Tailscale &amp; public access</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openCreateKeyModal()">
+            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+            <span>Create New API Key</span>
+          </button>
+        </div>
+
+        <div id="keys-list-container">
+          <div style="text-align: center; padding: 24px; color: var(--text-4); font-size: 12px;">
+            No API keys created yet. Without an API key, external access is unrestricted. Create a key to protect your Gateway on public internet.
+          </div>
+        </div>
+      </div>
+
       <!-- Interactive Test Ping Console -->
-      <div class="card" style="margin-top: 6px;">
+      <div class="card" style="margin-top: 10px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
           <div>
             <div style="font-size: 13px; font-weight: 600;">Live Gateway Test Console</div>
@@ -2636,6 +2660,40 @@
             <span id="test-result-meta" style="color: var(--text-4);">Latency: 0ms</span>
           </div>
           <div id="test-result-text" style="color: #ededed;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create API Key Modal -->
+  <div class="modal-backdrop" id="create-key-modal">
+    <div class="modal-box" style="max-width: 460px;">
+      <div class="modal-header">
+        <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="key" style="width: 14px; height: 14px; color: var(--amber);"></i>
+          <span>Create Gateway API Key</span>
+        </div>
+        <button class="btn btn-ghost btn-icon-sm" onclick="closeCreateKeyModal()">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div id="create-key-form">
+          <label style="display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px;">Key Label / Description</label>
+          <input type="text" id="input-key-name" placeholder="e.g. Cursor Pro - MacBook Air" style="width: 100%; padding: 8px 10px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-1); font-size: 12px; margin-bottom: 14px;" onkeydown="if(event.key==='Enter') submitCreateKey()">
+          <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="submitCreateKey()">
+            <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
+            <span>Generate Key</span>
+          </button>
+        </div>
+        <div id="create-key-result" style="display: none;">
+          <div style="font-size: 11px; color: var(--green); margin-bottom: 8px;">✨ Your API key has been created! Copy it now:</div>
+          <div style="display: flex; align-items: center; gap: 6px; background: #080808; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px;">
+            <code id="new-key-display" style="font-family: var(--font-mono); font-size: 11px; color: var(--amber); word-break: break-all; flex: 1;"></code>
+            <button class="btn btn-secondary btn-sm" onclick="copySnippet(document.getElementById('new-key-display').innerText, this)">Copy</button>
+          </div>
+          <div style="font-size: 11px; color: var(--text-4); margin-bottom: 14px;">Use in Cursor / Claude Code: <code>Authorization: Bearer sk-ag-...</code></div>
+          <button class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="closeCreateKeyModal()">Done</button>
         </div>
       </div>
     </div>
@@ -5493,6 +5551,121 @@
       }
     }
 
+    async function fetchApiKeys() {
+      try {
+        const res = await fetch('/api/keys');
+        const data = await res.json();
+        const container = document.getElementById('keys-list-container');
+        const badge = document.getElementById('keys-count-badge');
+        if (badge) badge.innerText = `${data.keys?.length || 0} Key${data.keys?.length === 1 ? '' : 's'}`;
+        if (!container) return;
+
+        if (!data.keys || data.keys.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 24px; color: var(--text-4); font-size: 12px;">
+              No API keys created yet. Without an API key, external access is unrestricted. Create a key to protect your Gateway on public internet.
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+              <thead>
+                <tr style="text-align: left; color: var(--text-4); border-bottom: 1px solid var(--border-subtle);">
+                  <th style="padding: 8px;">Name</th>
+                  <th style="padding: 8px;">Key</th>
+                  <th style="padding: 8px;">Requests</th>
+                  <th style="padding: 8px;">Last Used</th>
+                  <th style="padding: 8px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.keys.map(k => `
+                  <tr style="border-bottom: 1px solid var(--border-subtle);">
+                    <td style="padding: 8px; font-weight: 600; color: var(--text-1);">${escapeHtml(k.name)}</td>
+                    <td style="padding: 8px; font-family: var(--font-mono); color: var(--amber);">
+                      <code>${escapeHtml(k.preview)}</code>
+                      <button class="btn btn-ghost btn-icon-sm" style="margin-left: 4px;" onclick="copySnippet('${k.apiKey}', this)" title="Copy Full Key">
+                        <i data-lucide="copy" style="width: 11px; height: 11px;"></i>
+                      </button>
+                    </td>
+                    <td style="padding: 8px; color: var(--text-3);">${formatNumber(k.requests_count || 0)}</td>
+                    <td style="padding: 8px; color: var(--text-4);">${k.last_used_at ? new Date(k.last_used_at).toLocaleTimeString() : 'Never'}</td>
+                    <td style="padding: 8px; text-align: right;">
+                      <button class="btn btn-ghost btn-sm" style="color: ${k.is_active ? 'var(--green)' : 'var(--text-4)'}; font-size: 10px;" onclick="toggleApiKey('${k.id}')">
+                        ${k.is_active ? 'Active' : 'Disabled'}
+                      </button>
+                      <button class="btn btn-ghost btn-icon-sm" style="color: var(--red);" onclick="deleteApiKey('${k.id}')" title="Revoke Key">
+                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+        try { window.lucide.createIcons(); } catch (e) {}
+      } catch (e) {}
+    }
+
+    function openCreateKeyModal() {
+      const modal = document.getElementById('create-key-modal');
+      const form = document.getElementById('create-key-form');
+      const res = document.getElementById('create-key-result');
+      const input = document.getElementById('input-key-name');
+      if (form) form.style.display = 'block';
+      if (res) res.style.display = 'none';
+      if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeCreateKeyModal() {
+      const modal = document.getElementById('create-key-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function submitCreateKey() {
+      const input = document.getElementById('input-key-name');
+      const name = input ? input.value.trim() : '';
+      try {
+        const res = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name || 'Cursor Pro' })
+        });
+        const data = await res.json();
+        if (data.ok && data.key) {
+          const form = document.getElementById('create-key-form');
+          const resBox = document.getElementById('create-key-result');
+          const display = document.getElementById('new-key-display');
+          if (form) form.style.display = 'none';
+          if (resBox) resBox.style.display = 'block';
+          if (display) display.innerText = data.key.apiKey;
+          addLog(`🔑 Generated new API key: "${data.key.name}"`);
+          fetchApiKeys();
+        }
+      } catch (e) {
+        addLog(`❌ Failed to create API key: ${e.message}`);
+      }
+    }
+
+    async function toggleApiKey(id) {
+      try {
+        await fetch(`/api/keys/toggle?id=${encodeURIComponent(id)}`, { method: 'POST' });
+        fetchApiKeys();
+      } catch (e) {}
+    }
+
+    async function deleteApiKey(id) {
+      if (!confirm('Are you sure you want to revoke this API key? Applications using it will lose access.')) return;
+      try {
+        await fetch(`/api/keys/delete?id=${encodeURIComponent(id)}`, { method: 'POST' });
+        addLog('🗑️ API Key revoked.');
+        fetchApiKeys();
+      } catch (e) {}
+    }
+
     function launchDesktop() {
       fetch('/api/launch-desktop', { method: 'POST' });
       addLog('🚀 Launching Antigravity IDE...');
@@ -5926,6 +6099,8 @@
             fetchMatrix();
           } else if (item.type === 'tailscale_updated') {
             fetchTailscaleStatus();
+          } else if (item.type === 'keys_updated') {
+            fetchApiKeys();
           }
         } catch (err) {}
       };
@@ -6021,6 +6196,7 @@
     setViewMode(currentViewMode);
     fetchSmartShieldConfig();
     fetchTailscaleStatus();
+    fetchApiKeys();
     try { runSimulation(); } catch (e) {}
     const hashTab = (window.location.hash || '').replace('#', '');
     const savedTab = (hashTab && document.getElementById(hashTab)) ? hashTab : localStorage.getItem('harness_active_tab');
