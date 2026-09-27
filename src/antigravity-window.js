@@ -6,8 +6,9 @@
 // uses client-side routes of the form /c/<conversationId>, so we move it back to that route.
 import fs from 'fs';
 import path from 'path';
+import { getAntigravityUserDataDir } from './antigravity-auth-sync.js';
 
-const PORT_FILE = path.join(process.env.HOME || '', 'Library', 'Application Support', 'Antigravity', 'DevToolsActivePort');
+const PORT_FILE = path.join(getAntigravityUserDataDir(), 'DevToolsActivePort');
 const CONVERSATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const APP_URL = /^https:\/\/127\.0\.0\.1:(\d+)\//;
 

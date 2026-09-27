@@ -37,10 +37,18 @@ export function buildJetskiDocument(account, idToken = '') {
   return doc;
 }
 
+export function getAntigravityUserDataDir() {
+  if (process.platform === 'darwin') {
+    return path.join(process.env.HOME || '', 'Library', 'Application Support', 'Antigravity');
+  }
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || '', '.config'), 'Antigravity');
+}
+
 const KEYCHAIN_SERVICE = 'gemini';
 const KEYCHAIN_ACCOUNT = 'antigravity';
 
 export function writeKeychainToken(account, idToken = '') {
+  if (process.platform !== 'darwin') return; // macOS Keychain only
   const doc = buildJetskiDocument(account, idToken);
   const payloadJson = JSON.stringify(doc);
   const b64 = Buffer.from(payloadJson, 'utf8').toString('base64');
@@ -101,7 +109,8 @@ export function discoverLanguageServer() {
 
   let listing = '';
   try {
-    listing = execFileSync('/usr/sbin/lsof', ['-a', '-nP', '-p', pid, '-iTCP', '-sTCP:LISTEN'], { encoding: 'utf8' });
+    const lsofCmd = fs.existsSync('/usr/sbin/lsof') ? '/usr/sbin/lsof' : (fs.existsSync('/usr/bin/lsof') ? '/usr/bin/lsof' : 'lsof');
+    listing = execFileSync(lsofCmd, ['-a', '-nP', '-p', pid, '-iTCP', '-sTCP:LISTEN'], { encoding: 'utf8' });
   } catch {
     return null;
   }
@@ -463,7 +472,7 @@ export function isAntigravitySessionBusy(geminiDir = path.join(process.env.HOME 
   return getAntigravityActivity(geminiDir, { quietMs }).busy;
 }
 
-export function preserveConversationLayout(convId, storagePath = path.join(process.env.HOME || '', 'Library', 'Application Support', 'Antigravity', 'app_storage.json')) {
+export function preserveConversationLayout(convId, storagePath = path.join(getAntigravityUserDataDir(), 'app_storage.json')) {
   if (!convId) return false;
   try {
     if (!fs.existsSync(storagePath)) return false;

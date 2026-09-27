@@ -57,7 +57,7 @@ import {
   CLOUDCODE_STREAM_ENDPOINTS
 } from './translator.js';
 import { orderAccountCandidates, shouldAdoptActiveSession, planShieldSwitch, familyBuckets } from './account-order.js';
-import { readLanguageServerEmail, getPendingSwitch, cancelPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage } from './antigravity-auth-sync.js';
+import { readLanguageServerEmail, getPendingSwitch, cancelPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage, getAntigravityUserDataDir } from './antigravity-auth-sync.js';
 import { getTailscaleStatus, setTailscaleServe, resetTailscaleServe } from './tailscale.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -183,6 +183,7 @@ export async function checkAndRecoverQuotas() {
 }
 
 export function sendMacNotification(title, message, sound = 'Subtle') {
+  if (process.platform !== 'darwin') return; // macOS osascript only
   try {
     const cleanTitle = (title || 'Antigravity Gateway').replace(/"/g, '\\"');
     const cleanMsg = (message || '').replace(/"/g, '\\"');
@@ -199,7 +200,7 @@ async function dumpAntigravityUi() {
 
   // 1. Window state keys (values only for layout/conversation related keys)
   try {
-    const storagePath = path.join(process.env.HOME || '', 'Library', 'Application Support', 'Antigravity', 'app_storage.json');
+    const storagePath = path.join(getAntigravityUserDataDir(), 'app_storage.json');
     const data = JSON.parse(fs.readFileSync(storagePath, 'utf8') || '{}');
     const summary = {};
     for (const [key, value] of Object.entries(data)) {

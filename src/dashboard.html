@@ -279,80 +279,152 @@
       line-height: 1;
     }
 
-    /* Vercel Segmented Nav Tabs */
+    /* Modern Grouped Two-Tier Navigation Tabs */
     .nav-tabs-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--border-subtle);
-      margin-top: 4px;
+      padding: 6px 0;
       position: sticky;
       top: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(12px);
-      z-index: 20;
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 25;
+      gap: 12px;
     }
 
-    .nav-tabs {
+    .nav-tabs-grouped {
       display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding: 2px 0;
+    }
+
+    .nav-tabs-grouped::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav-tab-group {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 9px;
+      padding: 3px 4px;
+      gap: 3px;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .nav-tab-group:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .nav-group-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-4);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 6px 0 4px;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      margin-right: 2px;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .nav-tab-group.group-fleet .nav-group-label {
+      color: #60a5fa;
+    }
+
+    .nav-tab-group.group-dev .nav-group-label {
+      color: #fbbf24;
+    }
+
+    .nav-tab-group.group-observability .nav-group-label {
+      color: #34d399;
+    }
+
+    .nav-group-buttons {
+      display: inline-flex;
+      align-items: center;
       gap: 2px;
     }
 
     .nav-tab {
-      padding: 10px 14px;
+      padding: 6px 11px;
       font-size: 12px;
       font-weight: 500;
       color: var(--text-3);
-      border: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
       background: transparent;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
       position: relative;
-      transition: color 0.15s ease;
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      user-select: none;
     }
 
     .nav-tab:hover {
-      color: var(--text-2);
+      color: var(--text-1);
+      background: rgba(255, 255, 255, 0.05);
     }
 
     .nav-tab.active {
-      color: var(--text-1);
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.14);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }
 
-    .nav-tab.active::after {
-      content: '';
-      position: absolute;
-      bottom: -1px;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--accent);
+    .nav-tab.active i, .nav-tab.active svg {
+      color: var(--text-1) !important;
     }
 
     .nav-tab-badge {
       font-size: 10px;
       font-family: var(--font-mono);
-      padding: 1px 5px;
+      padding: 1px 6px;
       border-radius: 9999px;
-      background: var(--surface-2);
-      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       color: var(--text-3);
+      transition: all 0.15s ease;
     }
 
     .nav-tab.active .nav-tab-badge {
-      background: var(--surface-3);
-      color: var(--text-2);
-      border-color: var(--border-muted);
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.2);
     }
 
     .nav-right-meta {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       font-size: 11px;
       color: var(--text-3);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 900px) {
+      .nav-right-meta {
+        display: none;
+      }
     }
 
     /* Tab Panes */
@@ -1658,48 +1730,75 @@
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
+    <!-- Navigation Tabs: Grouped Two-Tier Workflow -->
     <div class="nav-tabs-bar">
-      <nav class="nav-tabs">
-        <button class="nav-tab active" data-tab="pane-accounts" onclick="switchTab('pane-accounts')">
-          <i data-lucide="users" style="width: 13px; height: 13px;"></i>
-          <span>Accounts</span>
-          <span class="nav-tab-badge" id="tab-badge-accounts">4</span>
-        </button>
+      <nav class="nav-tabs-grouped">
+        <!-- Tier Group 1: Core Fleet -->
+        <div class="nav-tab-group group-fleet">
+          <span class="nav-group-label" title="Account cluster & smart rotation protection">
+            <i data-lucide="server" style="width: 10px; height: 10px;"></i>
+            <span>Fleet</span>
+          </span>
+          <div class="nav-group-buttons">
+            <button class="nav-tab active" data-tab="pane-accounts" onclick="switchTab('pane-accounts')" title="Active pool & account quotas">
+              <i data-lucide="users" style="width: 13px; height: 13px;"></i>
+              <span>Accounts</span>
+              <span class="nav-tab-badge" id="tab-badge-accounts">4</span>
+            </button>
 
-        <button class="nav-tab" data-tab="pane-shield" onclick="switchTab('pane-shield')">
-          <i data-lucide="shield" style="width: 13px; height: 13px;"></i>
-          <span>Smart Shield &amp; Routing</span>
-        </button>
+            <button class="nav-tab" data-tab="pane-shield" onclick="switchTab('pane-shield')" title="Smart Shield failover policies">
+              <i data-lucide="shield" style="width: 13px; height: 13px;"></i>
+              <span>Smart Shield</span>
+            </button>
+          </div>
+        </div>
 
-        <button class="nav-tab" data-tab="pane-analytics" onclick="switchTab('pane-analytics')">
-          <i data-lucide="bar-chart-2" style="width: 13px; height: 13px;"></i>
-          <span>Analytics &amp; Savings</span>
-          <span class="nav-tab-badge" id="tab-badge-savings" style="color: var(--green);">$0.00 Saved</span>
-        </button>
+        <!-- Tier Group 2: Developer Gateway -->
+        <div class="nav-tab-group group-dev">
+          <span class="nav-group-label" title="API Keys, testing and simulation sandbox">
+            <i data-lucide="code" style="width: 10px; height: 10px;"></i>
+            <span>Gateway</span>
+          </span>
+          <div class="nav-group-buttons">
+            <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')" title="Virtual API keys & OpenAI-compatible endpoint">
+              <i data-lucide="key" style="width: 13px; height: 13px; color: var(--amber);"></i>
+              <span>API Keys &amp; Gateway</span>
+              <span class="nav-tab-badge" id="nav-keys-badge" style="background: rgba(245, 158, 11, 0.15); color: var(--amber); border-color: rgba(245, 158, 11, 0.3);">0 Keys</span>
+            </button>
 
-        <button class="nav-tab" data-tab="pane-logs" onclick="switchTab('pane-logs')">
-          <i data-lucide="terminal" style="width: 13px; height: 13px;"></i>
-          <span>Request Logs</span>
-          <span class="pulse-dot"></span>
-        </button>
+            <button class="nav-tab" data-tab="pane-playground" onclick="switchTab('pane-playground')" title="Interactive AI playground">
+              <i data-lucide="play-circle" style="width: 13px; height: 13px;"></i>
+              <span>Playground</span>
+            </button>
 
-        <button class="nav-tab" data-tab="pane-playground" onclick="switchTab('pane-playground')">
-          <i data-lucide="play-circle" style="width: 13px; height: 13px;"></i>
-          <span>Playground</span>
-        </button>
+            <button class="nav-tab" data-tab="pane-simulator" onclick="switchTab('pane-simulator')" title="What-if failover simulation sandbox">
+              <i data-lucide="cpu" style="width: 13px; height: 13px;"></i>
+              <span>Simulator</span>
+              <span class="nav-tab-badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.3);">Sandbox</span>
+            </button>
+          </div>
+        </div>
 
-        <button class="nav-tab" data-tab="pane-simulator" onclick="switchTab('pane-simulator')">
-          <i data-lucide="cpu" style="width: 13px; height: 13px;"></i>
-          <span>What-If Simulator</span>
-          <span class="nav-tab-badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.3);">Sandbox</span>
-        </button>
+        <!-- Tier Group 3: Observability -->
+        <div class="nav-tab-group group-observability">
+          <span class="nav-group-label" title="Usage telemetry, analytics and SQLite persistent logs">
+            <i data-lucide="activity" style="width: 10px; height: 10px;"></i>
+            <span>Metrics</span>
+          </span>
+          <div class="nav-group-buttons">
+            <button class="nav-tab" data-tab="pane-analytics" onclick="switchTab('pane-analytics')" title="Token velocity, model distribution and dollar savings">
+              <i data-lucide="bar-chart-2" style="width: 13px; height: 13px;"></i>
+              <span>Analytics &amp; ROI</span>
+              <span class="nav-tab-badge" id="tab-badge-savings" style="color: var(--green);">$0.00 Saved</span>
+            </button>
 
-        <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
-          <i data-lucide="key" style="width: 13px; height: 13px; color: var(--amber);"></i>
-          <span>API Keys &amp; Gateway</span>
-          <span class="nav-tab-badge" id="nav-keys-badge" style="background: rgba(245, 158, 11, 0.15); color: var(--amber); border-color: rgba(245, 158, 11, 0.3);">0 Keys</span>
-        </button>
+            <button class="nav-tab" data-tab="pane-logs" onclick="switchTab('pane-logs')" title="Live SQLite request audit logs">
+              <i data-lucide="terminal" style="width: 13px; height: 13px;"></i>
+              <span>Logs</span>
+              <span class="pulse-dot"></span>
+            </button>
+          </div>
+        </div>
       </nav>
 
       <div class="nav-right-meta">
