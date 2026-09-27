@@ -1623,11 +1623,13 @@ async function handleProxyRequest(req, res) {
     const statsNow = getAllStats();
     const ideEmail = await readLanguageServerEmail();
     const harnessEmail = (statsNow.global?.activeSessionEmail || '').toLowerCase();
+    const manualEmail = (statsNow.global?.manualActiveEmail || '').toLowerCase();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       ideEmail: ideEmail || null,
       harnessActiveEmail: harnessEmail || null,
-      inSync: !!ideEmail && ideEmail === harnessEmail,
+      manualActiveEmail: manualEmail || null,
+      inSync: !!ideEmail && (ideEmail === harnessEmail || (manualEmail && ideEmail === manualEmail)),
       pendingSwitch: getPendingSwitch()
     }, null, 2));
   }

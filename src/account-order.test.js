@@ -60,3 +60,15 @@ test('disabled accounts are completely excluded from candidate list', () => {
   assert.equal(ordered.some(a => a.email === 'bob@example.com'), false);
   assert.equal(ordered.length, 2);
 });
+
+test('shouldAdoptActiveSession rejects adoption when user has a manual active account', () => {
+  const globalStats = {
+    activeSessionAccountId: 'diit',
+    activeSessionEmail: 'alice@example.com',
+    manualActiveAccountId: 'diit',
+    manualActiveEmail: 'alice@example.com'
+  };
+  const servedAccount = { id: 'aqua', email: 'carol@example.com' };
+  assert.equal(shouldAdoptActiveSession(globalStats, servedAccount), false);
+});
+

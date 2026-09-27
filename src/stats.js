@@ -640,7 +640,10 @@ export function tailLiveAntigravityTranscripts() {
 
 export function checkAntigravityLiveSession() {
   try {
-    if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
+    if (stats.global.manualActiveEmail && stats.global.manualActiveAccountId) {
+      stats.global.activeSessionEmail = stats.global.manualActiveEmail;
+      stats.global.activeSessionAccountId = stats.global.manualActiveAccountId;
+    } else if (fs.existsSync(GEMINI_ACCOUNTS_FILE)) {
       const data = JSON.parse(fs.readFileSync(GEMINI_ACCOUNTS_FILE, 'utf8'));
       const activeEmail = (data.active || '').trim().toLowerCase();
       if (activeEmail) {
@@ -798,6 +801,9 @@ export function adoptIdeAccount(email) {
   const wanted = (email || '').trim().toLowerCase();
   if (!wanted) return false;
   loadStats();
+  if (stats.global.manualActiveEmail && stats.global.manualActiveEmail.toLowerCase() !== wanted) {
+    return false;
+  }
   const acc = getAccounts().find((a) => a.email && a.email.toLowerCase() === wanted);
   const sameEmail = (stats.global.activeSessionEmail || '').toLowerCase() === wanted;
   const sameId = (stats.global.activeSessionAccountId || null) === (acc ? acc.id : null);

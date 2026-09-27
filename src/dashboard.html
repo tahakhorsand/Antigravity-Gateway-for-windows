@@ -3366,14 +3366,8 @@
         );
       }
 
-      const activeSessionEmail = (
-        (lastIdeStatus?.inSync ? lastIdeStatus?.ideEmail : null) ||
-        lastStatsData?.global?.activeSessionEmail ||
-        lastIdeStatus?.pendingSwitch?.email ||
-        lastIdeStatus?.ideEmail ||
-        ''
-      ).toLowerCase();
-      const activeSessionId = lastStatsData?.global?.activeSessionAccountId;
+      const activeSessionEmail = resolveCanonicalActiveEmail(lastStatsData, lastIdeStatus);
+      const activeSessionId = resolveCanonicalActiveId(lastStatsData, activeSessionEmail);
 
       if (currentAccountFilter === 'active') {
         list = list.filter(a => a.id === activeSessionId || a.email?.toLowerCase() === activeSessionEmail);
@@ -3536,8 +3530,8 @@
     }
 
     async function triggerEmergencyRotate() {
-      const activeEmail = (lastIdeStatus?.ideEmail || lastStatsData?.global?.activeSessionEmail || '').toLowerCase();
-      const activeId = lastStatsData?.global?.activeSessionAccountId;
+      const activeEmail = resolveCanonicalActiveEmail(lastStatsData, lastIdeStatus);
+      const activeId = resolveCanonicalActiveId(lastStatsData, activeEmail);
       
       const pool = (cachedAccountsList || []).filter(a => 
         a.id !== activeId && 
@@ -3601,8 +3595,9 @@
       const toggleBtn = document.getElementById('acc-detail-btn-toggle');
       const activeBtn = document.getElementById('acc-detail-btn-active');
 
-      const activeEmail = (lastIdeStatus?.ideEmail || lastStatsData?.global?.activeSessionEmail || '').toLowerCase();
-      const isActive = acc.id === lastStatsData?.global?.activeSessionAccountId || acc.email?.toLowerCase() === activeEmail;
+      const activeEmail = resolveCanonicalActiveEmail(lastStatsData, lastIdeStatus);
+      const activeId = resolveCanonicalActiveId(lastStatsData, activeEmail);
+      const isActive = (activeId && acc.id === activeId) || (acc.email && acc.email.toLowerCase() === activeEmail);
       const isPaused = acc.enabled === false;
 
       if (avatarEl) {
@@ -4392,14 +4387,57 @@
       return (gw * 0.45) + (g5 * 0.35) + (cw * 0.1) + (c5 * 0.1);
     }
 
+    // Canonical active account resolvers across all dashboard components
+    function resolveCanonicalActiveEmail(data, ideStatus) {
+      if (data?.global?.manualActiveEmail) {
+        return data.global.manualActiveEmail.toLowerCase();
+      }
+      if (data?.global?.pendingSwitch?.email) {
+        return data.global.pendingSwitch.email.toLowerCase();
+      }
+      if (ideStatus?.pendingSwitch?.email) {
+        return ideStatus.pendingSwitch.email.toLowerCase();
+      }
+      if (ideStatus?.inSync && ideStatus?.ideEmail) {
+        return ideStatus.ideEmail.toLowerCase();
+      }
+      if (data?.global?.activeSessionEmail) {
+        return data.global.activeSessionEmail.toLowerCase();
+      }
+      if (ideStatus?.ideEmail) {
+        return ideStatus.ideEmail.toLowerCase();
+      }
+      const raw = Object.values(data?.accounts || {});
+      return (raw[0]?.email || '').toLowerCase();
+    }
+
+    function resolveCanonicalActiveId(data, activeEmail) {
+      if (data?.global?.manualActiveAccountId) {
+        return data.global.manualActiveAccountId;
+      }
+      if (data?.global?.activeSessionAccountId) {
+        return data.global.activeSessionAccountId;
+      }
+      if (activeEmail && data?.accounts) {
+        const emailLower = activeEmail.toLowerCase();
+        const found = Object.values(data.accounts).find(a => a.email && a.email.toLowerCase() === emailLower);
+        if (found) return found.id;
+      }
+      return null;
+    }
+
     function sortAccountsPool(accounts, activeId, activeEmail) {
       const emailLower = (activeEmail || '').toLowerCase();
       const active = accounts.find(a => 
-        (activeId && a.id === activeId) || 
-        (emailLower && a.email && a.email.toLowerCase() === emailLower)
+        (emailLower && a.email && a.email.toLowerCase() === emailLower) ||
+        (activeId && a.id === activeId)
       );
       const others = accounts.filter(a => a !== active);
-      others.sort((a, b) => calculateAccountScore(b) - calculateAccountScore(a));
+      others.sort((a, b) => {
+        const diff = calculateAccountScore(b) - calculateAccountScore(a);
+        if (Math.abs(diff) > 0.001) return diff;
+        return (a.email || '').localeCompare(b.email || '');
+      });
       return active ? [active, ...others] : others;
     }
 
@@ -4429,15 +4467,8 @@
         }
 
         // Active Session Email & Sync Status
-        const activeEmail = (
-          (ideStatus?.inSync ? ideStatus?.ideEmail : null) ||
-          data.global?.activeSessionEmail ||
-          ideStatus?.pendingSwitch?.email ||
-          ideStatus?.ideEmail ||
-          rawAccounts[0]?.email ||
-          ''
-        ).toLowerCase();
-        const activeId = data.global?.activeSessionAccountId;
+        const activeEmail = resolveCanonicalActiveEmail(data, ideStatus);
+        const activeId = resolveCanonicalActiveId(data, activeEmail);
         const activeEmailEl = document.getElementById('header-active-email');
         if (activeEmailEl) activeEmailEl.innerText = activeEmail || 'Unknown';
 
@@ -4650,7 +4681,7 @@
       }
 
       // 3. Active Session Runway Forecast
-      const activeSessionEmail = (data?.global?.activeSessionEmail || accounts[0]?.email || '').toLowerCase();
+      const activeSessionEmail = resolveCanonicalActiveEmail(data, lastIdeStatus);
       const activeAcc = accounts.find(a => a.email && a.email.toLowerCase() === activeSessionEmail) || accounts[0];
       const active5hPct = activeAcc?.gemini5h?.pct ?? 100;
       const burstTokensRemain = (active5hPct / 100) * 1000000;
@@ -4897,10 +4928,10 @@
         return;
       }
 
-      const activeSessionEmail = (ideStatus?.ideEmail || data.global?.activeSessionEmail || '').toLowerCase();
-      const activeSessionId = data.global?.activeSessionAccountId;
-      const isGenerating = !!data.global?.isSessionGenerating;
-      const pendingEmail = (data.global?.pendingSwitch?.email || '').toLowerCase();
+      const activeSessionEmail = resolveCanonicalActiveEmail(data, ideStatus);
+      const activeSessionId = resolveCanonicalActiveId(data, activeSessionEmail);
+      const isGenerating = !!data?.global?.isSessionGenerating;
+      const pendingEmail = (data?.global?.pendingSwitch?.email || '').toLowerCase();
 
       tbody.innerHTML = accounts.map((a, idx) => {
         const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
@@ -4911,7 +4942,7 @@
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
         const isServing = a.id === activeRunningId;
-        const isActive = a.id === activeSessionId || a.email.toLowerCase() === activeSessionEmail;
+        const isActive = (activeSessionId && a.id === activeSessionId) || (a.email && a.email.toLowerCase() === activeSessionEmail);
         const isPaused = a.enabled === false;
         const isNextRecommended = !isActive && idx === 1 && !isBanned && !isPaused;
         const isLowest = !isActive && idx === accounts.length - 1 && accounts.length > 2 && !isPaused;
@@ -5036,10 +5067,10 @@
         return;
       }
 
-      const activeSessionEmail = (ideStatus?.ideEmail || data.global?.activeSessionEmail || '').toLowerCase();
-      const activeSessionId = data.global?.activeSessionAccountId;
-      const isGenerating = !!data.global?.isSessionGenerating;
-      const pendingEmail = (data.global?.pendingSwitch?.email || '').toLowerCase();
+      const activeSessionEmail = resolveCanonicalActiveEmail(data, ideStatus);
+      const activeSessionId = resolveCanonicalActiveId(data, activeSessionEmail);
+      const isGenerating = !!data?.global?.isSessionGenerating;
+      const pendingEmail = (data?.global?.pendingSwitch?.email || '').toLowerCase();
 
       grid.innerHTML = accounts.map((a, idx) => {
         const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
@@ -5050,7 +5081,7 @@
         const isBanned = a.is403Banned;
         const isCooling = a.cooldownUntil && a.cooldownUntil > Date.now();
         const isServing = a.id === activeRunningId;
-        const isActive = a.id === activeSessionId || a.email.toLowerCase() === activeSessionEmail;
+        const isActive = (activeSessionId && a.id === activeSessionId) || (a.email && a.email.toLowerCase() === activeSessionEmail);
         const isPaused = a.enabled === false;
         const isNextRecommended = !isActive && idx === 1 && !isBanned && !isPaused;
         const isLowest = !isActive && idx === accounts.length - 1 && accounts.length > 2 && !isPaused;
