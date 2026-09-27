@@ -497,7 +497,7 @@ export function setMetadataDb(key, value) {
   }
 }
 
-export function queryLogsDb({ limit = 25, page = 1, account = '', model = '', search = '' } = {}) {
+export function queryLogsDb({ limit = 25, page = 1, account = '', model = '', search = '', status = '', minLatency = 0 } = {}) {
   try {
     const db = getDatabase();
     let whereSql = ' WHERE 1=1';
@@ -510,6 +510,22 @@ export function queryLogsDb({ limit = 25, page = 1, account = '', model = '', se
     if (model) {
       whereSql += ' AND model LIKE ?';
       params.push(`%${model}%`);
+    }
+    if (status) {
+      if (status === '200' || status === '2xx') {
+        whereSql += ' AND status_code >= 200 AND status_code < 300';
+      } else if (status === '429') {
+        whereSql += ' AND status_code = 429';
+      } else if (status === 'error' || status === '4xx_5xx') {
+        whereSql += ' AND status_code >= 400';
+      } else if (!isNaN(parseInt(status, 10))) {
+        whereSql += ' AND status_code = ?';
+        params.push(parseInt(status, 10));
+      }
+    }
+    if (minLatency && !isNaN(parseInt(minLatency, 10)) && parseInt(minLatency, 10) > 0) {
+      whereSql += ' AND latency_ms >= ?';
+      params.push(parseInt(minLatency, 10));
     }
     if (search) {
       whereSql += ' AND (account_email LIKE ? OR model LIKE ? OR endpoint LIKE ? OR CAST(request_id AS TEXT) LIKE ?)';

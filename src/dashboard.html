@@ -1238,6 +1238,142 @@
       font-weight: 500;
     }
 
+    /* Health & Latency Comparison Grid */
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 14px;
+    }
+    .matrix-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+    .matrix-card:hover {
+      border-color: var(--border-muted);
+      transform: translateY(-1px);
+    }
+    .matrix-card.healthy {
+      border-left: 3px solid var(--green);
+    }
+    .matrix-card.degraded {
+      border-left: 3px solid var(--amber);
+    }
+    .matrix-card.critical {
+      border-left: 3px solid var(--red);
+    }
+
+    /* Simulation Styles */
+    .sim-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .sim-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .sim-slider {
+      width: 100%;
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 4px;
+      outline: none;
+      -webkit-appearance: none;
+      accent-color: var(--blue);
+      cursor: pointer;
+    }
+    .sim-preset-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-3);
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sim-preset-btn:hover {
+      border-color: var(--border-muted);
+      color: var(--text-1);
+    }
+    .sim-preset-btn.active {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.4);
+      color: #c084fc;
+      font-weight: 500;
+    }
+    .sim-waterfall {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+    .sim-waterfall-step {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      position: relative;
+    }
+    .sim-waterfall-step::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 100%;
+      width: 2px;
+      height: 10px;
+      background: var(--border-subtle);
+      z-index: 1;
+    }
+    .sim-waterfall-step:last-child::before {
+      display: none;
+    }
+
+    /* Audit Log Metric Strip */
+    .log-metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 768px) {
+      .log-metric-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    .log-metric-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .log-metric-label {
+      font-size: 10px;
+      color: var(--text-4);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .log-metric-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-1);
+      font-family: var(--font-mono);
+    }
+
     /* Floating Toast Animation */
     @keyframes toast-in {
       from { opacity: 0; transform: translateY(12px) scale(0.96); }
@@ -1536,6 +1672,12 @@
           <span>Playground</span>
         </button>
 
+        <button class="nav-tab" data-tab="pane-simulator" onclick="switchTab('pane-simulator')">
+          <i data-lucide="cpu" style="width: 13px; height: 13px;"></i>
+          <span>What-If Simulator</span>
+          <span class="nav-tab-badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.3);">Sandbox</span>
+        </button>
+
         <button class="nav-tab" data-tab="pane-api" onclick="switchTab('pane-api')">
           <i data-lucide="code-2" style="width: 13px; height: 13px;"></i>
           <span>Universal API</span>
@@ -1665,7 +1807,16 @@
               <i data-lucide="layout-grid" style="width: 12px; height: 12px;"></i>
               <span>Cards</span>
             </button>
+            <button class="segmented-btn" id="btn-view-matrix" onclick="setViewMode('matrix')" title="Health & Latency Diagnostic Grid">
+              <i data-lucide="activity" style="width: 12px; height: 12px;"></i>
+              <span>Health Matrix</span>
+            </button>
           </div>
+
+          <button class="btn btn-secondary btn-sm" id="btn-ping-cluster" onclick="testClusterHealth()" title="Ping Google OAuth & measure latency across all accounts concurrently" style="height: 28px; font-size: 11px; padding: 0 10px;">
+            <i data-lucide="activity" style="width: 12px; height: 12px; color: var(--blue);"></i>
+            <span id="btn-ping-cluster-text">Ping Cluster</span>
+          </button>
         </div>
       </div>
 
@@ -1701,6 +1852,33 @@
       <!-- Card Grid View Container -->
       <div class="account-grid" id="view-grid-wrapper" style="display: none;">
         <!-- Dynamic Cards -->
+      </div>
+
+      <!-- Health & Latency Comparison Grid View Container -->
+      <div id="view-matrix-wrapper" style="display: none; flex-direction: column; gap: 14px;">
+        <!-- Health Summary Banner -->
+        <div class="card" style="padding: 14px 18px; background: var(--surface-1); border-color: var(--border-subtle); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="activity" style="width: 16px; height: 16px; color: var(--blue);"></i>
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-1);">Cluster OAuth &amp; Token Health Matrix</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--text-3); border-left: 1px solid var(--border-subtle); padding-left: 14px;">
+              <span>Healthy: <strong id="matrix-healthy-count" style="color: var(--green);">0/0</strong></span>
+              <span>Avg Latency: <strong id="matrix-avg-latency" style="color: var(--blue);">--</strong></span>
+              <span>Last Checked: <span id="matrix-last-checked" style="color: var(--text-4);">Never</span></span>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-matrix-ping-all" onclick="testClusterHealth()">
+            <i data-lucide="zap" style="width: 12px; height: 12px;"></i>
+            <span id="btn-matrix-ping-text">Ping All Accounts Now</span>
+          </button>
+        </div>
+
+        <!-- Matrix Cards Grid -->
+        <div class="matrix-grid" id="matrix-cards-container">
+          <!-- Dynamic Health Cards -->
+        </div>
       </div>
     </div>
 
@@ -2024,6 +2202,21 @@
             <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
           </select>
 
+          <select class="select-control" id="log-status-filter" onchange="fetchDbLogs()">
+            <option value="">All Statuses</option>
+            <option value="200">2xx Success (200 OK)</option>
+            <option value="429">429 Rate Limited</option>
+            <option value="error">4xx / 5xx Errors</option>
+          </select>
+
+          <select class="select-control" id="log-latency-filter" onchange="fetchDbLogs()">
+            <option value="0">Any Latency</option>
+            <option value="300">&gt; 300ms</option>
+            <option value="500">&gt; 500ms (Slow)</option>
+            <option value="1000">&gt; 1000ms (Lagging)</option>
+            <option value="2000">&gt; 2000ms (Heavy)</option>
+          </select>
+
           <select class="select-control" id="log-limit-select" onchange="changeLogPageSize(this.value)">
             <option value="15">15 / page</option>
             <option value="30" selected>30 / page</option>
@@ -2031,17 +2224,37 @@
             <option value="100">100 / page</option>
           </select>
 
-          <button class="btn btn-secondary btn-sm" onclick="exportLogs('csv')" title="Download request logs as CSV">
+          <button class="btn btn-secondary btn-sm" onclick="exportLogs('csv')" title="Download filtered request logs as CSV">
             <i data-lucide="download" style="width: 12px; height: 12px;"></i>
             <span>Export CSV</span>
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="exportLogs('json')" title="Download request logs as JSON">
+          <button class="btn btn-secondary btn-sm" onclick="exportLogs('json')" title="Download filtered request logs as JSON">
             <i data-lucide="file-json" style="width: 12px; height: 12px;"></i>
             <span>Export JSON</span>
           </button>
           <button class="btn btn-secondary btn-icon" onclick="fetchDbLogs()" title="Refresh Logs">
             <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
           </button>
+        </div>
+      </div>
+
+      <!-- Audit Log Quick KPIs Strip -->
+      <div class="log-metric-strip" id="log-metric-strip">
+        <div class="log-metric-item">
+          <span class="log-metric-label">Filtered Requests</span>
+          <span class="log-metric-val" id="log-kpi-total">0</span>
+        </div>
+        <div class="log-metric-item">
+          <span class="log-metric-label">Success Rate</span>
+          <span class="log-metric-val" id="log-kpi-success" style="color: var(--green);">100%</span>
+        </div>
+        <div class="log-metric-item">
+          <span class="log-metric-label">Avg Latency</span>
+          <span class="log-metric-val" id="log-kpi-latency" style="color: var(--blue);">0ms</span>
+        </div>
+        <div class="log-metric-item">
+          <span class="log-metric-label">Tokens Processed</span>
+          <span class="log-metric-val" id="log-kpi-tokens">0</span>
         </div>
       </div>
 
@@ -2148,6 +2361,156 @@
 
           <!-- Output Box -->
           <div style="flex: 1; min-height: 220px; max-height: 380px; overflow-y: auto; background: #060606; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 14px; font-size: 12px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; word-break: break-word;" id="play-response-body">Click "Send Request" to test model generation and load balancing through the gateway.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANE: Interactive Quota Simulation & What-If Sandbox -->
+    <div class="tab-pane" id="pane-simulator">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div class="section-heading" style="margin-bottom: 0;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="cpu" style="width: 16px; height: 16px; color: var(--purple, #a855f7);"></i>
+            <span>Interactive Quota Simulation &amp; What-If Sandbox</span>
+          </div>
+          <span class="section-sub">&bull; Model multi-agent workloads, forecast cluster exhaustion, and visualize failover cascades</span>
+        </div>
+
+        <!-- Preset Chips -->
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span style="font-size: 11px; color: var(--text-3);">Presets:</span>
+          <button class="sim-preset-btn" id="sim-btn-solo" onclick="applySimPreset('solo')">Solo Dev (Intensive)</button>
+          <button class="sim-preset-btn active" id="sim-btn-swarm" onclick="applySimPreset('swarm')">Agent Swarm (3-5 devs)</button>
+          <button class="sim-preset-btn" id="sim-btn-heavy" onclick="applySimPreset('heavy')">Refactor Sprint (10 devs)</button>
+          <button class="sim-preset-btn" id="sim-btn-ci" onclick="applySimPreset('ci')">Continuous CI/CD</button>
+        </div>
+      </div>
+
+      <div class="sim-grid">
+        <!-- Left: Workload Parameters & Sliders -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="sliders" style="width: 14px; height: 14px; color: var(--blue);"></i>
+            <span>Workload Parameters</span>
+          </div>
+
+          <!-- Slider 1: Concurrent Agents -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span style="color: var(--text-1); font-weight: 500;">Concurrent Agents / Engineers</span>
+              <strong style="color: var(--blue); font-family: var(--font-mono);" id="sim-val-agents">3 agents</strong>
+            </div>
+            <input type="range" id="sim-input-agents" min="1" max="25" value="3" class="sim-slider" oninput="runSimulation()">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-4); margin-top: 3px;">
+              <span>1 agent</span>
+              <span>10 agents</span>
+              <span>25 agents</span>
+            </div>
+          </div>
+
+          <!-- Slider 2: Context / Tokens per Turn -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span style="color: var(--text-1); font-weight: 500;">Average Prompt &amp; Context Size</span>
+              <strong style="color: var(--green); font-family: var(--font-mono);" id="sim-val-context">20,000 tokens</strong>
+            </div>
+            <input type="range" id="sim-input-context" min="2000" max="100000" step="2000" value="20000" class="sim-slider" oninput="runSimulation()">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-4); margin-top: 3px;">
+              <span>2k (Quick edits)</span>
+              <span>30k (Large files)</span>
+              <span>100k (Whole repo)</span>
+            </div>
+          </div>
+
+          <!-- Slider 3: Generation Turns per Hour -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span style="color: var(--text-1); font-weight: 500;">Turns per Hour (per Agent)</span>
+              <strong style="color: var(--amber); font-family: var(--font-mono);" id="sim-val-turns">15 turns/hr</strong>
+            </div>
+            <input type="range" id="sim-input-turns" min="2" max="60" value="15" class="sim-slider" oninput="runSimulation()">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-4); margin-top: 3px;">
+              <span>Low (5/hr)</span>
+              <span>Active (20/hr)</span>
+              <span>Autonomous (60/hr)</span>
+            </div>
+          </div>
+
+          <!-- Model Choice & Target Window -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="font-size: 11px; font-weight: 500; color: var(--text-3); display: block; margin-bottom: 6px;">Primary Model</label>
+              <select class="select-control" id="sim-select-model" onchange="runSimulation()" style="width: 100%;">
+                <option value="gemini-pro" selected>Gemini 2.5 Pro</option>
+                <option value="gemini-flash">Gemini 2.0 Flash</option>
+                <option value="claude-sonnet">Claude 3.5 Sonnet</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 11px; font-weight: 500; color: var(--text-3); display: block; margin-bottom: 6px;">Forecast Window</label>
+              <select class="select-control" id="sim-select-window" onchange="runSimulation()" style="width: 100%;">
+                <option value="1">1 Hour Sprint</option>
+                <option value="5" selected>5 Hour Burst Window</option>
+                <option value="24">24 Hour Day</option>
+                <option value="168">7 Day Week</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 11px; color: var(--text-3); line-height: 1.4;">
+            💡 <strong>Smart Shield Protection Rule:</strong> Accounts automatically failover when remaining burst headroom dips below the configured <strong>20% threshold</strong>.
+          </div>
+        </div>
+
+        <!-- Right: Real-time Simulation Results & Waterfall -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Top KPI Cards -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div class="card" style="padding: 12px;">
+              <span style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Hourly Token Burn</span>
+              <div style="font-size: 17px; font-weight: 700; color: var(--text-1); font-family: var(--font-mono); margin-top: 4px;" id="sim-kpi-hourly">900,000</div>
+              <span style="font-size: 10px; color: var(--text-3);">tokens / hour</span>
+            </div>
+            <div class="card" style="padding: 12px;">
+              <span style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Window Demand</span>
+              <div style="font-size: 17px; font-weight: 700; color: var(--blue); font-family: var(--font-mono); margin-top: 4px;" id="sim-kpi-window">4.5M</div>
+              <span style="font-size: 10px; color: var(--text-3);" id="sim-kpi-window-label">in 5h burst window</span>
+            </div>
+            <div class="card" style="padding: 12px;">
+              <span style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Commercial API Cost</span>
+              <div style="font-size: 17px; font-weight: 700; color: var(--green); font-family: var(--font-mono); margin-top: 4px;" id="sim-kpi-cost">$31.50</div>
+              <span style="font-size: 10px; color: var(--text-3);">Value saved via harness</span>
+            </div>
+          </div>
+
+          <!-- Viability Assessment Banner -->
+          <div id="sim-viability-banner" style="padding: 14px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div id="sim-viability-icon" style="width: 28px; height: 28px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: var(--green); display: flex; align-items: center; justify-content: center; font-weight: 700;">
+                ✓
+              </div>
+              <div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-1);" id="sim-viability-title">Cluster Runway Sustainable</div>
+                <div style="font-size: 11px; color: var(--text-3);" id="sim-viability-desc">Current cluster capacity easily absorbs this workload with zero 429 throttling.</div>
+              </div>
+            </div>
+            <span class="badge-tag" id="sim-viability-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--green); border-color: rgba(16, 185, 129, 0.3);">100% Zero Downtime</span>
+          </div>
+
+          <!-- Sequential Failover Cascade Waterfall -->
+          <div class="card" style="padding: 14px 16px; flex: 1;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="git-branch" style="width: 14px; height: 14px; color: var(--blue);"></i>
+                <span>Sequential Account Failover Cascade</span>
+              </div>
+              <span style="font-size: 10px; color: var(--text-4);">Predictive Smart Shield Dispatch</span>
+            </div>
+
+            <div class="sim-waterfall" id="sim-waterfall-list">
+              <!-- Dynamic Waterfall Steps -->
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2571,18 +2934,27 @@
       localStorage.setItem('harness_view_mode', mode);
       const btnTable = document.getElementById('btn-view-table');
       const btnGrid = document.getElementById('btn-view-grid');
+      const btnMatrix = document.getElementById('btn-view-matrix');
       const tableWrap = document.getElementById('view-table-wrapper');
       const gridWrap = document.getElementById('view-grid-wrapper');
+      const matrixWrap = document.getElementById('view-matrix-wrapper');
+
+      if (btnTable) btnTable.classList.remove('active');
+      if (btnGrid) btnGrid.classList.remove('active');
+      if (btnMatrix) btnMatrix.classList.remove('active');
+      if (tableWrap) tableWrap.style.display = 'none';
+      if (gridWrap) gridWrap.style.display = 'none';
+      if (matrixWrap) matrixWrap.style.display = 'none';
 
       if (mode === 'grid') {
-        if (btnTable) btnTable.classList.remove('active');
         if (btnGrid) btnGrid.classList.add('active');
-        if (tableWrap) tableWrap.style.display = 'none';
         if (gridWrap) gridWrap.style.display = 'grid';
+      } else if (mode === 'matrix') {
+        if (btnMatrix) btnMatrix.classList.add('active');
+        if (matrixWrap) matrixWrap.style.display = 'flex';
+        renderClusterHealthMatrix();
       } else {
-        if (btnGrid) btnGrid.classList.remove('active');
         if (btnTable) btnTable.classList.add('active');
-        if (gridWrap) gridWrap.style.display = 'none';
         if (tableWrap) tableWrap.style.display = 'block';
       }
     }
@@ -2606,6 +2978,8 @@
         fetchHeatmap();
       } else if (tabId === 'pane-shield') {
         fetchSmartShieldConfig();
+      } else if (tabId === 'pane-simulator') {
+        runSimulation();
       }
       if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
         try { window.lucide.createIcons(); } catch (e) {}
@@ -2800,6 +3174,7 @@
 
       renderAccountsTable(list, lastStatsData, lastIdeStatus);
       renderAccountsGrid(list, lastStatsData, lastIdeStatus);
+      renderClusterHealthMatrix();
       updateBulkToolbar();
 
       if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -3651,10 +4026,18 @@
       const search = document.getElementById('log-search-input')?.value || '';
       const account = document.getElementById('log-account-filter')?.value || '';
       const model = document.getElementById('log-model-filter')?.value || '';
+      const status = document.getElementById('log-status-filter')?.value || '';
+      const minLatency = document.getElementById('log-latency-filter')?.value || '0';
       const tbody = document.getElementById('db-logs-tbody');
       const info = document.getElementById('log-pagination-info');
       const btnPrev = document.getElementById('btn-log-prev');
       const btnNext = document.getElementById('btn-log-next');
+
+      // Summary KPIs
+      const kpiTotal = document.getElementById('log-kpi-total');
+      const kpiSuccess = document.getElementById('log-kpi-success');
+      const kpiLatency = document.getElementById('log-kpi-latency');
+      const kpiTokens = document.getElementById('log-kpi-tokens');
 
       try {
         const query = new URLSearchParams({
@@ -3662,7 +4045,9 @@
           limit: currentLogLimit,
           search,
           account,
-          model
+          model,
+          status,
+          minLatency
         });
         const res = await fetch(`/api/db/logs?${query.toString()}`);
         if (!res.ok) return;
@@ -3676,11 +4061,30 @@
           info.innerText = `Showing ${start}–${end} of ${pag.total} requests (Page ${pag.page} of ${pag.totalPages})`;
         }
 
+        if (kpiTotal) kpiTotal.innerText = pag.total.toLocaleString();
+        if (logs.length > 0) {
+          const successCount = logs.filter(l => l.status_code >= 200 && l.status_code < 300).length;
+          const successRate = Math.round((successCount / logs.length) * 100);
+          const avgLat = Math.round(logs.reduce((sum, l) => sum + (l.latency_ms || 0), 0) / logs.length);
+          const totalTok = logs.reduce((sum, l) => sum + (l.total_tokens || ((l.input_tokens || 0) + (l.output_tokens || 0))), 0);
+
+          if (kpiSuccess) {
+            kpiSuccess.innerText = `${successRate}%`;
+            kpiSuccess.style.color = successRate >= 95 ? 'var(--green)' : (successRate >= 80 ? 'var(--amber)' : 'var(--red)');
+          }
+          if (kpiLatency) kpiLatency.innerText = `${avgLat}ms`;
+          if (kpiTokens) kpiTokens.innerText = formatNumber(totalTok);
+        } else {
+          if (kpiSuccess) kpiSuccess.innerText = '100%';
+          if (kpiLatency) kpiLatency.innerText = '0ms';
+          if (kpiTokens) kpiTokens.innerText = '0';
+        }
+
         if (btnPrev) btnPrev.disabled = !pag.hasPrev;
         if (btnNext) btnNext.disabled = !pag.hasNext;
 
         if (logs.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--text-4);">No requests matching criteria</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--text-4);">No requests matching selected filters</td></tr>';
           return;
         }
 
@@ -4480,6 +4884,395 @@
       }).join('');
     }
 
+    // Cluster Health & Latency Comparison Matrix
+    let lastClusterHealthData = null;
+
+    async function testClusterHealth() {
+      const pingBtn = document.getElementById('btn-ping-cluster');
+      const matrixPingBtn = document.getElementById('btn-matrix-ping-all');
+      const pingText = document.getElementById('btn-ping-cluster-text');
+      const matrixPingText = document.getElementById('btn-matrix-ping-text');
+
+      if (pingBtn) pingBtn.disabled = true;
+      if (matrixPingBtn) matrixPingBtn.disabled = true;
+      if (pingText) pingText.innerText = 'Pinging...';
+      if (matrixPingText) matrixPingText.innerText = 'Pinging Google OAuth...';
+
+      showToast('⚡ Running cluster-wide latency & health diagnostic check...', 'info');
+
+      try {
+        const res = await fetch('/api/accounts/health-all', { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        lastClusterHealthData = data;
+
+        const countEl = document.getElementById('matrix-healthy-count');
+        const avgEl = document.getElementById('matrix-avg-latency');
+        const checkedEl = document.getElementById('matrix-last-checked');
+
+        if (countEl) countEl.innerText = `${data.healthyCount}/${data.totalCount}`;
+        if (avgEl) avgEl.innerText = `${data.avgLatencyMs}ms`;
+        if (checkedEl) checkedEl.innerText = new Date().toLocaleTimeString();
+
+        renderClusterHealthMatrix();
+        playNotificationSound('chime');
+        showToast(`✅ Cluster Health: ${data.healthyCount}/${data.totalCount} accounts operational (Avg ${data.avgLatencyMs}ms)`, 'success');
+      } catch (err) {
+        showToast(`❌ Health test error: ${err.message}`, 'error');
+      } finally {
+        if (pingBtn) pingBtn.disabled = false;
+        if (matrixPingBtn) matrixPingBtn.disabled = false;
+        if (pingText) pingText.innerText = 'Ping Cluster';
+        if (matrixPingText) matrixPingText.innerText = 'Ping All Accounts Now';
+      }
+    }
+
+    function renderClusterHealthMatrix() {
+      const container = document.getElementById('matrix-cards-container');
+      if (!container) return;
+
+      const accounts = cachedAccountsList || [];
+      if (accounts.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 32px; color: var(--text-4);">No accounts in pool.</div>';
+        return;
+      }
+
+      const healthList = lastClusterHealthData?.accounts || [];
+      const healthMap = new Map();
+      healthList.forEach(h => healthMap.set(h.id, h));
+
+      container.innerHTML = accounts.map((acc, index) => {
+        const h = healthMap.get(acc.id);
+        const isPaused = acc.enabled === false;
+        const latency = h ? h.latencyMs : null;
+        let cardStatus = 'healthy';
+        let statusBadge = '<span class="status-badge active-now"><span class="pulse-dot"></span> Ready</span>';
+
+        if (isPaused) {
+          cardStatus = 'degraded';
+          statusBadge = '<span class="status-badge" style="background: rgba(161, 161, 170, 0.1); color: var(--text-3);">Paused</span>';
+        } else if (acc.is403Banned) {
+          cardStatus = 'critical';
+          statusBadge = '<span class="status-badge restricted">403 Restricted</span>';
+        } else if (h && !h.ok) {
+          cardStatus = 'critical';
+          statusBadge = '<span class="status-badge restricted">Token Expired</span>';
+        } else if (latency && latency > 600) {
+          cardStatus = 'degraded';
+          statusBadge = '<span class="status-badge queued">High Latency</span>';
+        }
+
+        const latText = latency !== null ? `${latency}ms` : 'Not tested yet';
+        const latColor = latency === null ? 'var(--text-4)' : (latency < 250 ? 'var(--green)' : (latency < 600 ? 'var(--amber)' : 'var(--red)'));
+        const latWidth = latency !== null ? Math.min(100, Math.round((latency / 800) * 100)) : 0;
+        const g5 = acc.gemini5h?.pct ?? 100;
+        const gw = acc.geminiWeekly?.pct ?? 100;
+        const aliasText = acc.alias ? `"${acc.alias}"` : '';
+        const initial = (acc.alias || acc.name || acc.email || 'A')[0].toUpperCase();
+
+        return `
+          <div class="matrix-card ${cardStatus}">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--blue); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  ${initial}
+                </div>
+                <div style="overflow: hidden;">
+                  <div style="font-size: 12px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${acc.email}
+                  </div>
+                  <div style="font-size: 10px; color: var(--text-3);">
+                    Key #${index + 1} ${aliasText ? '&bull; ' + aliasText : ''}
+                  </div>
+                </div>
+              </div>
+              ${statusBadge}
+            </div>
+
+            <!-- Latency Gauge -->
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span style="color: var(--text-4);">OAuth Ping Latency:</span>
+                <strong style="color: ${latColor}; font-family: var(--font-mono);">${latText}</strong>
+              </div>
+              <div class="micro-bar" style="height: 4px; background: var(--surface-3);">
+                <div class="micro-fill" style="width: ${latWidth}%; height: 100%; background: ${latColor};"></div>
+              </div>
+            </div>
+
+            <!-- Headroom Telemetry -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 10px;">
+              <div>
+                <span style="color: var(--text-4);">Gemini 5h:</span>
+                <strong style="color: ${g5 > 50 ? 'var(--green)' : (g5 > 20 ? 'var(--amber)' : 'var(--red)')}; margin-left: 4px;">${g5}%</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-4);">Weekly:</span>
+                <strong style="color: ${gw > 50 ? 'var(--green)' : (gw > 20 ? 'var(--amber)' : 'var(--red)')}; margin-left: 4px;">${gw}%</strong>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display: flex; gap: 6px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border-subtle);">
+              <button class="btn btn-secondary btn-sm" onclick="openAccountDetails('${acc.id}')" style="flex: 1; font-size: 10px; height: 24px; padding: 0;">
+                <i data-lucide="shield" style="width: 10px; height: 10px;"></i>
+                <span>Inspect</span>
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="setActive('${acc.id}')" style="flex: 1; font-size: 10px; height: 24px; padding: 0;">
+                <i data-lucide="check" style="width: 10px; height: 10px;"></i>
+                <span>Set Active</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (e) {}
+      }
+    }
+
+    // What-If Simulator & Capacity Stress Test Engine
+    function applySimPreset(preset) {
+      document.querySelectorAll('.sim-preset-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`sim-btn-${preset}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const inputAgents = document.getElementById('sim-input-agents');
+      const inputContext = document.getElementById('sim-input-context');
+      const inputTurns = document.getElementById('sim-input-turns');
+      const selectModel = document.getElementById('sim-select-model');
+      const selectWindow = document.getElementById('sim-select-window');
+
+      if (preset === 'solo') {
+        if (inputAgents) inputAgents.value = 1;
+        if (inputContext) inputContext.value = 25000;
+        if (inputTurns) inputTurns.value = 25;
+        if (selectModel) selectModel.value = 'gemini-pro';
+        if (selectWindow) selectWindow.value = '5';
+      } else if (preset === 'swarm') {
+        if (inputAgents) inputAgents.value = 4;
+        if (inputContext) inputContext.value = 20000;
+        if (inputTurns) inputTurns.value = 15;
+        if (selectModel) selectModel.value = 'gemini-pro';
+        if (selectWindow) selectWindow.value = '5';
+      } else if (preset === 'heavy') {
+        if (inputAgents) inputAgents.value = 10;
+        if (inputContext) inputContext.value = 40000;
+        if (inputTurns) inputTurns.value = 20;
+        if (selectModel) selectModel.value = 'gemini-pro';
+        if (selectWindow) selectWindow.value = '5';
+      } else if (preset === 'ci') {
+        if (inputAgents) inputAgents.value = 2;
+        if (inputContext) inputContext.value = 10000;
+        if (inputTurns) inputTurns.value = 45;
+        if (selectModel) selectModel.value = 'gemini-flash';
+        if (selectWindow) selectWindow.value = '24';
+      }
+
+      runSimulation();
+    }
+
+    function runSimulation() {
+      const agents = parseInt(document.getElementById('sim-input-agents')?.value || '3', 10);
+      const context = parseInt(document.getElementById('sim-input-context')?.value || '20000', 10);
+      const turns = parseInt(document.getElementById('sim-input-turns')?.value || '15', 10);
+      const model = document.getElementById('sim-select-model')?.value || 'gemini-pro';
+      const windowHours = parseInt(document.getElementById('sim-select-window')?.value || '5', 10);
+
+      // Update Slider value displays
+      const valAgents = document.getElementById('sim-val-agents');
+      const valContext = document.getElementById('sim-val-context');
+      const valTurns = document.getElementById('sim-val-turns');
+
+      if (valAgents) valAgents.innerText = `${agents} agent${agents === 1 ? '' : 's'}`;
+      if (valContext) valContext.innerText = `${context.toLocaleString()} tokens`;
+      if (valTurns) valTurns.innerText = `${turns} turns/hr`;
+
+      // Calculations
+      const tokensPerHour = agents * context * turns;
+      const totalSimTokens = tokensPerHour * windowHours;
+
+      let costPerMillion = 3.00;
+      if (model === 'gemini-flash') costPerMillion = 0.30;
+      else if (model === 'claude-sonnet') costPerMillion = 8.00;
+      const dollarsSaved = (totalSimTokens / 1000000) * costPerMillion;
+
+      // Update KPI Cards
+      const kpiHourly = document.getElementById('sim-kpi-hourly');
+      const kpiWindow = document.getElementById('sim-kpi-window');
+      const kpiWindowLabel = document.getElementById('sim-kpi-window-label');
+      const kpiCost = document.getElementById('sim-kpi-cost');
+
+      if (kpiHourly) kpiHourly.innerText = formatNumber(tokensPerHour);
+      if (kpiWindow) kpiWindow.innerText = totalSimTokens >= 1000000 ? `${(totalSimTokens / 1000000).toFixed(2)}M` : formatNumber(totalSimTokens);
+      if (kpiWindowLabel) kpiWindowLabel.innerText = `in ${windowHours}h forecast window`;
+      if (kpiCost) kpiCost.innerText = `$${dollarsSaved.toFixed(2)}`;
+
+      // Active Cluster Headroom calculation
+      const accounts = (cachedAccountsList || []).filter(a => a.enabled !== false && !a.is403Banned);
+      const burstCapPerAccount = 1000000;
+      const usablePerAccount = accounts.map(a => {
+        const currentPct = (model === 'claude-sonnet' ? a.claude5h?.pct : a.gemini5h?.pct) ?? 100;
+        const usablePct = Math.max(0, currentPct - 20);
+        return {
+          id: a.id,
+          email: a.email,
+          alias: a.alias,
+          pct: currentPct,
+          tokensAvailable: Math.round((usablePct / 100) * burstCapPerAccount)
+        };
+      });
+
+      const totalPoolBurstAvailable = usablePerAccount.reduce((sum, a) => sum + a.tokensAvailable, 0);
+
+      // Viability assessment
+      const banner = document.getElementById('sim-viability-banner');
+      const bannerIcon = document.getElementById('sim-viability-icon');
+      const bannerTitle = document.getElementById('sim-viability-title');
+      const bannerDesc = document.getElementById('sim-viability-desc');
+      const bannerBadge = document.getElementById('sim-viability-badge');
+
+      const isSustainable = totalPoolBurstAvailable >= totalSimTokens || (accounts.length > 0 && (totalPoolBurstAvailable / tokensPerHour) >= windowHours);
+      const hoursUntilExhaustion = tokensPerHour > 0 ? (totalPoolBurstAvailable / tokensPerHour).toFixed(1) : 999;
+
+      if (isSustainable) {
+        if (banner) {
+          banner.style.background = 'rgba(16, 185, 129, 0.08)';
+          banner.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+        }
+        if (bannerIcon) {
+          bannerIcon.style.background = 'rgba(16, 185, 129, 0.2)';
+          bannerIcon.style.color = 'var(--green)';
+          bannerIcon.innerText = '✓';
+        }
+        if (bannerTitle) bannerTitle.innerText = 'Cluster Runway Sustainable (Zero Downtime)';
+        if (bannerDesc) bannerDesc.innerText = `Active pool easily absorbs ${formatNumber(totalSimTokens)} tokens across ${accounts.length} accounts. Failover routing will prevent all 429 errors.`;
+        if (bannerBadge) {
+          bannerBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+          bannerBadge.style.color = 'var(--green)';
+          bannerBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          bannerBadge.innerText = '100% Zero Downtime';
+        }
+      } else if (hoursUntilExhaustion >= 1.5) {
+        if (banner) {
+          banner.style.background = 'rgba(245, 158, 11, 0.08)';
+          banner.style.borderColor = 'rgba(245, 158, 11, 0.25)';
+        }
+        if (bannerIcon) {
+          bannerIcon.style.background = 'rgba(245, 158, 11, 0.2)';
+          bannerIcon.style.color = 'var(--amber)';
+          bannerIcon.innerText = '⚠️';
+        }
+        if (bannerTitle) bannerTitle.innerText = `Tight Headroom Margin (${hoursUntilExhaustion}h Runway)`;
+        if (bannerDesc) bannerDesc.innerText = `Cluster will absorb load for ${hoursUntilExhaustion} hours before exhausting burst quotas. Consider adding 1 more standby account.`;
+        if (bannerBadge) {
+          bannerBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+          bannerBadge.style.color = 'var(--amber)';
+          bannerBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+          bannerBadge.innerText = 'Moderate Buffer';
+        }
+      } else {
+        if (banner) {
+          banner.style.background = 'rgba(239, 68, 68, 0.08)';
+          banner.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+        }
+        if (bannerIcon) {
+          bannerIcon.style.background = 'rgba(239, 68, 68, 0.2)';
+          bannerIcon.style.color = 'var(--red)';
+          bannerIcon.innerText = '✕';
+        }
+        if (bannerTitle) bannerTitle.innerText = `Exhaustion Predicted in ${hoursUntilExhaustion} Hours`;
+        if (bannerDesc) bannerDesc.innerText = `Demand (${formatNumber(tokensPerHour)} tok/hr) exceeds pool burst buffer. Smart Shield will failover through all accounts rapidly.`;
+        if (bannerBadge) {
+          bannerBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+          bannerBadge.style.color = 'var(--red)';
+          bannerBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+          bannerBadge.innerText = 'Exhaustion Warning';
+        }
+      }
+
+      // Generate Sequential Failover Cascade Waterfall
+      const waterfallEl = document.getElementById('sim-waterfall-list');
+      if (!waterfallEl) return;
+
+      if (accounts.length === 0) {
+        waterfallEl.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-4);">No active accounts in pool to simulate.</div>';
+        return;
+      }
+
+      let simulatedMinutes = 0;
+      const steps = [];
+
+      for (let i = 0; i < accounts.length; i++) {
+        const acc = usablePerAccount[i];
+        const minutesOnAccount = tokensPerHour > 0 ? Math.round((acc.tokensAvailable / (tokensPerHour / 60))) : 999;
+        const startMin = simulatedMinutes;
+        const endMin = Math.min(windowHours * 60, simulatedMinutes + minutesOnAccount);
+        simulatedMinutes = endMin;
+
+        const startHrs = Math.floor(startMin / 60);
+        const startM = startMin % 60;
+        const endHrs = Math.floor(endMin / 60);
+        const endM = endMin % 60;
+        const timeSpan = `T+${startHrs}h ${startM < 10 ? '0' : ''}${startM}m ➔ T+${endHrs}h ${endM < 10 ? '0' : ''}${endM}m`;
+
+        const isExhausted = endMin < windowHours * 60 && i === accounts.length - 1;
+        const shortName = acc.alias || acc.email.split('@')[0];
+
+        steps.push({
+          stepNum: i + 1,
+          accountEmail: acc.email,
+          accountName: shortName,
+          timeSpan,
+          duration: `${minutesOnAccount} mins`,
+          pct: acc.pct,
+          isHandoff: i < accounts.length - 1 && endMin < windowHours * 60,
+          isExhausted
+        });
+
+        if (endMin >= windowHours * 60) break;
+      }
+
+      waterfallEl.innerHTML = steps.map(s => `
+        <div class="sim-waterfall-step">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 24px; height: 24px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); color: var(--blue); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(59, 130, 246, 0.3);">
+              ${s.stepNum}
+            </div>
+            <div>
+              <div style="font-size: 12px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px;">
+                <span>${s.accountName}</span>
+                <span class="badge-tag" style="font-size: 9px; padding: 1px 5px;">${s.pct}% quota</span>
+              </div>
+              <div style="font-size: 10px; color: var(--text-3); margin-top: 1px; font-family: var(--font-mono);">
+                ${s.timeSpan} (${s.duration})
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            ${s.isHandoff ? `
+              <span style="font-size: 10px; color: var(--amber); display: inline-flex; align-items: center; gap: 4px; background: rgba(245, 158, 11, 0.1); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid rgba(245, 158, 11, 0.2);">
+                <span>🛡️ Smart Failover (&lt;20%)</span>
+              </span>
+            ` : (s.isExhausted ? `
+              <span style="font-size: 10px; color: var(--red); display: inline-flex; align-items: center; gap: 4px; background: rgba(239, 68, 68, 0.1); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.2);">
+                <span>⚠️ Cluster Depleted</span>
+              </span>
+            ` : `
+              <span style="font-size: 10px; color: var(--green); display: inline-flex; align-items: center; gap: 4px; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.2);">
+                <span>✓ Absorbs Remainder</span>
+              </span>
+            `)}
+          </div>
+        </div>
+      `).join('');
+
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (e) {}
+      }
+    }
+
     // Logging & Actions
     function addLog(msg) {
       const box = document.getElementById('stream-box');
@@ -4712,13 +5505,21 @@
 
     // Export Logs
     function exportLogs(format) {
+      const search = document.getElementById('log-search-input')?.value || '';
+      const account = document.getElementById('log-account-filter')?.value || '';
+      const model = document.getElementById('log-model-filter')?.value || '';
+      const status = document.getElementById('log-status-filter')?.value || '';
+      const minLatency = document.getElementById('log-latency-filter')?.value || '0';
+
+      const query = new URLSearchParams({ format, search, account, model, status, minLatency });
       const a = document.createElement('a');
-      a.href = `/api/db/logs/export?format=${format}`;
+      a.href = `/api/db/logs/export?${query.toString()}`;
       a.download = `antigravity_requests_${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      addLog(`📥 Exported SQLite logs as ${format.toUpperCase()}`);
+      addLog(`📥 Exported filtered SQLite logs as ${format.toUpperCase()}`);
+      showToast(`📥 Exported filtered logs as ${format.toUpperCase()}`, 'success');
     }
 
     // Sound chime generator using Web Audio API (Zero dependencies, works across all browsers)
@@ -5057,6 +5858,7 @@
     updateNotificationButton();
     setViewMode(currentViewMode);
     fetchSmartShieldConfig();
+    try { runSimulation(); } catch (e) {}
     const hashTab = (window.location.hash || '').replace('#', '');
     const savedTab = (hashTab && document.getElementById(hashTab)) ? hashTab : localStorage.getItem('harness_active_tab');
     if (savedTab && document.getElementById(savedTab)) {

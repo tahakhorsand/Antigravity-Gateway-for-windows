@@ -1062,7 +1062,12 @@ async function handleProxyRequest(req, res) {
   if (urlPath.startsWith('/api/db/logs/export')) {
     const query = new URL(req.url, 'http://localhost').searchParams;
     const format = query.get('format') === 'json' ? 'json' : 'csv';
-    const logsResult = queryLogsDb({ limit: 5000, page: 1 });
+    const account = query.get('account') || '';
+    const model = query.get('model') || '';
+    const search = query.get('search') || '';
+    const status = query.get('status') || '';
+    const minLatency = query.get('minLatency') || '';
+    const logsResult = queryLogsDb({ limit: 5000, page: 1, account, model, search, status, minLatency });
     const logs = logsResult.logs || [];
     if (format === 'json') {
       res.writeHead(200, {
@@ -1103,7 +1108,9 @@ async function handleProxyRequest(req, res) {
     const account = query.get('account') || '';
     const model = query.get('model') || '';
     const search = query.get('search') || '';
-    const result = queryLogsDb({ limit, page, account, model, search });
+    const status = query.get('status') || '';
+    const minLatency = query.get('minLatency') || '';
+    const result = queryLogsDb({ limit, page, account, model, search, status, minLatency });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(result, null, 2));
   }
@@ -1316,7 +1323,7 @@ async function handleProxyRequest(req, res) {
   }
 
   // Account Token & Health Check
-  if (urlPath.startsWith('/api/accounts/health') && req.method === 'POST') {
+  if (urlPath === '/api/accounts/health' && req.method === 'POST') {
     const query = new URL(req.url, 'http://localhost').searchParams;
     const accountId = query.get('id');
     const accounts = getAccounts();
@@ -1352,6 +1359,57 @@ async function handleProxyRequest(req, res) {
         error: err.message
       }));
     }
+  }
+
+  // Cluster-Wide Parallel Health & Latency Ping
+  if (urlPath === '/api/accounts/health-all' && req.method === 'POST') {
+    const accounts = getAccounts();
+    const stats = getAllStats();
+    const tStart = Date.now();
+    const results = await Promise.allSettled(accounts.map(async (acc) => {
+      const t0 = Date.now();
+      try {
+        const token = await getValidAccessToken(acc);
+        const latencyMs = Date.now() - t0;
+        const s = stats.accounts?.[acc.id];
+        return {
+          id: acc.id,
+          email: acc.email,
+          alias: acc.alias,
+          ok: true,
+          latencyMs,
+          name: acc.name,
+          hasRefreshToken: !!acc.refresh_token,
+          expiresAt: acc.expiry_timestamp,
+          isBanned: s ? !!s.is403Banned : false,
+          isCooling: isCoolingDown(acc.id),
+          tokenPreview: token ? `${token.slice(0, 8)}...${token.slice(-6)}` : null
+        };
+      } catch (err) {
+        return {
+          id: acc.id,
+          email: acc.email,
+          alias: acc.alias,
+          ok: false,
+          latencyMs: Date.now() - t0,
+          error: err.message
+        };
+      }
+    }));
+
+    const checks = results.map(r => r.value || { ok: false, error: r.reason?.message });
+    const healthyCount = checks.filter(c => c.ok).length;
+    const avgLatency = healthyCount > 0 ? Math.round(checks.filter(c => c.ok).reduce((sum, c) => sum + c.latencyMs, 0) / healthyCount) : 0;
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      ok: true,
+      durationMs: Date.now() - tStart,
+      healthyCount,
+      totalCount: accounts.length,
+      avgLatencyMs: avgLatency,
+      accounts: checks
+    }));
   }
 
   // Bulk Account Operations (Pause, Resume, Sync)
