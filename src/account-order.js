@@ -42,6 +42,7 @@ export function orderAccountCandidates(accounts, statsAccounts = {}, options = {
 
 export function shouldAdoptActiveSession(globalStats, servedAccount) {
   if (!servedAccount) return false;
+  if (globalStats?.manualActiveAccountId) return false;
   const activeId = globalStats?.activeSessionAccountId || null;
   const activeEmail = (globalStats?.activeSessionEmail || '').trim().toLowerCase();
   if (!activeId && !activeEmail) return false;

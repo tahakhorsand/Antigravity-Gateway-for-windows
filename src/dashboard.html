@@ -1577,6 +1577,12 @@
           <strong id="header-active-email">Detecting...</strong>
         </div>
 
+        <!-- Reset to Current IDE Button -->
+        <button class="btn btn-secondary btn-sm" id="btn-reset-current" onclick="resetToCurrentIde()" title="Reset harness active account to match current IDE session and cancel pending switch" style="display: none; background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.3); color: var(--blue);">
+          <i data-lucide="rotate-ccw" style="width: 12px; height: 12px; color: var(--blue);"></i>
+          <span>Reset to Current</span>
+        </button>
+
         <!-- Next Reset Pill -->
         <div class="telemetry-pill" id="pill-next-reset" title="Earliest upcoming quota reset window">
           <i data-lucide="clock" style="width: 13px; height: 13px; color: var(--amber);"></i>
@@ -4187,6 +4193,12 @@
           syncEl.style.color = ideStatus?.inSync ? 'var(--green)' : 'var(--text-3)';
         }
 
+        const btnResetCurrent = document.getElementById('btn-reset-current');
+        if (btnResetCurrent) {
+          const needsReset = !!(ideStatus && (!ideStatus.inSync || ideStatus.pendingSwitch));
+          btnResetCurrent.style.display = needsReset ? 'inline-flex' : 'none';
+        }
+
         // Update Next Reset Countdown Timestamp across all account windows
         let earliestReset = null;
         let earliestEmail = null;
@@ -5330,6 +5342,21 @@
         await fetchMatrix();
       } catch (e) {
         console.error('Failed to set active account:', e);
+      }
+    }
+
+    async function resetToCurrentIde() {
+      try {
+        const res = await fetch('/api/reset-to-current', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (data.ok) {
+          addLog(`🔄 Reset active session to current IDE account (${data.email || 'active'}).`);
+        } else {
+          addLog(`⚠️ Reset failed: ${data.error || 'unknown error'}`);
+        }
+        await fetchMatrix();
+      } catch (e) {
+        addLog(`❌ Reset failed: ${e.message}`);
       }
     }
 

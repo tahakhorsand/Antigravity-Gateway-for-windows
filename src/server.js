@@ -43,7 +43,7 @@ import {
   CLOUDCODE_STREAM_ENDPOINTS
 } from './translator.js';
 import { orderAccountCandidates, shouldAdoptActiveSession, planShieldSwitch, familyBuckets } from './account-order.js';
-import { readLanguageServerEmail, getPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage } from './antigravity-auth-sync.js';
+import { readLanguageServerEmail, getPendingSwitch, cancelPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage } from './antigravity-auth-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -547,6 +547,8 @@ function getNextAccountCandidates(accounts, statsData) {
 }
 
 function adoptSessionAfterFailover(account, statsData) {
+  if (!getMetadataDb('smart_shield_enabled', true)) return;
+  if (statsData?.global?.manualActiveAccountId) return;
   if (!shouldAdoptActiveSession(statsData?.global, account)) return;
   const switched = switchAntigravityActiveAccount(account.id, account);
   if (!switched) return;
@@ -1232,6 +1234,48 @@ async function handleProxyRequest(req, res) {
     }
     res.writeHead(400, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: false, error: 'Missing ?id=' }));
+  }
+
+  // Reset Active Session & Manual Lock to Currently Detected IDE Account
+  if (urlPath === '/api/reset-to-current' && req.method === 'POST') {
+    cancelPendingSwitch();
+    manualSwitchLockUntil = 0;
+    manualSwitchTargetEmail = null;
+    const ideEmail = await readLanguageServerEmail();
+    const accounts = getAccounts();
+    const targetEmail = (ideEmail || '').trim().toLowerCase();
+    const acc = targetEmail ? accounts.find(a => a.email && a.email.toLowerCase() === targetEmail) : null;
+    if (acc) {
+      const switchResult = await switchAntigravityActiveAccount(acc.id, acc, {
+        restartLanguageServer: false,
+        isManual: true
+      });
+      setActiveAccount(acc.id, { manual: true });
+      broadcastEvent({
+        type: 'account_switch',
+        accountId: acc.id,
+        email: acc.email,
+        ide: switchResult.ide || null
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, activeId: acc.id, email: acc.email, ide: switchResult.ide || null }));
+    } else {
+      clearManualActiveAccount();
+      broadcastEvent({ type: 'account_switch', accountId: null, email: targetEmail || null });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, email: targetEmail || null, message: 'Cleared pending switch and manual lock' }));
+    }
+  }
+
+  // Clear Manual Lock
+  if (urlPath === '/api/clear-manual-lock' && req.method === 'POST') {
+    cancelPendingSwitch();
+    manualSwitchLockUntil = 0;
+    manualSwitchTargetEmail = null;
+    clearManualActiveAccount();
+    broadcastEvent({ type: 'manual_lock_cleared' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true }));
   }
 
   // Toggle Account Enabled / Paused
