@@ -1058,6 +1058,138 @@
       border-radius: 2px;
     }
 
+    /* Quota Chrono Timeline */
+    .timeline-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      transition: border-color 0.2s ease;
+    }
+    .timeline-card:hover {
+      border-color: var(--border-muted);
+    }
+    .timeline-track {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 4px 2px 10px 2px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--surface-3) transparent;
+    }
+    .timeline-track::-webkit-scrollbar {
+      height: 5px;
+    }
+    .timeline-track::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .timeline-track::-webkit-scrollbar-thumb {
+      background: var(--surface-3);
+      border-radius: 4px;
+    }
+    .timeline-event-card {
+      min-width: 250px;
+      max-width: 280px;
+      flex-shrink: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .timeline-event-card:hover {
+      border-color: var(--blue);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+    .timeline-event-card.imminent {
+      border-color: rgba(59, 130, 246, 0.4);
+      background: linear-gradient(180deg, rgba(59, 130, 246, 0.06) 0%, var(--surface-2) 100%);
+    }
+    .timeline-event-card.imminent::after {
+      content: '';
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 8px var(--blue);
+      animation: pulse-dot 1.5s infinite ease-in-out;
+    }
+
+    /* Modal / Inspection Drawer Tabs */
+    .drawer-nav-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--surface-1);
+      padding: 0 16px;
+      gap: 4px;
+    }
+    .drawer-nav-tab {
+      padding: 9px 14px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-3);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .drawer-nav-tab:hover {
+      color: var(--text-1);
+    }
+    .drawer-nav-tab.active {
+      color: var(--blue);
+      border-bottom-color: var(--blue);
+      font-weight: 600;
+    }
+    .drawer-tab-content {
+      display: none;
+    }
+    .drawer-tab-content.active {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Mini Request Log Table */
+    .log-mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .log-mini-table th {
+      text-align: left;
+      padding: 6px 10px;
+      font-weight: 600;
+      color: var(--text-3);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .log-mini-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      color: var(--text-2);
+      font-variant-numeric: tabular-nums;
+    }
+    .log-mini-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
     /* Enterprise Savings Card */
     .roi-grid {
       display: grid;
@@ -1330,6 +1462,13 @@
           <strong id="header-shield-val">Armed (&lt;20%)</strong>
         </div>
 
+        <!-- Emergency Quick Rotate Button -->
+        <button class="btn btn-secondary btn-sm" id="btn-quick-rotate" onclick="triggerEmergencyRotate()" title="Emergency Rotate: Instantly rotate active session to highest-headroom standby account (Shortcut: ⇧⌘R)" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); color: var(--amber);">
+          <i data-lucide="zap" style="width: 12px; height: 12px; color: var(--amber);"></i>
+          <span>Quick Rotate</span>
+          <kbd style="font-size: 9px; padding: 1px 4px; margin-left: 2px;">⇧⌘R</kbd>
+        </button>
+
         <!-- Actions -->
         <button class="btn btn-secondary btn-sm" onclick="openCommandPalette()" title="Command Palette (Shortcut: ⌘K)">
           <i data-lucide="command" style="width: 12px; height: 12px;"></i>
@@ -1461,6 +1600,34 @@
               Next failover: Calculating...
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Chrono Quota Replenishment Timeline Card -->
+      <div class="timeline-card" id="timeline-card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="calendar-clock" style="width: 14px; height: 14px; color: var(--blue);"></i>
+            <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2);">Quota Replenishment Chrono-Timeline</span>
+            <span class="badge-tag" id="timeline-events-count" style="font-size: 10px; background: rgba(59, 130, 246, 0.1); color: var(--blue); border-color: rgba(59, 130, 246, 0.25);">0 Upcoming</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text-3);">
+            <span style="display: flex; align-items: center; gap: 5px;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--blue); display: inline-block;"></span>
+              5h Burst
+            </span>
+            <span style="display: flex; align-items: center; gap: 5px;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block;"></span>
+              Weekly Reset
+            </span>
+            <span style="font-size: 10px; color: var(--text-4); border-left: 1px solid var(--border-subtle); padding-left: 10px;">
+              Live Cloud Code Feed
+            </span>
+          </div>
+        </div>
+
+        <div class="timeline-track" id="reset-timeline-track">
+          <div style="color: var(--text-4); font-size: 11px; padding: 6px 0;">Loading reset timelines...</div>
         </div>
       </div>
 
@@ -2169,86 +2336,152 @@
     </div>
   </div>
 
-  <!-- Account Details & Token Inspector Modal -->
+  <!-- Account Details & Deep-Dive Diagnostic Drawer Modal -->
   <div class="modal-backdrop" id="account-details-modal">
-    <div class="modal-box" style="max-width: 540px;">
+    <div class="modal-box" style="max-width: 660px; max-height: 90vh;">
       <div class="modal-header">
         <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-          <i data-lucide="shield" style="width: 14px; height: 14px; color: var(--blue);"></i>
-          <span>Account &amp; Token Diagnostic Inspector</span>
+          <i data-lucide="shield" style="width: 15px; height: 15px; color: var(--blue);"></i>
+          <span>Account Deep-Dive &amp; Token Diagnostic Inspector</span>
         </div>
         <button class="btn btn-ghost btn-icon-sm" onclick="closeAccountDetails()">
           <i data-lucide="x" style="width: 14px; height: 14px;"></i>
         </button>
       </div>
-      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
-        <!-- Header Info -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
-          <div>
-            <div style="font-size: 13px; font-weight: 600; color: var(--text-1);" id="acc-detail-email">user@gmail.com</div>
-            <div style="font-size: 11px; color: var(--text-3);" id="acc-detail-sub">Pro Account &bull; Tier: PRO</div>
+
+      <!-- Account Summary Banner -->
+      <div style="padding: 12px 18px; background: var(--surface-2); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div id="acc-detail-avatar" style="width: 34px; height: 34px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); color: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; border: 1px solid rgba(59, 130, 246, 0.3);">
+            M
           </div>
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px;">
+              <span id="acc-detail-email">user@gmail.com</span>
+              <span class="alias-pill" id="acc-detail-alias-badge" style="display: none;"></span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-3); margin-top: 1px;" id="acc-detail-sub">Pro Account &bull; Tier: PRO</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
           <span class="status-badge active-now" id="acc-detail-status">Active Now</span>
         </div>
+      </div>
 
-        <!-- Token Health & Latency Test -->
-        <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3);">OAuth Token Health</span>
-            <button class="btn btn-secondary btn-sm" id="btn-test-health" onclick="testAccountHealth()" style="font-size: 10px; height: 22px; padding: 0 8px;">
-              <i data-lucide="activity" style="width: 10px; height: 10px;"></i>
-              <span>Test Latency</span>
-            </button>
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
-            <div>
-              <span style="color: var(--text-4);">Access Token:</span>
-              <code style="display: block; font-size: 10px; color: var(--text-2); font-family: var(--font-mono); margin-top: 2px;" id="acc-detail-token">ya29.a0...</code>
-            </div>
-            <div>
-              <span style="color: var(--text-4);">Token Expiration:</span>
-              <span style="display: block; color: var(--text-2); margin-top: 2px;" id="acc-detail-expiry">Checking...</span>
-            </div>
-            <div>
-              <span style="color: var(--text-4);">Refresh Token:</span>
-              <span style="display: block; color: var(--green); margin-top: 2px;" id="acc-detail-refresh">Persistent</span>
-            </div>
-            <div>
-              <span style="color: var(--text-4);">API Latency:</span>
-              <span style="display: block; color: var(--blue); margin-top: 2px;" id="acc-detail-latency">Click "Test Latency"</span>
-            </div>
-          </div>
-        </div>
+      <!-- Drawer Internal Tab Bar -->
+      <div class="drawer-nav-tabs">
+        <button class="drawer-nav-tab active" id="drawer-tab-btn-quotas" onclick="switchDrawerTab('quotas')">
+          <i data-lucide="layers" style="width: 12px; height: 12px;"></i>
+          <span>Quotas &amp; Models</span>
+        </button>
+        <button class="drawer-nav-tab" id="drawer-tab-btn-health" onclick="switchDrawerTab('health')">
+          <i data-lucide="activity" style="width: 12px; height: 12px;"></i>
+          <span>OAuth &amp; Diagnostics</span>
+        </button>
+        <button class="drawer-nav-tab" id="drawer-tab-btn-logs" onclick="switchDrawerTab('logs')">
+          <i data-lucide="terminal" style="width: 12px; height: 12px;"></i>
+          <span>Recent Activity</span>
+        </button>
+      </div>
 
-        <!-- 4-Bucket Detailed Quota Breakdown -->
-        <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px;">
-          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 10px;">Quota Buckets Breakdown</div>
+      <div class="modal-body" style="padding: 16px 18px; max-height: 60vh; overflow-y: auto;">
+        <!-- TAB 1: Quotas & Model Limits -->
+        <div class="drawer-tab-content active" id="drawer-pane-quotas">
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 2px;">
+            Real-Time Quota Windows
+          </div>
           <div style="display: flex; flex-direction: column; gap: 10px;" id="acc-detail-buckets">
             <!-- Dynamic Quota Progress Bars -->
           </div>
+
+          <!-- Model Capabilities Grid -->
+          <div style="margin-top: 6px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+            <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 8px;">Model Support &amp; Availability</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 11px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--surface-1); border-radius: var(--radius-sm);">
+                <span style="color: var(--text-2);">Gemini 2.5 / 2.0 Pro</span>
+                <span style="color: var(--green); font-size: 10px; font-weight: 600;">ACTIVE</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--surface-1); border-radius: var(--radius-sm);">
+                <span style="color: var(--text-2);">Gemini 2.0 Flash</span>
+                <span style="color: var(--green); font-size: 10px; font-weight: 600;">UNLIMITED</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--surface-1); border-radius: var(--radius-sm);">
+                <span style="color: var(--text-2);">Claude 3.7 / 3.5 Sonnet</span>
+                <span style="color: var(--blue); font-size: 10px; font-weight: 600;">TIER PRO</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--surface-1); border-radius: var(--radius-sm);">
+                <span style="color: var(--text-2);">Imagen 3 Generation</span>
+                <span style="color: var(--text-3); font-size: 10px;">AVAILABLE</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- SQLite Request & Token Stats -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
-          <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px;">
-            <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Requests</div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text-1);" id="acc-detail-reqs">0</div>
+        <!-- TAB 2: Token Health & Diagnostics -->
+        <div class="drawer-tab-content" id="drawer-pane-health">
+          <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3);">OAuth Credential Diagnostics</span>
+              <button class="btn btn-secondary btn-sm" id="btn-test-health" onclick="testAccountHealth()" style="font-size: 10px; height: 22px; padding: 0 8px;">
+                <i data-lucide="activity" style="width: 10px; height: 10px;"></i>
+                <span>Test Latency</span>
+              </button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+              <div>
+                <span style="color: var(--text-4);">Access Token:</span>
+                <code style="display: block; font-size: 10px; color: var(--text-2); font-family: var(--font-mono); margin-top: 2px;" id="acc-detail-token">ya29.a0...</code>
+              </div>
+              <div>
+                <span style="color: var(--text-4);">Token Expiration:</span>
+                <span style="display: block; color: var(--text-2); margin-top: 2px;" id="acc-detail-expiry">Checking...</span>
+              </div>
+              <div>
+                <span style="color: var(--text-4);">Refresh Token:</span>
+                <span style="display: block; color: var(--green); margin-top: 2px;" id="acc-detail-refresh">Persistent</span>
+              </div>
+              <div>
+                <span style="color: var(--text-4);">API Latency:</span>
+                <span style="display: block; color: var(--blue); margin-top: 2px;" id="acc-detail-latency">Click "Test Latency"</span>
+              </div>
+            </div>
           </div>
-          <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px;">
-            <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Tokens</div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text-1);" id="acc-detail-tokens">0</div>
+
+          <!-- SQLite Request & Token Stats -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-top: 4px;">
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 8px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Total Requests</div>
+              <div style="font-size: 15px; font-weight: 600; color: var(--text-1); margin-top: 2px;" id="acc-detail-reqs">0</div>
+            </div>
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 8px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Total Tokens</div>
+              <div style="font-size: 15px; font-weight: 600; color: var(--text-1); margin-top: 2px;" id="acc-detail-tokens">0</div>
+            </div>
+            <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 8px;">
+              <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">API Cost Saved</div>
+              <div style="font-size: 15px; font-weight: 600; color: var(--green); margin-top: 2px;" id="acc-detail-saved">$0.00</div>
+            </div>
           </div>
-          <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px;">
-            <div style="font-size: 10px; color: var(--text-4); text-transform: uppercase;">Value Saved</div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--green);" id="acc-detail-saved">$0.00</div>
+        </div>
+
+        <!-- TAB 3: Recent Activity Logs -->
+        <div class="drawer-tab-content" id="drawer-pane-logs">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3);">Recent Activity (SQLite Audit Log)</span>
+            <span style="font-size: 10px; color: var(--text-4);" id="acc-detail-logs-count">Last 8 requests</span>
+          </div>
+          <div style="background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow-x: auto;" id="acc-detail-logs-container">
+            <div style="padding: 20px; text-align: center; color: var(--text-4); font-size: 11px;">Loading activity logs...</div>
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="justify-content: space-between;">
+
+      <div class="modal-footer" style="justify-content: space-between; padding: 12px 18px;">
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-secondary btn-sm" id="acc-detail-btn-sync" onclick="syncSingleAccountFromModal()">
             <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
-            <span>Refresh Quota</span>
+            <span>Refresh Quotas</span>
           </button>
           <button class="btn btn-secondary btn-sm" id="acc-detail-btn-toggle" onclick="toggleAccountFromModal()">
             <span>Pause Account</span>
@@ -2256,7 +2489,10 @@
         </div>
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-secondary btn-sm" onclick="closeAccountDetails()">Close</button>
-          <button class="btn btn-primary btn-sm" id="acc-detail-btn-active" onclick="setActiveFromModal()">Set Active Now</button>
+          <button class="btn btn-primary btn-sm" id="acc-detail-btn-active" onclick="setActiveFromModal()">
+            <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+            <span>Set Active Now</span>
+          </button>
         </div>
       </div>
     </div>
@@ -2278,6 +2514,14 @@
         </button>
       </div>
       <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle);">
+          <span style="color: var(--text-2); font-weight: 500;">⚡ Quick Emergency Rotate</span>
+          <span style="display: flex; gap: 4px;"><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>R</kbd></span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle);">
+          <span style="color: var(--text-2);">Command Palette &amp; Search</span>
+          <span style="display: flex; gap: 4px;"><kbd>⌘</kbd> <kbd>K</kbd></span>
+        </div>
         <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle);">
           <span style="color: var(--text-2);">Switch to Account 1 &ndash; 9</span>
           <span style="display: flex; gap: 4px;"><kbd>1</kbd> &hellip; <kbd>9</kbd></span>
@@ -2586,6 +2830,123 @@
 
     // Account Details & Diagnostic Inspector
     let currentDetailAccId = null;
+    let currentDrawerTab = 'quotas';
+
+    function switchDrawerTab(tabId) {
+      currentDrawerTab = tabId;
+      document.querySelectorAll('.drawer-nav-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.drawer-tab-content').forEach(p => p.classList.remove('active'));
+
+      const btn = document.getElementById(`drawer-tab-btn-${tabId}`);
+      const pane = document.getElementById(`drawer-pane-${tabId}`);
+      if (btn) btn.classList.add('active');
+      if (pane) pane.classList.add('active');
+
+      if (tabId === 'logs' && currentDetailAccId) {
+        loadAccountRecentLogs(currentDetailAccId);
+      }
+      if (window.lucide) try { window.lucide.createIcons(); } catch (e) {}
+    }
+
+    async function loadAccountRecentLogs(accId) {
+      const container = document.getElementById('acc-detail-logs-container');
+      const countEl = document.getElementById('acc-detail-logs-count');
+      if (!container) return;
+
+      const acc = (cachedAccountsList || []).find(a => a.id === accId);
+      if (!acc) return;
+
+      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-4); font-size: 11px;">Loading activity logs from SQLite...</div>';
+
+      try {
+        const res = await fetch(`/api/db/logs?account=${encodeURIComponent(acc.email)}&limit=8`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const logs = data.logs || [];
+
+        if (countEl) countEl.innerText = `${logs.length} requests logged`;
+
+        if (logs.length === 0) {
+          container.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-4); font-size: 11px;">No requests processed by this account yet.</div>';
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="log-mini-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Model</th>
+                <th>Status</th>
+                <th>Latency</th>
+                <th>Tokens</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map(l => {
+                const timeStr = l.timestamp ? new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--';
+                const statusColor = (l.status_code >= 200 && l.status_code < 300) ? 'var(--green)' : 'var(--red)';
+                const tok = (l.total_tokens || 0).toLocaleString();
+                const modelName = (l.model || 'gemini-pro').replace('gemini-', '');
+                return `
+                  <tr>
+                    <td style="color: var(--text-3); font-family: var(--font-mono);">${timeStr}</td>
+                    <td style="font-weight: 500; color: var(--text-1);">${modelName}</td>
+                    <td><span style="color: ${statusColor}; font-weight: 600;">${l.status_code || 200}</span></td>
+                    <td style="color: var(--text-3); font-family: var(--font-mono);">${l.latency_ms || 0}ms</td>
+                    <td style="font-family: var(--font-mono); color: var(--text-2);">${tok}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--red); font-size: 11px;">Error loading logs: ${err.message}</div>`;
+      }
+    }
+
+    async function triggerEmergencyRotate() {
+      const activeEmail = (lastIdeStatus?.ideEmail || lastStatsData?.global?.activeSessionEmail || '').toLowerCase();
+      const activeId = lastStatsData?.global?.activeSessionAccountId;
+      
+      const pool = (cachedAccountsList || []).filter(a => 
+        a.id !== activeId && 
+        a.email?.toLowerCase() !== activeEmail && 
+        a.enabled !== false && 
+        !a.is403Banned && 
+        (!a.cooldownUntil || a.cooldownUntil <= Date.now())
+      );
+
+      if (pool.length === 0) {
+        showToast('⚠️ No standby accounts with available quota found to rotate into', 'warn');
+        return;
+      }
+
+      // Candidate with the highest score / headroom
+      pool.sort((a, b) => calculateAccountScore(b) - calculateAccountScore(a));
+      const target = pool[0];
+
+      const btn = document.getElementById('btn-quick-rotate');
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('loading');
+      }
+
+      try {
+        showToast(`⚡ Emergency Rotate triggered ➔ Switching to ${target.alias || target.email}...`, 'info');
+        await setActive(target.id);
+        playNotificationSound('chime');
+        showToast(`✅ Rotated active session to ${target.alias || target.email} (${target.geminiWeekly?.pct ?? 100}% quota)`, 'success');
+      } catch (err) {
+        showToast(`❌ Emergency Rotate failed: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+        }
+      }
+    }
 
     function openAccountDetails(accId) {
       currentDetailAccId = accId;
@@ -2596,6 +2957,8 @@
       if (!modal) return;
 
       const emailEl = document.getElementById('acc-detail-email');
+      const aliasBadge = document.getElementById('acc-detail-alias-badge');
+      const avatarEl = document.getElementById('acc-detail-avatar');
       const subEl = document.getElementById('acc-detail-sub');
       const statusEl = document.getElementById('acc-detail-status');
       const tokenEl = document.getElementById('acc-detail-token');
@@ -2613,7 +2976,20 @@
       const isActive = acc.id === lastStatsData?.global?.activeSessionAccountId || acc.email?.toLowerCase() === activeEmail;
       const isPaused = acc.enabled === false;
 
-      if (emailEl) emailEl.innerText = `${acc.email}${acc.alias ? ` (${acc.alias})` : ''}`;
+      if (avatarEl) {
+        const letter = (acc.alias || acc.name || acc.email || 'A').slice(0, 1).toUpperCase();
+        avatarEl.innerText = letter;
+      }
+
+      if (emailEl) emailEl.innerText = acc.email;
+      if (aliasBadge) {
+        if (acc.alias) {
+          aliasBadge.style.display = 'inline-block';
+          aliasBadge.innerText = acc.alias;
+        } else {
+          aliasBadge.style.display = 'none';
+        }
+      }
       if (subEl) subEl.innerText = `${acc.name || 'Pro Account'} • Tier: ${acc.subscriptionTier || 'PRO'}`;
       
       if (statusEl) {
@@ -2633,6 +3009,8 @@
       if (tokenEl) tokenEl.innerText = acc.access_token ? `${acc.access_token.slice(0, 10)}...${acc.access_token.slice(-6)}` : 'Managed via Google Cloud Code';
       if (refreshEl) refreshEl.innerText = 'Persistent (Active)';
       if (latencyEl) latencyEl.innerText = 'Click "Test Latency"';
+
+      switchDrawerTab('quotas');
 
       if (expiryEl) {
         if (acc.expiry_timestamp) {
@@ -3129,6 +3507,7 @@
 
     // Live Reset Countdown Timer (Updates every second)
     function updateResetCountdown() {
+      try { tickTimelineCountdowns(); } catch (e) {}
       const timerEl = document.getElementById('header-reset-timer');
       const pill = document.getElementById('pill-next-reset');
       if (!timerEl || !nextResetTimestamp) return;
@@ -3478,6 +3857,7 @@
         if (roiNet) roiNet.innerText = data.global?.dollarsSavedFormatted || '$0.00';
 
         try { updatePoolRunway(accounts, data); } catch (e) { console.error('Error updating pool runway:', e); }
+        try { renderResetTimeline(accounts); } catch (e) { console.error('Error rendering reset timeline:', e); }
         try { renderDailyChart(data.global?.dailyAnalytics || []); } catch (e) { console.error('Error rendering daily chart:', e); }
         try { renderModelShare(data.global?.modelDistribution || []); } catch (e) { console.error('Error rendering model share:', e); }
         try { applyAccountFilters(); } catch (e) { console.error('Error applying account filters:', e); }
@@ -3642,6 +4022,194 @@
         } else {
           runwayTargetEl.innerText = 'Next failover: None available';
         }
+      }
+    }
+
+    // Chrono Quota Replenishment Timeline Helpers & Renderer
+    function formatTimelineDuration(diffMs) {
+      if (diffMs <= 0) return 'Resetting now...';
+      const totalSec = Math.floor(diffMs / 1000);
+      const days = Math.floor(totalSec / 86400);
+      const hours = Math.floor((totalSec % 86400) / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      const secs = totalSec % 60;
+
+      if (days > 0) {
+        return `${days}d ${hours}h ${mins}m`;
+      }
+      if (hours > 0) {
+        return `${hours}h ${mins}m ${secs}s`;
+      }
+      return `${mins}m ${secs}s`;
+    }
+
+    function formatResetTimeDisplay(targetMs) {
+      const d = new Date(targetMs);
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      if (isToday) return `Today at ${timeStr}`;
+      if (isTomorrow) return `Tomorrow at ${timeStr}`;
+      return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${timeStr}`;
+    }
+
+    function tickTimelineCountdowns() {
+      const elements = document.querySelectorAll('.timeline-countdown[data-target]');
+      const now = Date.now();
+      elements.forEach(el => {
+        const target = parseInt(el.getAttribute('data-target'), 10);
+        if (!target) return;
+        const diff = target - now;
+        if (diff <= 0) {
+          el.innerText = '⚡ Quota Restored';
+          el.style.color = 'var(--green)';
+        } else {
+          el.innerText = formatTimelineDuration(diff);
+        }
+      });
+    }
+
+    function renderResetTimeline(accounts) {
+      const track = document.getElementById('reset-timeline-track');
+      const countBadge = document.getElementById('timeline-events-count');
+      if (!track) return;
+
+      const events = [];
+      const now = Date.now();
+
+      for (const a of (accounts || [])) {
+        if (a.enabled === false || a.is403Banned) continue;
+        const windows = [
+          { 
+            name: 'Gemini 5h Burst', 
+            time: a.gemini5h?.resetTime, 
+            pct: a.gemini5h?.pct ?? 100, 
+            badge: '5h Burst', 
+            badgeColor: 'var(--blue)', 
+            badgeBorder: 'rgba(59, 130, 246, 0.3)', 
+            badgeBg: 'rgba(59, 130, 246, 0.1)' 
+          },
+          { 
+            name: 'Gemini Weekly', 
+            time: a.geminiWeekly?.resetTime, 
+            pct: a.geminiWeekly?.pct ?? 100, 
+            badge: 'Weekly Reset', 
+            badgeColor: 'var(--green)', 
+            badgeBorder: 'rgba(16, 185, 129, 0.3)', 
+            badgeBg: 'rgba(16, 185, 129, 0.1)' 
+          },
+          { 
+            name: 'Claude 5h Burst', 
+            time: a.claude5h?.resetTime, 
+            pct: a.claude5h?.pct ?? 100, 
+            badge: 'Claude 5h', 
+            badgeColor: 'var(--purple, #c084fc)', 
+            badgeBorder: 'rgba(168, 85, 247, 0.3)', 
+            badgeBg: 'rgba(168, 85, 247, 0.1)' 
+          },
+          { 
+            name: 'Claude Weekly', 
+            time: a.claudeWeekly?.resetTime, 
+            pct: a.claudeWeekly?.pct ?? 100, 
+            badge: 'Claude Weekly', 
+            badgeColor: 'var(--green)', 
+            badgeBorder: 'rgba(16, 185, 129, 0.3)', 
+            badgeBg: 'rgba(16, 185, 129, 0.1)' 
+          }
+        ];
+
+        for (const w of windows) {
+          if (!w.time) continue;
+          const targetMs = new Date(w.time).getTime();
+          if (!isNaN(targetMs) && targetMs > now) {
+            events.push({
+              accId: a.id,
+              email: a.email,
+              alias: a.alias,
+              windowName: w.name,
+              badge: w.badge,
+              badgeColor: w.badgeColor,
+              badgeBorder: w.badgeBorder,
+              badgeBg: w.badgeBg,
+              targetMs: targetMs,
+              pct: w.pct
+            });
+          }
+        }
+      }
+
+      // Sort ascending chronologically (soonest upcoming replenishment first)
+      events.sort((a, b) => a.targetMs - b.targetMs);
+
+      if (countBadge) {
+        countBadge.innerText = `${events.length} Upcoming`;
+      }
+
+      if (events.length === 0) {
+        track.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; color: var(--green); font-size: 11px; padding: 12px 16px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-sm); width: 100%;">
+            <i data-lucide="check-circle" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+            <span>All active accounts currently have 100% quota headroom. No pending replenishment cooldowns.</span>
+          </div>`;
+        if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+          try { window.lucide.createIcons(); } catch (e) {}
+        }
+        return;
+      }
+
+      // Render up to 15 chronological upcoming events
+      const displayEvents = events.slice(0, 15);
+      track.innerHTML = displayEvents.map((ev, idx) => {
+        const diffMs = ev.targetMs - now;
+        const isImminent = idx === 0 || diffMs <= 2 * 3600 * 1000; // First event or within 2h
+        const displayEmail = ev.alias ? `${ev.alias}` : ev.email.split('@')[0];
+        const initial = (ev.alias || ev.email || 'A')[0].toUpperCase();
+
+        return `
+          <div class="timeline-event-card ${isImminent ? 'imminent' : ''}" onclick="openAccountDetails('${ev.accId}')" title="Click to inspect ${ev.email}" tabindex="0" onkeydown="if(event.key==='Enter') openAccountDetails('${ev.accId}')">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 7px; overflow: hidden; min-width: 0;">
+                <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--blue); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  ${initial}
+                </div>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${displayEmail}
+                </span>
+              </div>
+              <span class="badge-tag" style="font-size: 9px; padding: 2px 6px; border-color: ${ev.badgeBorder}; color: ${ev.badgeColor}; background: ${ev.badgeBg}; flex-shrink: 0;">
+                ${ev.badge}
+              </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 2px; margin: 4px 0;">
+              <div class="timeline-countdown" data-target="${ev.targetMs}" style="font-size: 15px; font-weight: 700; color: var(--text-1); font-family: var(--font-mono); letter-spacing: -0.3px;">
+                ${formatTimelineDuration(diffMs)}
+              </div>
+              <div style="font-size: 10px; color: var(--text-3); display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="clock" style="width: 10px; height: 10px;"></i>
+                <span>${formatResetTimeDisplay(ev.targetMs)}</span>
+              </div>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 4px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; margin-bottom: 3px;">
+                <span style="color: var(--text-3);">Headroom: <strong style="color: ${ev.pct > 50 ? 'var(--green)' : (ev.pct > 20 ? 'var(--amber)' : 'var(--red)')}">${ev.pct}%</strong></span>
+                <span style="color: var(--text-4);">Restores 100%</span>
+              </div>
+              <div class="micro-bar" style="height: 3px; background: var(--surface-3); border-radius: 2px; overflow: hidden;">
+                <div class="micro-fill ${getBarColor(ev.pct)}" style="width: ${ev.pct}%; height: 100%;"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        try { window.lucide.createIcons(); } catch (e) {}
       }
     }
 
@@ -4414,6 +4982,12 @@
         } else {
           openCommandPalette();
         }
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        triggerEmergencyRotate();
         return;
       }
 
