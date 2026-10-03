@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tahakhorsand/Antigravity-Gateway-for-windows/blob/Antigravity-Gateway-for-windows/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <a href="https://nodejs.org"><img alt="Node.js 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933.svg"></a>
   <img alt="Platform: Windows & macOS" src="https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20macOS-informational.svg">
   <img alt="Dependencies: zero runtime dependencies" src="https://img.shields.io/badge/dependencies-zero%20dependencies-brightgreen.svg">
@@ -70,14 +70,14 @@
 Choose either method:
 
 - **Method A (Easiest - Direct Download)**:
-  1. Click the green **Code** button at the top of this GitHub page and click **Download ZIP** (or [Click Here to Download ZIP](https://github.com/tahakhorsand/Antigravity-Gateway-for-windows/archive/refs/heads/Antigravity-Gateway-for-windows.zip)).
-  2. Extract the downloaded ZIP file to any folder on your computer (for example: `C:\Antigravity-Gateway-for-windows`).
+  1. Click the green **Code** button at the top of this GitHub page and click **Download ZIP** (or [Click Here to Download ZIP](https://github.com/tahakhorsand/Antigravity-Gateway-for-windows-mac/archive/HEAD.zip)).
+  2. Extract the downloaded ZIP file to any folder on your computer (for example: `C:\Antigravity-Gateway-for-windows-mac`).
   3. Open the extracted folder.
 
 - **Method B (Using Git)**:
   ```cmd
-  git clone https://github.com/tahakhorsand/Antigravity-Gateway-for-windows.git
-  cd Antigravity-Gateway-for-windows
+  git clone https://github.com/tahakhorsand/Antigravity-Gateway-for-windows-mac.git
+  cd Antigravity-Gateway-for-windows-mac
   ```
 
 ---
@@ -146,8 +146,8 @@ Whenever Google releases an automatic update for Antigravity:
 ## 🍏 Quick Start (macOS)
 
 ```bash
-git clone https://github.com/tahakhorsand/Antigravity-Gateway-for-windows.git
-cd Antigravity-Gateway-for-windows
+git clone https://github.com/tahakhorsand/Antigravity-Gateway-for-windows-mac.git
+cd Antigravity-Gateway-for-windows-mac
 node scripts/setup.js
 node src/server.js
 ```
@@ -252,12 +252,12 @@ node --test src/*.test.js
 
 #### گام اول: دانلود پروژه
 - **ساده‌ترین روش (بدون نیاز به گیت)**:
-  1. روی دکمه سبز رنگ **Code** در بالای همین صفحه گیت‌هاب کلیک کرده و گزینه **Download ZIP** را انتخاب کنید (یا [اینجا کلیک کنید](https://github.com/tahakhorsand/Antigravity-Gateway-for-windows/archive/refs/heads/Antigravity-Gateway-for-windows.zip)).
+  1. روی دکمه سبز رنگ **Code** در بالای همین صفحه گیت‌هاب کلیک کرده و گزینه **Download ZIP** را انتخاب کنید (یا [اینجا کلیک کنید](https://github.com/tahakhorsand/Antigravity-Gateway-for-windows-mac/archive/HEAD.zip)).
   2. فایل فشرده را در هر مسیری که مایلید (مثلاً در یک پوشه داخل درایو C یا دسکتاپ) Extract کنید.
 - **یا با دستور گیت**:
   ```cmd
-  git clone https://github.com/tahakhorsand/Antigravity-Gateway-for-windows.git
-  cd Antigravity-Gateway-for-windows
+  git clone https://github.com/tahakhorsand/Antigravity-Gateway-for-windows-mac.git
+  cd Antigravity-Gateway-for-windows-mac
   ```
 
 #### گام دوم: اجرای فایل نصب
