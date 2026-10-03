@@ -44,7 +44,7 @@
 
 ---
 
-## 📋 Prerequisites (پیش‌نیازها)
+## 📋 Prerequisites
 
 1. **Google Antigravity**: Must be installed on your computer, and you should be logged into at least one Google account inside Antigravity.
 2. **Node.js 22 or higher**:
