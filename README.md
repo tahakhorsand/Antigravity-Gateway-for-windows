@@ -2,178 +2,196 @@
   <img src="assets/image.png" alt="Antigravity Harness logo" width="220">
 </p>
 
-<h1 align="center">Antigravity Harness</h1>
+<h1 align="center">Antigravity Gateway & Smart Shield</h1>
 
 <p align="center">
-  Keep <a href="https://antigravity.google">Google Antigravity</a> working across several of your own Google AI Pro accounts —
-  switch accounts <b>before</b> a quota runs out, <b>between</b> tasks, without losing your conversation.
+  <b>Multi-Account Load Balancer, Quota Shield & Parallel Harness for Google Antigravity</b><br>
+  Keep <a href="https://antigravity.google">Google Antigravity</a> running smoothly across multiple Google AI Pro accounts.<br>
+  Switch accounts <b>before</b> quota runs out, <b>between</b> tasks, without losing your active conversation or context.
 </p>
 
 <p align="center">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg">
   <img alt="Node.js 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933.svg">
-  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-lightgrey.svg">
-  <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen.svg">
+  <img alt="Platform: Windows & macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-informational.svg">
+  <img alt="Dependencies: zero runtime dependencies" src="https://img.shields.io/badge/dependencies-none-brightgreen.svg">
+  <img alt="Tests: 37 passing" src="https://img.shields.io/badge/tests-37%20passed-success.svg">
 </p>
-
-> [!WARNING]
-> **Unofficial project.** Not affiliated with, endorsed by or supported by Google. "Antigravity" and "Gemini" are trademarks of Google LLC.
-> Rotating accounts to get around per-account usage limits may violate Google's terms of service and can get accounts restricted. Use only accounts you own, and use at your own risk.
 
 ---
 
-## Why
+## 🌟 Key Features
 
-Antigravity has weekly and 5-hour usage limits per account. When one runs out mid-project you have to log out, log in with another account and find your conversation again. Antigravity Harness does that for you: it watches the quota of every account, and when the one in use runs low it moves Antigravity to the best next account at a moment when no task is running, then reopens the conversation you were in.
+- **Cross-Platform Support**: Native, first-class support for both **Windows 10/11** and **macOS**.
+- **1-Click Automated Setup**:
+  - `install.bat` on Windows sets up everything in seconds.
+  - Automatically detects Antigravity installation path and Windows OS version.
+  - Automatically extracts official Google Antigravity OAuth client credentials directly from `language_server.exe` — **no Google Cloud Console project or OAuth consent screen needed!**
+  - Auto-imports currently active Antigravity account from Windows Credential Manager (`gemini:antigravity`) or macOS Keychain into the pool.
+  - Automatically creates a Desktop shortcut (`Antigravity Gateway.lnk`).
+- **Post-Update Self-Healing & Diagnostic (`repair-after-update.bat`)**:
+  - When Google Antigravity updates itself, running the repair tool automatically re-locates binaries, re-syncs OAuth credentials, verifies Credential Manager tokens, and cleanly restarts the gateway.
+- **Smart Quota Shield**:
+  - Live quota tracking (weekly & 5-hour buckets for Gemini Pro, Flash, Claude, and Imagen 3).
+  - Rotates accounts intelligently before quota is exhausted.
+  - Grace period awareness: avoids unnecessary restarts if the quota window resets within 15 minutes.
+- **Context & Conversation Preservation**:
+  - Seamlessly re-attaches to the exact conversation (`/c/<conversation-id>`) in the Antigravity window via local DevTools debugging.
+  - Overcomes the language server port reassignment issue on Windows by proactively navigating cross-port HTTPS endpoints.
+- **Safe Task Scheduling**:
+  - Waits until agent responses, tool executions, and background commands finish before switching accounts.
+- **Silent Background Execution**:
+  - Completely hidden background execution via `run-background.vbs` or the interactive `start.bat` control panel.
+- **Zero Runtime Dependencies**: Built purely with native Node.js (`node:sqlite`, `fetch`, `WebSocket`, `node:crypto`).
 
-## Features
+---
 
-- **Live quota tracking** – Gemini and Claude/GPT limits (weekly and 5-hour) for every account, with reset times.
-- **Knows the real active account** – asks Antigravity which account it is signed into; the dashboard always matches the IDE.
-- **Model aware** – detects whether your conversation uses Gemini or Claude/GPT and watches the right limits.
-- **Smart Shield** – switches when the weekly or 5-hour quota drops below your thresholds; skips the switch when the low limit resets within 15 minutes.
-- **Quota-efficient ordering** – spends the quota that would expire first ("use it or lose it"), or returns to your *main account* once it has recovered.
-- **Never interrupts a task** – waits until the agent's turn is finished, including long-running background commands.
-- **Keeps your conversation open** – after the switch the Antigravity window is moved back to the conversation you were in.
-- **Auto-continue** (optional) – after a hard "quota reached" error it switches and asks the agent to continue.
-- **Dashboard** – quotas, switch log, settings and a manual *Set Active* button at `http://127.0.0.1:8045`.
-- **Zero dependencies** – plain Node.js (built-in `node:sqlite`, `fetch`, `WebSocket`).
+## 🚀 Quick Start (Windows)
 
-## How it works
+### 1. One-Click Installation
+
+1. Clone or download this repository:
+   ```cmd
+   git clone https://github.com/YOUR_USERNAME/Antigravity-Gateway.git
+   cd Antigravity-Gateway
+   ```
+2. Double-click **`install.bat`** (or run `npm run setup` in your terminal).
+   - The installer verifies Node.js (v22+ required).
+   - Auto-extracts Antigravity's official OAuth credentials into `oauth-client.json`.
+   - Imports your logged-in Antigravity account into `accounts.json`.
+   - Creates an **Antigravity Gateway** desktop shortcut.
+
+### 2. Running & Managing the Gateway
+
+- **Desktop Shortcut**: Double-click the shortcut to start the gateway in the background.
+- **Interactive Control Menu (`start.bat`)**:
+  - `[1]` Run in Background (Silent, recommended)
+  - `[2]` Run in Foreground (Inspect live logs and debug output)
+  - `[3]` Open Dashboard (`http://127.0.0.1:8045`)
+  - `[4]` Stop Gateway
+- **Stop Gateway**: Double-click `stop.bat` to terminate running background instances.
+
+### 3. Adding More Accounts to the Pool
+
+1. Open the dashboard at **http://127.0.0.1:8045**.
+2. Click **Add Account**.
+3. Sign in to your secondary Google account in the browser.
+4. The account and its quota limits will automatically appear in your pool.
+
+### 4. Post-Update Self-Repair (`repair-after-update.bat`)
+
+Whenever Google Antigravity receives an automatic update:
+- Double-click **`repair-after-update.bat`** (or run `npm run repair`).
+- It validates binary paths, re-extracts tokens, cleans zombie sockets, and restarts the background service.
+
+---
+
+## 🍏 Quick Start (macOS)
+
+```bash
+git clone https://github.com/YOUR_USERNAME/Antigravity-Gateway.git
+cd Antigravity-Gateway
+npm run setup
+npm start
+```
+Open **http://127.0.0.1:8045** in your browser. To keep it running persistently, you can use [PM2](https://pm2.keymetrics.io/):
+```bash
+pm2 start src/server.js --name antigravity-gateway
+pm2 save
+```
+
+---
+
+## 🧠 Architecture & Windows Port Details
 
 ```mermaid
 sequenceDiagram
-    participant H as Harness
-    participant G as Google (quota API)
-    participant A as Antigravity
-    loop every 30–60 s
-        H->>G: quota of the active account
-        H->>A: which account / model is in use?
+    participant H as Antigravity Gateway (Port 8045)
+    participant G as Google Cloud Code Quota API
+    participant LS as Language Server (.exe)
+    participant IDE as Antigravity Window (Electron / DevTools)
+
+    loop Every 30-60 seconds
+        H->>G: Poll live quotas & reset timers
+        H->>LS: Query current active account
     end
-    Note over H: below threshold → pick next account
-    H->>A: wait until the agent's turn and background commands are done
-    H->>A: write new login (Keychain + ~/.gemini), restart language server
-    A-->>H: signed in as the new account (window reloads)
-    H->>A: reopen the same conversation
-    opt after a hard quota error (auto-continue)
-        H->>A: send "continue" in the conversation
-    end
+
+    Note over H: Quota below threshold -> Select best account
+
+    H->>IDE: Wait for agent & background commands to settle
+    H->>LS: Write token to Windows Credential Manager ("gemini:antigravity")
+    H->>LS: Update %APPDATA%/Antigravity/User/globalStorage/app_storage.json
+    H->>LS: Gracefully restart language_server.exe
+    LS-->>IDE: Spawns on new dynamic HTTPS port
+    H->>IDE: Detect new HTTPS port & navigate window to /c/<conversationId>
+    IDE-->>H: Ready with new account & preserved context!
 ```
 
-| Piece | What it does |
-|---|---|
-| Quota | Reads each account's buckets from Google's Cloud Code endpoints (all accounts every 3 min, the active one every 30–60 s). |
-| Activity detection | Reads Antigravity's conversation logs (`~/.gemini/antigravity/brain/*/transcript.jsonl`) to know when a turn has finished and whether background commands are still running. |
-| Switching | Writes the new account's OAuth tokens where Antigravity reads its login, then restarts Antigravity's language server; Antigravity respawns it signed in as the new account. |
-| Conversation restore | Antigravity reloads its window at a blank conversation after the restart; the harness moves it back to `/c/<conversation-id>` through the local DevTools endpoint Antigravity opens itself. |
+### Windows-Specific Engineering Highlights:
+- **Windows Credential Manager Integration (`scripts/wincred.ps1`)**: Native P/Invoke via `Advapi32.dll` (`CredWriteW` / `CredReadW`) eliminates `cmdkey.exe`'s 512-character limit and avoids external compiled binaries.
+- **Cross-Port Reconnection**: When Antigravity's supervisor restarts `language_server.exe`, it assigns a new ephemeral HTTPS port. The gateway probes for the new port and redirects DevTools proactively, preventing UI freeze or blank screens.
+- **Portability**: All launch scripts use relative paths and UTF-8 encoding (`chcp 65001`), supporting non-ASCII directory paths.
 
-## Requirements
+---
 
-- macOS with the Antigravity desktop app
-- Node.js **22 or newer**
-- Two or more Google accounts with Antigravity access
-- [PM2](https://pm2.keymetrics.io/) (recommended, keeps the harness running)
+## ⚙️ Configuration & Smart Shield Settings
 
-## Installation
+All settings can be configured via the web UI at `http://127.0.0.1:8045`:
 
-```bash
-git clone https://github.com/mushfiqnabiaz/Antigravity-Gateway.git antigravity-harness
-cd antigravity-harness
-cp oauth-client.example.json oauth-client.json
-```
-
-Fill in `oauth-client.json` with the OAuth client used to sign in the accounts. Antigravity refreshes the tokens itself after a switch, so they must be issued to an installed-app OAuth client that Antigravity accepts. This file is git-ignored; you can also use the `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` environment variables.
-
-Start the harness:
-
-```bash
-pm2 start src/server.js --name antigravity-harness
-pm2 save            # and `pm2 startup` once, to start it after a reboot
-```
-
-Or run it in the foreground with `npm start`. Open **http://127.0.0.1:8045**.
-
-### Adding accounts
-
-1. In the dashboard click **Add Account**. A Google sign-in tab opens (from the native app it opens in your default browser).
-2. Choose the account and approve. Google sends you back to `http://127.0.0.1:8045/oauth/callback`.
-3. The tab shows **Account added** and closes itself; the account appears in the dashboard with its quota a few seconds later.
-
-Signing in again with an account that is already in the pool refreshes its login instead of adding a duplicate. Tokens are stored in the git-ignored `accounts.json`.
-
-The sign-in asks only for the permissions Antigravity itself uses: `openid`, `userinfo.email`, `userinfo.profile` and `cloud-platform`. Each sign-in link uses PKCE and a one-time state, and expires after 10 minutes.
-
-Prefer the terminal? `npm run add-account` does the same (it returns to `http://localhost:8085/oauth/callback`).
-
-## Settings
-
-All settings live in the dashboard's **Smart Quota Shield** panel (stored in `data/harness.db`):
-
-| Setting | Default | Meaning |
+| Setting | Default | Description |
 |---|---|---|
-| Switch when weekly / 5h below | 20% / 20% | Thresholds for leaving the current account. 15–25% leaves room for the running task to finish. |
-| Watch limits of | Auto | Gemini, Claude/GPT, both, or the models the conversation is actually using. |
-| Main account | none | Account to return to once its quota has recovered. Without one, the quota that expires soonest is used first. |
-| Auto-continue after limit | off | After a hard quota error, switch and send a continue message to the conversation. Never overwrites a draft. |
-| Auto-Switch | on | Turns Smart Shield on or off. Manual *Set Active* always works. |
+| **Weekly / 5h Threshold** | `20%` / `20%` | Percentage remaining before rotating to next account |
+| **Watch Limits Of** | Auto | Gemini, Claude/GPT, both, or current active conversation model |
+| **Main Account** | None | Preferred default account to return to once quotas recover |
+| **Auto-Continue** | Off | Automatically sends "continue" after switching from a quota limit |
+| **Auto-Switch** | On | Enables automated Smart Shield background rotation |
 
-## HTTP API
+---
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/ide-status` | Account Antigravity is signed into, and any queued switch |
-| `POST /api/set-active-account?id=<id>` | Switch now, or as soon as the current task finishes |
-| `GET/POST /api/config/smart-shield` | Read / change Smart Shield settings |
-| `POST /api/shield/test` | Simulate a quota error on the current account |
-| `POST /api/ide-focus?id=<conversation>` | Open a conversation in the Antigravity window |
-| `GET /api/stats`, `GET /health` | Quotas, usage and account state |
-| `POST /v1/chat/completions`, `POST /v1/messages` | OpenAI / Anthropic compatible endpoints for other tools |
+## 🛠️ API Reference
 
-The server only listens on `127.0.0.1`, and POST requests coming from other websites are refused.
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/stats` | GET | Status of all accounts, quotas, and OS environment |
+| `/api/ide-status` | GET | Currently active Antigravity account & pending switch queue |
+| `/api/set-active-account` | POST | Manually switch active account (`?id=<account_id>`) |
+| `/api/config/smart-shield` | GET/POST | Read or update Smart Shield rotation parameters |
+| `/api/ide-focus` | POST | Focus specific conversation in IDE window (`?id=<conversation_id>`) |
+| `/v1/chat/completions` | POST | OpenAI-compatible proxy endpoint |
+| `/v1/messages` | POST | Anthropic-compatible proxy endpoint |
 
-## Troubleshooting
+---
 
-| Problem | Fix |
-|---|---|
-| `EADDRINUSE: 127.0.0.1:8045` | Another copy is running (often under PM2). Use `npm run restart`. |
-| Dashboard says "Antigravity not detected" | Make sure Antigravity is open. Switching depends on reading its login. |
-| A switch stays "queued" | A task or background command (build, dev server) is still running. It happens when that finishes, or after 15 minutes without activity. |
-| An account shows *403 Forbidden* | Google restricted the account; the harness stops using it. |
-| Sign-in shows `Error 403: restricted_client` / "Unregistered scope(s)" | The OAuth client only allows the scopes listed under [Adding accounts](#adding-accounts). Don't add scopes to `SCOPES` in `src/config.js`. |
-| Sign-in tab says the link expired | Links are single-use and last 10 minutes. Click **Add Account** again. |
+## 🧪 Testing
 
-Note: the switch restarts Antigravity's language server, so anything the agent left running in the background (for example a dev server) stops at that moment.
-
-## Development
+The test suite runs with Node.js built-in test runner without external dependencies:
 
 ```bash
-npm test          # node:test, no dependencies
-npm run restart   # reload the running harness after a change
+npm test
 ```
 
-```
-src/
-  server.js                  HTTP server, dashboard API, Smart Shield loop
-  account-order.js           account ranking and Smart Shield decisions (pure, tested)
-  antigravity-auth-sync.js   Antigravity login, restart scheduling, activity detection
-  antigravity-window.js      DevTools control of the Antigravity window
-  quota.js                   live quota from Google
-  stats.js, db.js            usage statistics (SQLite)
-  translator.js              OpenAI / Anthropic request translation
-  dashboard.html             dashboard UI
-scripts/
-  restart.sh                 restart under PM2 or standalone
-  build-native-app.sh        optional native macOS app (`npm run build:app`)
-```
+37 tests covering account rotation, Smart Shield thresholds, token formatting, active session detection, and layout preservation.
 
-## Contributing
+---
 
-Issues and pull requests are welcome. Please:
+## 🇮🇷 راهنمای فارسی (Persian Guide)
 
-- keep it dependency-free,
-- add a test for decision logic (see `src/smart-shield.test.js`),
-- never commit `accounts.json`, `oauth-client.json`, `stats.json` or `data/` — they hold tokens and usage data.
+این پروژه نسخه توسعه‌یافته و پورت‌شده‌ی **Antigravity Gateway** برای سیستم‌عامل **ویندوز** و مک است که امکان استفاده‌ی همزمان و بدون وقفه از چند اکانت گوگل پرو (Google AI Pro) را در نرم‌افزار **Google Antigravity** فراهم می‌کند.
 
-## License
+### ویژگی‌های کلیدی:
+1. **نصب آسان با یک کلیک (`install.bat`)**:
+   - نیازی به ساخت پروژه در گوگل کلاد کنسول یا وارد کردن دستی Client ID نیست؛ اسکریپت به صورت خودکار اطلاعات مجاز را از خود باینری نرم‌افزار استخراج می‌کند.
+   - اکانت لاگین‌شده‌ی فعلی شما را به طور خودکار به لیست اضافه می‌کند.
+   - شورتکات روی دسکتاپ ایجاد می‌کند.
+2. **رفع باگ گیر کردن سوییچ در ویندوز**:
+   - پورت‌های متغیر نرم‌افزار و بازنشانی صفحه گفتگو را به طور هوشمند مدیریت کرده و مانع از گیر کردن برنامه یا نیاز به ری‌استارت دستی می‌شود.
+3. **ابزار تعمیر بعد از آپدیت (`repair-after-update.bat`)**:
+   - در صورت آپدیت شدن نرم‌افزار Antigravity توسط گوگل، تنها با اجرای این فایل، تمام مسیرها، توکن‌ها و پورت‌ها به طور خودکار عیب‌یابی و اصلاح می‌شوند.
+4. **اجرا در پس‌زمینه (Background)**:
+   - با استفاده از فایل `run-background.vbs` یا منوی `start.bat` برنامه به شکل کاملاً مخفی و بدون اشغال صفحه در پس‌زمینه اجرا می‌شود.
 
-[MIT](LICENSE) © Mushfiqur Rahaman
+---
+
+## 📄 License
+
+MIT License. See [LICENSE](LICENSE) for details.

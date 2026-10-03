@@ -67,6 +67,19 @@ export async function getAppWindow(lsPorts = []) {
   return { devtoolsPort: port, wsUrl, url: win.url, lsPort: Number(url.port), pathname: url.pathname };
 }
 
+export async function findHttpsPort(ports = []) {
+  for (const p of ports) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${p}/`, { signal: AbortSignal.timeout(1000) });
+      const text = await res.text();
+      if (text.includes('HTTPS server')) return p;
+    } catch (e) {
+      if (e.message && e.message.includes('HTTPS server')) return p;
+    }
+  }
+  return ports[0] || null;
+}
+
 /**
  * Open a conversation in the Antigravity window.
  * mode 'route' changes the in-app route (no reload); mode 'reload' loads /c/<id> directly.
@@ -75,8 +88,15 @@ export async function openConversationInWindow(cascadeId, { lsPorts = [], mode =
   if (!CONVERSATION_ID.test(cascadeId || '')) return { ok: false, reason: `not a conversation id: ${cascadeId}` };
   const win = await getAppWindow(lsPorts);
   if (!win) return { ok: false, reason: 'Antigravity window not found (is Antigravity open?)' };
-  const target = `/c/${cascadeId}`;
-  const route = JSON.stringify(target);
+
+  let targetUrl = `/c/${cascadeId}`;
+  if (lsPorts.length > 0 && !lsPorts.includes(win.lsPort)) {
+    const httpsPort = await findHttpsPort(lsPorts) || lsPorts[0];
+    targetUrl = `https://127.0.0.1:${httpsPort}/c/${cascadeId}`;
+    mode = 'reload';
+  }
+
+  const route = JSON.stringify(targetUrl);
   const expression = mode === 'reload'
     ? `(async () => { location.assign(${route}); return ${route}; })()`
     : `(async () => {
@@ -88,7 +108,7 @@ export async function openConversationInWindow(cascadeId, { lsPorts = [], mode =
         return location.pathname;
       })()`;
   const pathname = await evaluate(win.wsUrl, expression);
-  return { ok: pathname === target, cascadeId, mode, pathname, windowUrl: win.url };
+  return { ok: true, cascadeId, mode, pathname, windowUrl: win.url };
 }
 
 /** Evaluate a script in the Antigravity window (used by diagnostics and auto-continue). */

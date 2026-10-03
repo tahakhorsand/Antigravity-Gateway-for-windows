@@ -3536,15 +3536,19 @@
       try {
         const res = await fetch(`/api/accounts/sync?id=${encodeURIComponent(accId)}`, { method: 'POST' });
         const data = await res.json();
-        if (data.ok) {
-          showToast(`✨ ${data.email.split('@')[0]} quota refreshed: ${data.quota?.geminiWeekly?.pct ?? 100}%`, 'success');
+        if (data.ok && data.quota && !data.quota.error) {
+          const gw = data.quota.geminiWeekly?.pct ?? 100;
+          const g5 = data.quota.gemini5h?.pct ?? 100;
+          const cw = data.quota.claudeWeekly?.pct ?? 100;
+          const userShort = (data.email || 'Account').split('@')[0];
+          showToast(`✨ ${userShort}: Gemini ${gw}% | 5h Burst ${g5}% | Claude ${cw}%`, 'success');
           playNotificationSound('chime');
           await fetchMatrix();
         } else {
-          showToast(`❌ Sync failed: ${data.error || 'Unknown error'}`, 'error');
+          showToast(`❌ Sync failed: ${data.error || data.quota?.error || 'Unknown error'}`, 'error');
         }
       } catch (err) {
-        showToast(`❌ Network error syncing account`, 'error');
+        showToast(`❌ Network error syncing account: ${err.message}`, 'error');
       } finally {
         if (icon) icon.classList.remove('spin-fast');
       }
@@ -5017,6 +5021,22 @@
       }
     }
 
+    // Dynamic live reset countdown helper
+    function getLiveResetText(bucket) {
+      if (!bucket) return 'Active';
+      if (!bucket.resetTime) return bucket.resetText || 'Active';
+      const target = new Date(bucket.resetTime).getTime();
+      const diffMs = target - Date.now();
+      if (diffMs <= 0) return 'Reset ready';
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const days = Math.floor(diffMins / (60 * 24));
+      const hours = Math.floor((diffMins % (60 * 24)) / 60);
+      const mins = diffMins % 60;
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${mins}m`;
+      return `${mins}m`;
+    }
+
     // Render Accounts Table View
     function renderAccountsTable(accounts, data, ideStatus) {
       const tbody = document.getElementById('accounts-table-body');
@@ -5036,6 +5056,9 @@
         const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
         const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
+        const gwReset = getLiveResetText(gw);
+        const g5Reset = getLiveResetText(g5);
+        const cwReset = cw.resetTime ? getLiveResetText(cw) : null;
 
         const isQueued = !pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
@@ -5096,7 +5119,7 @@
               <div class="quota-cell">
                 <div class="quota-meta">
                   <span class="quota-pct">${gw.pct}%</span>
-                  <span class="quota-reset">Resets in ${gw.resetText || 'Active'}</span>
+                  <span class="quota-reset">Resets in ${gwReset}</span>
                 </div>
                 <div class="micro-bar">
                   <div class="micro-fill ${getBarColor(gw.pct)}" style="width: ${gw.pct}%;"></div>
@@ -5107,7 +5130,7 @@
               <div class="quota-cell">
                 <div class="quota-meta">
                   <span class="quota-pct">${g5.pct}%</span>
-                  <span class="quota-reset">Resets in ${g5.resetText || 'Active'}</span>
+                  <span class="quota-reset">Resets in ${g5Reset}</span>
                 </div>
                 <div class="micro-bar">
                   <div class="micro-fill ${getBarColor(g5.pct)}" style="width: ${g5.pct}%;"></div>
@@ -5118,7 +5141,7 @@
               <div class="quota-cell">
                 <div class="quota-meta">
                   <span class="quota-pct">${cw.pct}%</span>
-                  <span class="quota-reset">Claude / 3P</span>
+                  <span class="quota-reset">${cwReset ? `Resets in ${cwReset}` : 'Claude / 3P'}</span>
                 </div>
                 <div class="micro-bar">
                   <div class="micro-fill ${getBarColor(cw.pct)}" style="width: ${cw.pct}%;"></div>
@@ -5175,6 +5198,9 @@
         const gw = a.geminiWeekly || { pct: 100, resetText: 'Active' };
         const g5 = a.gemini5h || { pct: 100, resetText: 'Active' };
         const cw = a.claudeWeekly || { pct: 100, resetText: 'Active' };
+        const gwReset = getLiveResetText(gw);
+        const g5Reset = getLiveResetText(g5);
+        const cwReset = cw.resetTime ? getLiveResetText(cw) : null;
 
         const isQueued = !pendingEmail && a.email.toLowerCase() === pendingEmail;
         const isBanned = a.is403Banned;
@@ -5229,7 +5255,7 @@
             <div class="acc-card-quotas">
               <div class="quota-cell">
                 <div class="quota-meta">
-                  <span style="color:var(--text-3); font-size:11px;">Gemini Weekly</span>
+                  <span style="color:var(--text-3); font-size:11px;">Gemini Weekly (${gwReset})</span>
                   <span class="quota-pct">${gw.pct}%</span>
                 </div>
                 <div class="micro-bar">
@@ -5239,7 +5265,7 @@
 
               <div class="quota-cell">
                 <div class="quota-meta">
-                  <span style="color:var(--text-3); font-size:11px;">5-Hour Burst</span>
+                  <span style="color:var(--text-3); font-size:11px;">5-Hour Burst (${g5Reset})</span>
                   <span class="quota-pct">${g5.pct}%</span>
                 </div>
                 <div class="micro-bar">
@@ -5249,7 +5275,7 @@
 
               <div class="quota-cell">
                 <div class="quota-meta">
-                  <span style="color:var(--text-3); font-size:11px;">Claude / 3P</span>
+                  <span style="color:var(--text-3); font-size:11px;">Claude / 3P ${cwReset ? `(${cwReset})` : ''}</span>
                   <span class="quota-pct">${cw.pct}%</span>
                 </div>
                 <div class="micro-bar">
@@ -5698,11 +5724,20 @@
       addLog('🔄 Synchronizing live quota buckets from Google Cloud Code...');
 
       try {
-        await fetch('/api/refresh-quotas', { method: 'POST' });
-        addLog('✅ Quotas and reset schedules updated.');
+        const res = await fetch('/api/refresh-quotas', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (data.ok) {
+          addLog('✅ Quotas and reset schedules updated.');
+          showToast('✨ All accounts live quotas synced with Google Cloud', 'success');
+          playNotificationSound('chime');
+        } else {
+          addLog('❌ Failed to refresh quotas: ' + (data.error || 'Server error'));
+          showToast(`❌ Sync error: ${data.error || 'Failed to refresh'}`, 'error');
+        }
         await fetchMatrix();
       } catch (e) {
         addLog('❌ Failed to refresh quotas: ' + e.message);
+        showToast('❌ Failed to refresh quotas: ' + e.message, 'error');
       } finally {
         if (icon) icon.classList.remove('spin');
         if (text) text.innerText = 'Sync Quotas';
@@ -5719,17 +5754,30 @@
         const who = data.email || ide.email || 'selected account';
 
         if (!res.ok || data.ok === false) {
-          addLog(`⚠️ Could not switch to ${who}: ${data.error || 'unknown error'}`);
+          const msg = data.error || 'unknown error';
+          addLog(`⚠️ Could not switch to ${who}: ${msg}`);
+          showToast(`❌ Could not switch to ${who}: ${msg}`, 'error');
+        } else if (ide.ok === false) {
+          const msg = ide.reason || 'IDE sync failed';
+          addLog(`⚠️ IDE sync notice for ${who}: ${msg}`);
+          showToast(`⚠️ Switched harness to ${who} (${msg})`, 'info');
+          playNotificationSound('chime');
         } else if (ide.restarted || (ide.ok && !ide.deferred && !ide.note)) {
           addLog(`✅ Switched active account to ${who}.`);
+          showToast(`✅ Switched active account to ${who}`, 'success');
+          playNotificationSound('chime');
         } else if (ide.deferred) {
           addLog(`⏳ Switch queued for ${who}. Will apply once active task finishes.`);
+          showToast(`⏳ Switch queued for ${who} (waiting for IDE idle)`, 'info');
         } else {
           addLog(`🔄 Active account set to ${who}.`);
+          showToast(`✅ Active account set to ${who}`, 'success');
+          playNotificationSound('chime');
         }
         await fetchMatrix();
       } catch (e) {
         console.error('Failed to set active account:', e);
+        showToast(`❌ Network error switching account: ${e.message}`, 'error');
       }
     }
 

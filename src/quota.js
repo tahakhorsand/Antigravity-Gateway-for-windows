@@ -61,6 +61,10 @@ async function requestWithFallback(endpoints, token, body = {}) {
         return { status: 403, error: 'Forbidden' };
       }
 
+      if (res.status === 401) {
+        return { status: 401, error: 'Unauthorized' };
+      }
+
       if (res.ok) {
         const data = await res.json();
         return { status: 200, data };
@@ -73,15 +77,23 @@ async function requestWithFallback(endpoints, token, body = {}) {
   return { status: 500, error: lastError?.message || 'Failed all endpoints' };
 }
 
-export async function fetchLiveAccountQuota(account) {
+export async function fetchLiveAccountQuota(account, forceRefresh = false) {
   try {
-    const token = await getValidAccessToken(account);
+    let token = await getValidAccessToken(account, forceRefresh);
 
     // 1. Subscription Tier
     let subscriptionTier = 'FREE';
-    const tierRes = await requestWithFallback(LOAD_CODE_ASSIST_ENDPOINTS, token, {
+    let tierRes = await requestWithFallback(LOAD_CODE_ASSIST_ENDPOINTS, token, {
       metadata: { ideType: 'ANTIGRAVITY' }
     });
+
+    // If 401 Unauthorized, token might have been revoked or invalidated; retry once with force refresh
+    if (tierRes.status === 401) {
+      token = await getValidAccessToken(account, true);
+      tierRes = await requestWithFallback(LOAD_CODE_ASSIST_ENDPOINTS, token, {
+        metadata: { ideType: 'ANTIGRAVITY' }
+      });
+    }
 
     if (tierRes.status === 403) {
       return { is403: true, error: 'Account restricted or 403 Forbidden' };
@@ -100,7 +112,11 @@ export async function fetchLiveAccountQuota(account) {
     }
 
     // 2. Quota Summary (Weekly + 5h Buckets)
-    const summaryRes = await requestWithFallback(QUOTA_SUMMARY_ENDPOINTS, token);
+    let summaryRes = await requestWithFallback(QUOTA_SUMMARY_ENDPOINTS, token);
+    if (summaryRes.status === 401) {
+      token = await getValidAccessToken(account, true);
+      summaryRes = await requestWithFallback(QUOTA_SUMMARY_ENDPOINTS, token);
+    }
 
     let geminiWeekly = { pct: 100, resetTime: null, resetText: 'Active', desc: '' };
     let gemini5h = { pct: 100, resetTime: null, resetText: 'Active', desc: '' };

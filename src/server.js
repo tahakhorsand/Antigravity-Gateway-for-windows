@@ -1,6 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { exec, execFile, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { CONFIG } from './config.js';
@@ -57,13 +58,20 @@ import {
   CLOUDCODE_STREAM_ENDPOINTS
 } from './translator.js';
 import { orderAccountCandidates, shouldAdoptActiveSession, planShieldSwitch, familyBuckets } from './account-order.js';
-import { readLanguageServerEmail, getPendingSwitch, cancelPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage, getAntigravityUserDataDir } from './antigravity-auth-sync.js';
+import { readLanguageServerEmail, getPendingSwitch, cancelPendingSwitch, focusAntigravityConversation, getActiveAntigravityConversationId, callLanguageServer, isAntigravitySessionBusy, sendAntigravityMessage, getAntigravityUserDataDir, detectWindowsVersion, detectAntigravityInstall } from './antigravity-auth-sync.js';
 import { getTailscaleStatus, setTailscaleServe, resetTailscaleServe } from './tailscale.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DASHBOARD_PATH = path.resolve(__dirname, 'dashboard.html');
 const ICON_PATH = path.resolve(__dirname, '../assets/chip_ai_1024.png');
+
+process.on('uncaughtException', (err) => {
+  console.error('[Daemon Error] uncaughtException:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Daemon Error] unhandledRejection:', reason);
+});
 
 let requestCounter = 0;
 let isSyncingQuotas = false;
@@ -96,6 +104,11 @@ export async function syncAllQuotas() {
   for (const acc of accounts) {
     try {
       const liveQuota = await fetchLiveAccountQuota(acc);
+      if (liveQuota.error) {
+        console.error(`${colors.yellow}[QuotaSync] ⚠️ Could not sync quota for ${acc.email}: ${liveQuota.error}${colors.reset}`);
+        updateAccountLiveQuota(acc.id, liveQuota);
+        continue;
+      }
       updateAccountLiveQuota(acc.id, liveQuota);
       if (liveQuota.is403) {
         broadcastEvent({ type: 'account_banned', accountId: acc.id, email: acc.email });
@@ -183,13 +196,30 @@ export async function checkAndRecoverQuotas() {
 }
 
 export function sendMacNotification(title, message, sound = 'Subtle') {
-  if (process.platform !== 'darwin') return; // macOS osascript only
-  try {
-    const cleanTitle = (title || 'Antigravity Gateway').replace(/"/g, '\\"');
-    const cleanMsg = (message || '').replace(/"/g, '\\"');
-    const script = `display notification "${cleanMsg}" with title "${cleanTitle}" sound name "${sound}"`;
-    exec(`osascript -e '${script}'`, () => {});
-  } catch (e) {}
+  const cleanTitle = (title || 'Antigravity Gateway').replace(/"/g, '\\"');
+  const cleanMsg = (message || '').replace(/"/g, '\\"');
+
+  if (process.platform === 'darwin') {
+    try {
+      const script = `display notification "${cleanMsg}" with title "${cleanTitle}" sound name "${sound}"`;
+      exec(`osascript -e '${script}'`, () => {});
+    } catch (e) {}
+  } else if (process.platform === 'win32') {
+    try {
+      const ps = `Add-Type -AssemblyName System.Windows.Forms; $b = New-Object System.Windows.Forms.NotifyIcon; $b.Icon = [System.Drawing.SystemIcons]::Information; $b.BalloonTipTitle = '${cleanTitle}'; $b.BalloonTipText = '${cleanMsg}'; $b.Visible = $true; $b.ShowBalloonTip(4000); Start-Sleep -Milliseconds 800; $b.Dispose();`;
+      exec(`powershell.exe -NoProfile -Command "${ps}"`, () => {});
+    } catch (e) {}
+  }
+}
+
+export function openInBrowser(url) {
+  if (process.platform === 'darwin') {
+    execFile('open', [url], () => {});
+  } else if (process.platform === 'win32') {
+    exec(`powershell.exe -NoProfile -Command "Start-Process '${url}'"`, () => {});
+  } else {
+    execFile('xdg-open', [url], () => {});
+  }
 }
 
 async function dumpAntigravityUi() {
@@ -1078,7 +1108,9 @@ async function handleProxyRequest(req, res) {
         ideEmail: ideState.email,
         ideDetected: ideState.detected,
         ideCheckedAt: ideState.checkedAt,
-        pendingSwitch: getPendingSwitch()
+        pendingSwitch: getPendingSwitch(),
+        osInfo: detectWindowsVersion() || { platform: process.platform, release: os.release() },
+        antigravityInstall: detectAntigravityInstall()
       }
     };
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1229,10 +1261,10 @@ async function handleProxyRequest(req, res) {
         setMetadataDb('smart_shield_primary_email', targetEmail);
       }
 
-      // Manual switch: restart Antigravity's language server so the IDE really signs in as the
-      // chosen account. If a task is running, the restart waits until the session is idle.
+      // Manual switch: restart Antigravity's language server immediately so the IDE switches now.
       const switchResult = await switchAntigravityActiveAccount(accountId, targetAcc, {
         restartLanguageServer: true,
+        force: true,
         isManual: true,
         onDeferredDone: (result) => broadcastEvent({
           type: 'ide_switch_result',
@@ -1372,7 +1404,12 @@ async function handleProxyRequest(req, res) {
       return res.end(JSON.stringify({ ok: false, error: 'Account not found' }));
     }
     try {
-      const live = await fetchLiveAccountQuota(targetAcc);
+      const live = await fetchLiveAccountQuota(targetAcc, true);
+      if (live.error) {
+        updateAccountLiveQuota(accountId, live);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: live.error }));
+      }
       updateAccountLiveQuota(accountId, live);
       broadcastEvent({
         type: 'quota_recovered',
@@ -1767,16 +1804,28 @@ async function handleProxyRequest(req, res) {
 
   // API Action: Launch Desktop App
   if (urlPath === '/api/launch-desktop' && req.method === 'POST') {
-    // Antigravity talks to Google directly; account switching works through its login, not a proxy.
-    exec('open -a "Antigravity"');
+    if (process.platform === 'win32') {
+      const install = detectAntigravityInstall();
+      if (install?.exe && fs.existsSync(install.exe)) {
+        exec(`start "" "${install.exe}"`);
+      } else {
+        exec('start antigravity:');
+      }
+    } else {
+      exec('open -a "Antigravity"');
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true }));
   }
 
   // API Action: Open Parallel Terminals
   if (urlPath === '/api/open-terminals' && req.method === 'POST') {
-    const scriptPath = path.resolve(__dirname, '../scripts/start-terminals.sh');
-    exec(`bash "${scriptPath}"`);
+    if (process.platform === 'win32') {
+      exec('start cmd.exe /k "echo Antigravity Gateway Terminal && cd /d %USERPROFILE%"');
+    } else {
+      const scriptPath = path.resolve(__dirname, '../scripts/start-terminals.sh');
+      exec(`bash "${scriptPath}"`);
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true }));
   }
@@ -1787,7 +1836,7 @@ async function handleProxyRequest(req, res) {
     const openExternally = urlPath === '/api/add-account' || new URL(req.url, 'http://localhost').searchParams.get('open') === '1';
     try {
       const { url } = createLoginUrl(`http://127.0.0.1:${CONFIG.PORT}/oauth/callback`);
-      if (openExternally) execFile('open', [url], () => {});
+      if (openExternally) openInBrowser(url);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ ok: true, url, opened: openExternally }));
     } catch (error) {
@@ -2083,6 +2132,13 @@ ${accounts.map((a, i) => `    ${i + 1}. ${colors.cyan}${a.email}${colors.reset} 
 ${colors.bold}${colors.cyan}──────────────────────────────────────────────────────────────────${colors.reset}
   ${colors.dim}Ready! Open http://127.0.0.1:8045 in browser or app.${colors.reset}
 `);
+
+  // Automatically open browser on startup unless disabled
+  if (process.env.NO_OPEN !== '1') {
+    setTimeout(() => {
+      openInBrowser(`http://127.0.0.1:${CONFIG.PORT}`);
+    }, 800);
+  }
 
   // Initial live quota sync from Google
   setTimeout(() => {

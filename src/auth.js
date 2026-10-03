@@ -53,11 +53,17 @@ export function isCoolingDown(accountId) {
   return true;
 }
 
-export async function getValidAccessToken(account) {
+export async function getValidAccessToken(account, forceRefresh = false) {
   const now = Math.floor(Date.now() / 1000);
-  // If access token is valid for at least 120 more seconds, use it
-  if (account.access_token && account.expiry_timestamp && account.expiry_timestamp > now + 120) {
+  // If access token is valid for at least 120 more seconds, use it unless forceRefresh is requested
+  if (!forceRefresh && account.access_token && account.expiry_timestamp && account.expiry_timestamp > now + 120) {
     return account.access_token;
+  }
+
+  const clientId = CONFIG.CLIENT_ID;
+  const clientSecret = CONFIG.CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('OAuth client credentials missing: check oauth-client.json');
   }
 
   // Refresh token with Google
@@ -65,8 +71,8 @@ export async function getValidAccessToken(account) {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: CONFIG.CLIENT_ID,
-      client_secret: CONFIG.CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: 'refresh_token',
       refresh_token: account.refresh_token
     })
@@ -79,6 +85,16 @@ export async function getValidAccessToken(account) {
 
   account.access_token = data.access_token;
   account.expiry_timestamp = now + (data.expires_in || 3600);
-  saveAccounts(accountsCache);
+
+  const allAccounts = getAccounts();
+  const idx = allAccounts.findIndex(a => a.id === account.id || a.email === account.email);
+  if (idx !== -1) {
+    allAccounts[idx].access_token = account.access_token;
+    allAccounts[idx].expiry_timestamp = account.expiry_timestamp;
+    saveAccounts(allAccounts);
+  } else {
+    saveAccounts(accountsCache);
+  }
+
   return account.access_token;
 }

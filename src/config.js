@@ -10,24 +10,34 @@ const __dirname = path.dirname(__filename);
 // (see oauth-client.example.json).
 function loadOAuthClient() {
   if (process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
-    return { clientId: process.env.GOOGLE_OAUTH_CLIENT_ID, clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET };
+    return { 
+      clientId: process.env.GOOGLE_OAUTH_CLIENT_ID.trim(), 
+      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET.trim() 
+    };
   }
   const file = path.resolve(__dirname, '../oauth-client.json');
   try {
     const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (data.client_id && data.client_secret) return { clientId: data.client_id, clientSecret: data.client_secret };
+    if (data.client_id && data.client_secret) {
+      return { 
+        clientId: String(data.client_id).trim(), 
+        clientSecret: String(data.client_secret).trim() 
+      };
+    }
   } catch { /* fall through */ }
   console.error('❌ Missing OAuth client: create oauth-client.json (see oauth-client.example.json) or set GOOGLE_OAUTH_CLIENT_ID/SECRET.');
   return { clientId: '', clientSecret: '' };
 }
 
-const oauthClient = loadOAuthClient();
-
 export const CONFIG = {
   PORT: process.env.PORT ? parseInt(process.env.PORT, 10) : 8045,
   HOST: '127.0.0.1',
-  CLIENT_ID: oauthClient.clientId,
-  CLIENT_SECRET: oauthClient.clientSecret,
+  get CLIENT_ID() {
+    return loadOAuthClient().clientId;
+  },
+  get CLIENT_SECRET() {
+    return loadOAuthClient().clientSecret;
+  },
   TOKEN_ENDPOINT: 'https://oauth2.googleapis.com/token',
   UPSTREAM_BASE_URL: 'https://generativelanguage.googleapis.com',
   ACCOUNTS_FILE: path.resolve(__dirname, '../accounts.json'),

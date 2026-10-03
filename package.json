@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
+    "setup": "node scripts/setup.js",
+    "repair": "node scripts/repair.js",
     "add-account": "node src/add-account.js",
     "build:app": "bash scripts/build-native-app.sh",
     "terminals": "bash scripts/start-terminals.sh",

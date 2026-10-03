@@ -1,14 +1,54 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import { CONFIG } from './config.js';
 import { getAccounts, saveAccounts } from './auth.js';
 import { openConversationInWindow, getAppWindow, sendMessageToConversation } from './antigravity-window.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const JETSKI_FILE = 'jetski-standalone-oauth-token';
 const USER_STATUS_PATH = '/exa.language_server_pb.LanguageServerService/GetUserStatus';
 // Asks the Antigravity window to open a conversation (message: { cascade_id }).
 const FOCUS_CONVERSATION_PATH = '/exa.language_server_pb.LanguageServerService/SmartFocusConversation';
+
+export const DEFAULT_GEMINI_DIR = path.join(process.env.USERPROFILE || process.env.HOME || '', '.gemini');
+
+export function detectWindowsVersion() {
+  if (process.platform !== 'win32') return null;
+  return {
+    platform: 'Windows',
+    caption: os.version ? os.version() : 'Windows',
+    release: os.release(),
+    arch: process.arch
+  };
+}
+
+export function detectAntigravityInstall() {
+  if (process.platform === 'win32') {
+    const candidates = [
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'antigravity'),
+      path.join(process.env.PROGRAMFILES || '', 'Antigravity'),
+      path.join(process.env['ProgramFiles(x86)'] || '', 'Antigravity')
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        const exe = path.join(c, 'Antigravity.exe');
+        const ls = path.join(c, 'resources', 'bin', 'language_server.exe');
+        return { root: c, exe, ls, exists: fs.existsSync(exe) };
+      }
+    }
+  } else if (process.platform === 'darwin') {
+    const macApp = '/Applications/Antigravity.app';
+    if (fs.existsSync(macApp)) {
+      return { root: macApp, exe: path.join(macApp, 'Contents/MacOS/Antigravity'), exists: true };
+    }
+  }
+  return null;
+}
 
 export function expiryMillis(account) {
   const raw = Number(account?.expiry_timestamp || 0);
@@ -41,6 +81,9 @@ export function getAntigravityUserDataDir() {
   if (process.platform === 'darwin') {
     return path.join(process.env.HOME || '', 'Library', 'Application Support', 'Antigravity');
   }
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'), 'Antigravity');
+  }
   return path.join(process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || '', '.config'), 'Antigravity');
 }
 
@@ -48,40 +91,69 @@ const KEYCHAIN_SERVICE = 'gemini';
 const KEYCHAIN_ACCOUNT = 'antigravity';
 
 export function writeKeychainToken(account, idToken = '') {
-  if (process.platform !== 'darwin') return; // macOS Keychain only
   const doc = buildJetskiDocument(account, idToken);
   const payloadJson = JSON.stringify(doc);
   const b64 = Buffer.from(payloadJson, 'utf8').toString('base64');
   const fullKeyringValue = `go-keyring-base64:${b64}`;
 
-  // Delete previous generic password first to prevent attribute collisions & prompts
-  try {
-    execFileSync('security', [
-      'delete-generic-password',
-      '-s', KEYCHAIN_SERVICE,
-      '-a', KEYCHAIN_ACCOUNT
-    ], { stdio: 'pipe', timeout: 5000 });
-  } catch {
-    // OK if it didn't exist
-  }
+  if (process.platform === 'darwin') {
+    // Delete previous generic password first to prevent attribute collisions & prompts
+    try {
+      execFileSync('security', [
+        'delete-generic-password',
+        '-s', KEYCHAIN_SERVICE,
+        '-a', KEYCHAIN_ACCOUNT
+      ], { stdio: 'pipe', timeout: 5000 });
+    } catch {
+      // OK if it didn't exist
+    }
 
-  // -A flag allows all applications to access without prompting for keychain unlock password
-  execFileSync('security', [
-    'add-generic-password',
-    '-s', KEYCHAIN_SERVICE,
-    '-a', KEYCHAIN_ACCOUNT,
-    '-l', 'Antigravity',
-    '-w', fullKeyringValue,
-    '-A'
-  ], { stdio: 'pipe', timeout: 8000 });
+    // -A flag allows all applications to access without prompting for keychain unlock password
+    execFileSync('security', [
+      'add-generic-password',
+      '-s', KEYCHAIN_SERVICE,
+      '-a', KEYCHAIN_ACCOUNT,
+      '-l', 'Antigravity',
+      '-w', fullKeyringValue,
+      '-A'
+    ], { stdio: 'pipe', timeout: 8000 });
+  } else if (process.platform === 'win32') {
+    try {
+      const psScript = path.resolve(__dirname, '../scripts/wincred.ps1');
+      execFileSync('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', psScript,
+        '-Action', 'write',
+        '-Target', `${KEYCHAIN_SERVICE}:${KEYCHAIN_ACCOUNT}`,
+        '-User', KEYCHAIN_ACCOUNT,
+        '-Secret', fullKeyringValue
+      ], { encoding: 'utf8', timeout: 8000 });
+      console.log(`[Antigravity] ✅ Windows Credential Manager updated: ${KEYCHAIN_SERVICE}:${KEYCHAIN_ACCOUNT}`);
+    } catch (e) {
+      console.warn(`[Antigravity] Windows Credential Manager update warning: ${e.message}`);
+    }
+  }
 }
 
 export function writeJetskiToken(geminiDir, account, idToken = '') {
-  const target = path.join(geminiDir, JETSKI_FILE);
-  const tmp = `${target}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(buildJetskiDocument(account, idToken), null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, target);
-  try { fs.chmodSync(target, 0o600); } catch { /* already replaced */ }
+  const docJson = JSON.stringify(buildJetskiDocument(account, idToken), null, 2);
+  const dirs = [geminiDir];
+  const userData = getAntigravityUserDataDir();
+  if (userData && !dirs.includes(userData)) dirs.push(userData);
+
+  for (const dir of dirs) {
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, JETSKI_FILE);
+      const tmp = `${target}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, docJson, { mode: 0o600 });
+      fs.renameSync(tmp, target);
+      try { fs.chmodSync(target, 0o600); } catch { /* already replaced */ }
+    } catch (err) {
+      console.warn(`[Antigravity] Could not write ${JETSKI_FILE} to ${dir}: ${err.message}`);
+    }
+  }
 }
 
 export function idTokenEmail(idToken) {
@@ -94,7 +166,55 @@ export function idTokenEmail(idToken) {
   }
 }
 
+let cachedLanguageServer = null;
+
+function discoverLanguageServerWindows() {
+  if (cachedLanguageServer) {
+    try {
+      process.kill(Number(cachedLanguageServer.pid), 0);
+      if (Date.now() - cachedLanguageServer.cachedAt < 5000) {
+        return cachedLanguageServer;
+      }
+    } catch {
+      cachedLanguageServer = null;
+    }
+  }
+
+  let pid = '';
+  let csrf = '';
+  try {
+    const psScript = `Get-CimInstance Win32_Process -Filter "name LIKE '%language_server%'" | Select-Object ProcessId, CommandLine | ConvertTo-Json -Compress`;
+    const stdout = execFileSync('powershell.exe', ['-NoProfile', '-Command', psScript], { encoding: 'utf8', timeout: 5000 });
+    if (!stdout.trim()) return null;
+    let procData = JSON.parse(stdout);
+    if (Array.isArray(procData)) procData = procData[0];
+    pid = String(procData.ProcessId);
+    const cmdLine = procData.CommandLine || '';
+    csrf = cmdLine.match(/--csrf_token\s+([^\s]+)/)?.[1];
+  } catch {
+    return null;
+  }
+  if (!pid || !csrf) return null;
+
+  try {
+    const netstatOut = execFileSync('netstat.exe', ['-ano', '-p', 'tcp'], { encoding: 'utf8', timeout: 5000 });
+    const ports = [];
+    const portRegex = new RegExp(`127\\.0\\.0\\.1:(\\d+)\\s+.*LISTENING\\s+${pid}\\b`, 'g');
+    for (const match of netstatOut.matchAll(portRegex)) {
+      ports.push(Number(match[1]));
+    }
+    if (ports.length === 0) return null;
+    cachedLanguageServer = { pid, csrf, ports, cachedAt: Date.now() };
+    return cachedLanguageServer;
+  } catch {
+    return null;
+  }
+}
+
 export function discoverLanguageServer() {
+  if (process.platform === 'win32') {
+    return discoverLanguageServerWindows();
+  }
   let ps = '';
   try {
     ps = execFileSync('ps', ['-ax', '-o', 'pid=,command='], { encoding: 'utf8' });
@@ -245,10 +365,10 @@ export function restoreConversationAfterRestart(cascadeId, { timeoutMs = 45000, 
         if (onRestored) setTimeout(() => onRestored(cascadeId), 1500);
         return;
       }
-      if (onNewServer) {
+      if (win) {
         if (!reloadedAt) reloadedAt = Date.now();
-        if (Date.now() - reloadedAt >= 2500) { // let the app finish starting up
-          const result = await openConversationInWindow(cascadeId, { lsPorts: server.ports });
+        if (Date.now() - reloadedAt >= 1200) { // let the app finish starting up
+          const result = await openConversationInWindow(cascadeId, { lsPorts: server?.ports || [], mode: 'reload' });
           if (result.ok) {
             console.log(`[Antigravity] ✅ Reopened conversation ${cascadeId}`);
             if (onRestored) setTimeout(() => onRestored(cascadeId), 1500);
@@ -289,7 +409,7 @@ export function applyAllCredentials(geminiDir, account, idToken = '') {
   }
 }
 
-export function getActiveAntigravityConversationId(geminiDir = path.join(process.env.HOME || '', '.gemini')) {
+export function getActiveAntigravityConversationId(geminiDir = DEFAULT_GEMINI_DIR) {
   try {
     const brainDir = path.join(geminiDir, 'antigravity', 'brain');
     if (!fs.existsSync(brainDir)) return null;
@@ -436,7 +556,7 @@ export function readTranscriptTail(file, maxBytes = 512 * 1024) {
 }
 
 /** Activity across all recently touched Antigravity conversations. */
-export function getAntigravityActivity(geminiDir = path.join(process.env.HOME || '', '.gemini'), options = {}) {
+export function getAntigravityActivity(geminiDir = DEFAULT_GEMINI_DIR, options = {}) {
   const opts = { ...ACTIVITY_DEFAULTS, ...options };
   const now = Date.now();
   const conversations = [];
@@ -468,42 +588,48 @@ export function getAntigravityActivity(geminiDir = path.join(process.env.HOME ||
 }
 
 /** True while any Antigravity agent turn is still in progress. */
-export function isAntigravitySessionBusy(geminiDir = path.join(process.env.HOME || '', '.gemini'), quietMs = ACTIVITY_DEFAULTS.quietMs) {
+export function isAntigravitySessionBusy(geminiDir = DEFAULT_GEMINI_DIR, quietMs = ACTIVITY_DEFAULTS.quietMs) {
   return getAntigravityActivity(geminiDir, { quietMs }).busy;
 }
 
-export function preserveConversationLayout(convId, storagePath = path.join(getAntigravityUserDataDir(), 'app_storage.json')) {
-  if (!convId) return false;
+export function preserveConversationLayout(convId, storagePath = path.join(getAntigravityUserDataDir(), 'app_storage.json'), email = null) {
+  if (!convId && !email) return false;
   try {
     if (!fs.existsSync(storagePath)) return false;
     const content = fs.readFileSync(storagePath, 'utf8');
     const data = JSON.parse(content || '{}');
 
-    // 1. Ensure conversation pane layout exists
-    const layoutKey = `antigravity-multi-conversation-layout-v3-${convId}`;
-    if (!data[layoutKey]) {
-      data[layoutKey] = JSON.stringify({
-        rootNode: { type: 'pane', id: 'pane-1', cascadeId: convId },
-        focusedPaneId: 'pane-1'
-      });
+    if (email) {
+      data['jetski.onboarding.lastLoginUsername'] = email;
     }
 
-    // 2. Ensure layout index contains this conversation as the active pane
-    let indexList = [];
-    try {
-      indexList = JSON.parse(data['antigravity-multi-conversation-layout-v3-index'] || '[]');
-    } catch {
-      indexList = [];
+    if (convId) {
+      // 1. Ensure conversation pane layout exists
+      const layoutKey = `antigravity-multi-conversation-layout-v3-${convId}`;
+      if (!data[layoutKey]) {
+        data[layoutKey] = JSON.stringify({
+          rootNode: { type: 'pane', id: 'pane-1', cascadeId: convId },
+          focusedPaneId: 'pane-1'
+        });
+      }
+
+      // 2. Ensure layout index contains this conversation as the active pane
+      let indexList = [];
+      try {
+        indexList = JSON.parse(data['antigravity-multi-conversation-layout-v3-index'] || '[]');
+      } catch {
+        indexList = [];
+      }
+
+      // Move or add this conversation to the very front so it opens directly
+      indexList = indexList.filter(group => !(Array.isArray(group) && group.includes(convId)));
+      indexList.unshift([convId]);
+
+      data['antigravity-multi-conversation-layout-v3-index'] = JSON.stringify(indexList);
     }
-
-    // Move or add this conversation to the very front so it opens directly
-    indexList = indexList.filter(group => !(Array.isArray(group) && group.includes(convId)));
-    indexList.unshift([convId]);
-
-    data['antigravity-multi-conversation-layout-v3-index'] = JSON.stringify(indexList);
 
     fs.writeFileSync(storagePath, JSON.stringify(data, null, 2), 'utf8');
-    console.log(`[Antigravity] ✅ Preserved active conversation ${convId} in app_storage.json`);
+    if (convId) console.log(`[Antigravity] ✅ Preserved active conversation ${convId} in app_storage.json`);
     return true;
   } catch (err) {
     console.error(`[Antigravity] Could not preserve conversation layout: ${err.message}`);
@@ -511,7 +637,7 @@ export function preserveConversationLayout(convId, storagePath = path.join(getAn
   }
 }
 
-export async function syncAntigravityAccount(account, geminiDir = path.join(process.env.HOME || '', '.gemini'), options = {}) {
+export async function syncAntigravityAccount(account, geminiDir = DEFAULT_GEMINI_DIR, options = {}) {
   const { restartLanguageServer = false, force = false, idleMs = ACTIVITY_DEFAULTS.quietMs } = options;
 
   // A newer explicit switch request supersedes any switch still waiting for idle.
@@ -525,6 +651,8 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
     return { ok: false, reason: 'missing account token' };
   }
 
+  const wanted = (account.email || '').trim().toLowerCase();
+
   let idToken = '';
   try {
     idToken = await refreshGoogleToken(account);
@@ -535,13 +663,12 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
   // 1. Always identify and preserve the active conversation layout
   const activeConvId = options.restoreConversationId || options.conversationId || getActiveAntigravityConversationId(geminiDir);
   if (activeConvId) {
-    preserveConversationLayout(activeConvId);
+    preserveConversationLayout(activeConvId, undefined, wanted);
   }
 
   // 2. Write all credentials (Keychain, jetski, oauth_creds)
   applyAllCredentials(geminiDir, account, idToken);
 
-  const wanted = (account.email || '').trim().toLowerCase();
   const current = await readLanguageServerEmail();
 
   // If language server restart is not requested, keep process alive
@@ -585,26 +712,31 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
   }
 
   if (current && current === wanted) {
-    if (activeConvId) preserveConversationLayout(activeConvId);
+    if (activeConvId) preserveConversationLayout(activeConvId, undefined, wanted);
     return { ok: true, email: current, activeConversationId: activeConvId };
   }
 
   const server = discoverLanguageServer();
   if (!server) {
-    if (activeConvId) preserveConversationLayout(activeConvId);
+    if (activeConvId) preserveConversationLayout(activeConvId, undefined, wanted);
     return { ok: true, email: wanted, note: 'credentials updated; language server was not running', activeConversationId: activeConvId };
   }
 
   // 3. Preserve conversation layout immediately before killing language_server
   if (activeConvId) {
-    preserveConversationLayout(activeConvId);
+    preserveConversationLayout(activeConvId, undefined, wanted);
   }
 
-  // 4. Terminate language_server child process (SIGKILL); Antigravity's supervisor respawns it
+  // 4. Terminate language_server child process; Antigravity's supervisor respawns it
   //    with the credentials we just wrote. It gives up after 3 crashes in 60s, hence the gap guard.
   try {
     lastRestartAt = Date.now();
-    process.kill(Number(server.pid), 'SIGKILL');
+    cachedLanguageServer = null;
+    if (process.platform === 'win32') {
+      execFileSync('taskkill.exe', ['/F', '/PID', String(server.pid)], { stdio: 'ignore' });
+    } else {
+      process.kill(Number(server.pid), 'SIGKILL');
+    }
   } catch (error) {
     return { ok: false, reason: error.message, email: current };
   }
@@ -612,7 +744,7 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
   // 5. Post-kill re-assert write (credentials and conversation layout)
   try {
     applyAllCredentials(geminiDir, account, idToken);
-    if (activeConvId) preserveConversationLayout(activeConvId);
+    if (activeConvId) preserveConversationLayout(activeConvId, undefined, wanted);
   } catch (e) {
     console.warn(`[Antigravity] Post-kill re-assert write warning: ${e.message}`);
   }
@@ -625,7 +757,7 @@ export async function syncAntigravityAccount(account, geminiDir = path.join(proc
     email = await readLanguageServerEmail();
     if (email === wanted) {
       if (activeConvId) {
-        preserveConversationLayout(activeConvId);
+        preserveConversationLayout(activeConvId, undefined, wanted);
         restoreConversationAfterRestart(activeConvId, { onRestored: options.onConversationRestored });
       }
       return { ok: true, email, restarted: true, activeConversationId: activeConvId };
@@ -666,7 +798,7 @@ export function cancelPendingSwitch() {
 
 export function scheduleLanguageServerSwitch(account, options = {}) {
   const {
-    geminiDir = path.join(process.env.HOME || '', '.gemini'),
+    geminiDir = DEFAULT_GEMINI_DIR,
     idleMs = ACTIVITY_DEFAULTS.quietMs,
     pollMs = 2000,
     maxWaitMs = 30 * 60 * 1000,

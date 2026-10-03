@@ -170,9 +170,10 @@ export function updateAccountLiveQuota(accountId, liveQuota) {
     acc.is403Banned = true;
     acc.banReason = '403 Forbidden / Restricted by Google';
     acc.enabled = false;
-  } else {
+  } else if (!liveQuota.error) {
     acc.is403Banned = false;
     acc.banReason = null;
+    acc.syncError = null;
     acc.enabled = true; // a successful quota check lifts an earlier 403 block
     acc.subscriptionTier = liveQuota.subscriptionTier || acc.subscriptionTier || 'PRO';
     acc.lastSynced = liveQuota.lastSynced || new Date().toISOString();
@@ -183,6 +184,8 @@ export function updateAccountLiveQuota(accountId, liveQuota) {
     if (liveQuota.quotas) {
       acc.quotas = { ...acc.quotas, ...liveQuota.quotas };
     }
+  } else {
+    acc.syncError = liveQuota.error;
   }
 
   computeBestAccount();
@@ -350,10 +353,10 @@ function updateLoadMetrics() {
   stats.global.loadPercentage = Math.min(100, Math.round(concurrencyLoad + rpmLoad));
 }
 
-const GEMINI_DIR = path.resolve(process.env.HOME || '/Users/nabiaz', '.gemini');
+const GEMINI_DIR = path.resolve(process.env.USERPROFILE || process.env.HOME || '', '.gemini');
 const GEMINI_ACCOUNTS_FILE = path.join(GEMINI_DIR, 'google_accounts.json');
 const GEMINI_CREDS_FILE = path.join(GEMINI_DIR, 'oauth_creds.json');
-const BRAIN_DIR = path.join(GEMINI_DIR, 'antigravity/brain');
+const BRAIN_DIR = path.join(GEMINI_DIR, 'antigravity', 'brain');
 
 let broadcastCallback = null;
 export function setBroadcastCallback(cb) {
