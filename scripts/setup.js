@@ -190,6 +190,12 @@ export async function runSetup() {
   console.log('   🚀 Antigravity Gateway - Auto-Setup & Onboarding   ');
   console.log('======================================================\n');
 
+  const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+  if (nodeMajor < 22) {
+    log(`Node.js 22 or higher is required (current: ${process.version}). Please update from https://nodejs.org`, 'error');
+    process.exit(1);
+  }
+
   log(`Operating System: ${process.platform === 'win32' ? (os.version ? os.version() : 'Windows') : os.type()} (${os.release()} ${process.arch})`);
 
   const install = detectAntigravityInstall();

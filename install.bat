@@ -20,33 +20,26 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [1/4] Checking Node.js environment...
-node -v
-echo.
-
-echo [2/4] Installing project dependencies...
-if not exist "node_modules\" (
-    echo Installing npm packages...
-    call npm install --omit=dev
-) else (
-    echo Dependencies already installed. Updating if necessary...
-    call npm install --omit=dev
-)
+echo [1/3] Checking Node.js environment...
+node -e "const v = parseInt(process.versions.node.split('.')[0]); if (v < 22) { console.error('\n[ERROR] Node.js version ' + process.version + ' detected.\nAntigravity Gateway requires Node.js 22 or higher (built-in SQLite and Fetch support).\nPlease upgrade from https://nodejs.org'); process.exit(1); } else { console.log('Node.js ' + process.version + ' OK (Zero runtime dependencies required)'); }"
 if %errorlevel% neq 0 (
-    echo [WARNING] npm install reported an issue. Continuing with setup...
+    echo.
+    pause
+    exit /b 1
 )
 echo.
 
-echo [3/4] Running automated system configuration...
+echo [2/3] Configuring Antigravity credentials and environment...
 node scripts/setup.js
 if %errorlevel% neq 0 (
+    echo.
     echo [ERROR] Setup script encountered an error.
     pause
     exit /b 1
 )
 echo.
 
-echo [4/4] Installation Complete!
+echo [3/3] Installation Complete!
 echo.
 echo Antigravity Gateway is now configured for your system.
 echo A shortcut 'Antigravity Gateway' has been placed on your Desktop.
